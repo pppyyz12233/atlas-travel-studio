@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>旅行规划师</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS — Apple Design + Emil Design Engineering
+   ============================================================ */
+:root {
+  /* Surfaces — Apple §12: translucent materials */
+  --glass-bg: rgba(255,255,255,0.72);
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-border: rgba(255,255,255,0.5);
+  --sidebar-bg: rgba(250,250,252,0.78);
+  --content-bg: #f5f5f7;
+  --card-bg: #ffffff;
+
+  /* Typography — Apple §15: system font, optical sizing */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", monospace;
+
+  /* Colors */
+  --blue: #0071e3;
+  --blue-hover: #0077ed;
+  --green: #34c759;
+  --red: #ff3b30;
+  --amber: #ff9500;
+  --purple: #af52de;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #aeaeb2;
+  --border: rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+
+  /* Easings — Emil: custom curves beat built-in */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Timing — Emil: UI < 300ms */
+  --fast: 120ms;
+  --normal: 200ms;
+  --slow: 300ms;
+  --drawer: 400ms;
+}
+
+/* Reset */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--content-bg);color:var(--text);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+/* ============================================================
+   LAYOUT — Three-column, glass sidebar
+   ============================================================ */
+.app{display:flex;height:100vh}
+
+/* ---- Sidebar — Apple §12: translucent material ---- */
+.sidebar{
+  width:280px;flex-shrink:0;
+  background:var(--sidebar-bg);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  z-index:10;
+}
+.sidebar-header{
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sidebar-logo{
+  width:32px;height:32px;border-radius:9px;
+  background:linear-gradient(135deg,#0071e3,#5e5ce6);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:16px;
+}
+.sidebar-title{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.sidebar-form{padding:16px 20px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1}
+.sidebar-footer{padding:12px 20px;border-top:1px solid var(--border);font-size:12px}
+
+/* ---- Form ---- */
+.field-group{display:flex;flex-direction:column;gap:3px}
+.field-label{font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.04em}
+.field{
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:10px 14px;font-size:14px;font-family:var(--font);
+  width:100%;outline:none;background:rgba(255,255,255,0.6);
+  transition:border-color var(--fast) var(--ease-out),box-shadow var(--fast) var(--ease-out);
+  color:var(--text);
+}
+.field:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(0,113,227,0.12);
+}
+.field-row{display:flex;gap:8px}
+.field-row .field-group{flex:1}
+
+/* ---- Buttons — Emil: scale(0.97) on press, 160ms ---- */
+.btn{
+  background:var(--blue);color:#fff;border:none;
+  border-radius:12px;padding:12px 20px;font-size:15px;
+  font-weight:600;font-family:var(--font);cursor:pointer;
+  transition:transform var(--fast) var(--ease-out),background var(--fast) var(--ease-out),opacity var(--fast) var(--ease-out);
+  will-change:transform;
+  letter-spacing:-0.01em;
+}
+.btn:active{transform:scale(0.97)}
+.btn:hover{background:var(--blue-hover)}
+.btn:disabled{opacity:0.4;pointer-events:none}
+.btn-full{width:100%;padding:13px;font-size:15px}
+
+/* ---- Progress ---- */
+.progress-box{margin-top:4px}
+.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.progress-counter{font-size:11px;font-weight:600;color:var(--text-secondary)}
+.progress-timer{font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)}
+.progress-track{height:3px;background:rgba(0,0,0,0.06);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:2px;
+  transition:width var(--slow) var(--ease-out);will-change:width}
+.progress-step{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12px}
+.progress-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--text-tertiary);
+  transition:all var(--normal) var(--ease-out)}
+.progress-dot.running{background:var(--blue);box-shadow:0 0 0 4px rgba(0,113,227,0.15)}
+.progress-dot.done{background:var(--green)}
+.progress-dot.failed{background:var(--red)}
+.progress-label{color:var(--text-tertiary);flex:1;transition:color var(--normal) var(--ease-out)}
+.progress-label.active{color:var(--text);font-weight:600}
+.progress-meta{font-size:10px;color:var(--text-tertiary);font-family:var(--font-mono)}
+
+/* ---- Chat Area ---- */
+.chat-panel{flex:1;display:flex;flex-direction:column;background:var(--content-bg);min-width:0}
+.chat-messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:8px;
+  scroll-behavior:smooth}
+.chat-input-bar{padding:14px 20px;border-top:1px solid var(--border);
+  background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  display:flex;gap:10px;align-items:center}
+.chat-input{
+  flex:1;border:1.5px solid var(--border);border-radius:12px;
+  padding:11px 16px;font-size:14px;font-family:var(--font);outline:none;
+  background:rgba(255,255,255,0.5);
+  transition:border-color var(--fast) var(--ease-out),box-shadow var(--fast) var(--ease-out);
+  color:var(--text);
+}
+.chat-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,0.12)}
+
+/* ---- Welcome ---- */
+.welcome{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text-tertiary)}
+.welcome-icon{font-size:52px;margin-bottom:16px}
+.welcome-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.02em}
+.welcome-sub{font-size:13px;margin-top:6px;text-align:center;line-height:1.6}
+.welcome-hint{font-size:12px;margin-top:16px;color:var(--text-tertiary)}
+
+/* ---- Chat Bubbles ---- */
+.bubble{max-width:82%;padding:12px 18px;font-size:14px;line-height:1.6;word-wrap:break-word}
+.bubble-user{background:var(--blue);color:#fff;border-radius:18px 18px 4px 18px;margin-left:auto}
+.bubble-ai{background:var(--card-bg);border:1px solid var(--border);border-radius:18px 18px 18px 4px;
+  box-shadow:var(--shadow-sm)}
+
+/* ---- Markdown ---- */
+.md h2{font-size:1.1em;font-weight:700;color:var(--blue);margin:.5em 0 .2em}
+.md h3{font-size:1em;font-weight:600;color:var(--text);margin:.4em 0 .1em}
+.md table{width:100%;border-collapse:collapse;margin:.4em 0;font-size:.88em}
+.md th{background:#f5f5f7;font-weight:600;text-align:left;padding:6px 10px;border:1px solid var(--border)}
+.md td{padding:6px 10px;border:1px solid var(--border)}
+.md p{margin:.3em 0}
+.md ul,.md ol{padding-left:1.3em;margin:.3em 0}
+
+/* ---- Step Card — Emil: staggered entry ---- */
+.step-card{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:12px;
+  padding:10px 14px;display:flex;align-items:center;gap:10px;
+  box-shadow:var(--shadow-sm);
+  opacity:0;transform:translateY(8px);
+  animation:stepIn var(--normal) var(--ease-out) forwards;
+}
+@keyframes stepIn{to{opacity:1;transform:translateY(0)}}
+.step-card .sc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.step-card .sc-icon{font-size:16px;flex-shrink:0}
+.step-card .sc-body{flex:1;min-width:0}
+.step-card .sc-name{font-weight:600;font-size:13px;color:var(--text)}
+.step-card .sc-detail{font-size:11px;color:var(--text-secondary);margin-top:1px}
+.step-card .sc-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;flex-shrink:0}
+.sc-badge.ok{background:#e8f8ed;color:var(--green)}
+.sc-badge.fail{background:#fef0ef;color:var(--red)}
+
+/* ---- Typing indicator — Apple-style bounce ---- */
+.typing-indicator{display:flex;gap:5px;padding:8px 0}
+.typing-indicator span{width:7px;height:7px;border-radius:50%;background:var(--text-tertiary);
+  animation:typingBounce 1.4s infinite var(--ease-in-out)}
+.typing-indicator span:nth-child(2){animation-delay:0.16s}
+.typing-indicator span:nth-child(3){animation-delay:0.32s}
+@keyframes typingBounce{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-5px)}}
+
+/* ---- Map Panel — Apple §12: floating chrome ---- */
+.map-panel{width:440px;flex-shrink:0;display:flex;flex-direction:column;
+  background:var(--card-bg);border-left:1px solid var(--border);z-index:5}
+.map-header{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:600;color:var(--text-secondary)}
+.map-container{flex:1;min-height:0;position:relative}
+#mapDiv{width:100%;height:100%}
+.map-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);font-size:13px;pointer-events:none;z-index:1;background:var(--content-bg)}
+.map-legend{padding:6px 16px;border-top:1px solid var(--border);flex-shrink:0;
+  display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-tertiary)}
+.map-legend-item{display:flex;align-items:center;gap:4px}
+.map-legend-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* ---- Info Window ---- */
+.amap-info-content{font-size:13px;line-height:1.5;max-width:220px;font-family:var(--font)}
+.amap-info-content h4{margin:0 0 4px;font-size:14px;color:var(--text);letter-spacing:-0.01em}
+.amap-info-content p{margin:2px 0;color:var(--text-secondary);font-size:12px}
+.iw-tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;color:#fff;margin-bottom:4px}
+
+/* ============================================================
+   REDUCED MOTION — Apple §14
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+  .step-card{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<!-- ===== SIDEBAR — glass ===== -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">🗺</div>
+    <span class="sidebar-title">旅行规划师</span>
+  </div>
+  <div class="sidebar-form">
+    <div class="field-group"><label class="field-label">目的地</label><input id="dest" class="field" placeholder="东京" value="东京"></div>
+    <div class="field-group"><label class="field-label">出发地</label><input id="from" class="field" placeholder="上海" value="上海"></div>
+    <div class="field-group"><label class="field-label">出发日期</label><input id="startDate" class="field" type="date" value="2026-08-01"></div>
+    <div class="field-row">
+      <div class="field-group"><label class="field-label">天数</label><input id="days" class="field" type="number" value="5" style="text-align:center"></div>
+      <div class="field-group"><label class="field-label">人数</label><input id="ppl" class="field" type="number" value="2" style="text-align:center"></div>
+      <div class="field-group"><label class="field-label">预算</label><input id="budget" class="field" type="number" value="8000" style="text-align:center"></div>
+    </div>
+    <button id="goBtn" class="btn btn-full" onclick="doGo()">开始规划</button>
+    <div id="progBox" class="progress-box" style="display:none"></div>
+  </div>
+  <div class="sidebar-footer">
+    <span id="loginBtn" onclick="showLogin()" style="color:var(--blue);cursor:pointer;font-weight:500">登入账号</span>
+    <span id="userBox" style="display:none;align-items:center;gap:6px">
+      <span id="uAv" style="width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:600"></span>
+      <span id="uNm" style="font-weight:500"></span>
+      <span onclick="logout()" style="color:var(--text-tertiary);cursor:pointer;margin-left:auto;font-size:11px">退出</span>
+    </span>
+  </div>
+</aside>
+
+<!-- ===== CHAT ===== -->
+<main class="chat-panel">
+  <div class="chat-messages" id="chatBox">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">🗺</div>
+      <div class="welcome-title">想去哪里旅行？</div>
+      <div class="welcome-sub">填写左边信息开始规划<br>或在下方直接描述你的旅行计划</div>
+      <div class="welcome-hint">例："从上海去东京5天，人均8000，想去秋叶原和浅草寺"</div>
+    </div>
+  </div>
+  <div class="chat-input-bar">
+    <input id="chatInput" class="chat-input" placeholder="描述旅行计划，或输入修改请求…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}">
+    <button class="btn" onclick="send()" style="padding:11px 22px">发送</button>
+  </div>
+</main>
+
+<!-- ===== MAP ===== -->
+<section class="map-panel" id="rightPanel">
+  <div class="map-header">
+    <span>地图标注</span>
+    <span id="markerCount" style="font-weight:400;color:var(--text-tertiary)">0 个标记</span>
+  </div>
+  <div class="map-container">
+    <div id="mapDiv"></div>
+    <div class="map-placeholder" id="mapPlaceholder">加载地图中...</div>
+  </div>
+  <div class="map-legend">
+    <span class="map-legend-item"><span class="map-legend-dot" style="background:#ff3b30"></span>航班</span>
+    <span class="map-legend-item"><span class="map-legend-dot" style="background:#0071e3"></span>酒店</span>
+    <span class="map-legend-item"><span class="map-legend-dot" style="background:#34c759"></span>景点</span>
+    <span class="map-legend-item"><span class="map-legend-dot" style="background:#af52de"></span>日程</span>
+    <span class="map-legend-item"><span class="map-legend-dot" style="background:#ff9500"></span>预算</span>
+  </div>
+</section>
+</div>
+
+<!-- ===== AMAP ===== -->
+<script>
+window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
+</script>
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
+
+<script>
+/* ================================================================
+   STATE
+   ================================================================ */
+var A="/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
+var map=null,amapReady=false,_markers=[],_infoWindow=null,_stepResults={};
+var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null;
+
+var STEP_COLORS={flight:"#ff3b30",hotel:"#0071e3",attraction:"#34c759",itinerary:"#af52de",budget:"#ff9500"};
+var STEP_ICONS={flight:"✈️",hotel:"🏨",attraction:"🎯",itinerary:"📋",budget:"💰"};
+
+/* ================================================================
+   MAP
+   ================================================================ */
+function initMap(){
+  try{
+    var ph=document.getElementById("mapPlaceholder");if(ph)ph.style.display="none";
+    map=new AMap.Map("mapDiv",{zoom:13,center:[113.2644,23.1291],resizeEnable:true});
+    _infoWindow=new AMap.InfoWindow({offset:new AMap.Pixel(0,-30)});
+    amapReady=true;
+  }catch(e){console.error("[Map]",e)}
+}
+window.onload=function(){
+  if(window.AMap&&typeof AMap.Map==="function"){initMap();return}
+  var t=0,iv=setInterval(function(){t++;
+    if(window.AMap&&typeof AMap.Map==="function"){clearInterval(iv);initMap()}
+    else if(t>50){clearInterval(iv);var ph=document.getElementById("mapPlaceholder");if(ph)ph.textContent="地图加载失败"}
+  },200);
+};
+
+function clearMarkers(){if(map)map.clearMap();_markers=[];updateMarkerCount()}
+function updateMarkerCount(){var el=document.getElementById("markerCount");if(el)el.textContent=_markers.length+" 个标记"}
+
+function addMapMarker(lng,lat,title,subtitle,color,stepName){
+  if(!amapReady)return;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="'+color+'"/><circle cx="12" cy="11" r="5" fill="white"/></svg>';
+  var m=new AMap.Marker({position:[lng,lat],title:title,
+    icon:new AMap.Icon({size:new AMap.Size(24,32),image:"data:image/svg+xml,"+encodeURIComponent(svg),imageSize:new AMap.Size(24,32)}),
+    zIndex:100,extData:{step:stepName,color:color,title:title,subtitle:subtitle}});
+  m.on("click",function(){var d=m.getExtData();
+    _infoWindow.setContent('<div class="amap-info-content"><span class="iw-tag" style="background:'+(d.color||"#0071e3")+'">'+d.step+'</span><h4>'+d.title+'</h4><p>'+d.subtitle+'</p></div>');
+    _infoWindow.open(map,m.getPosition())});
+  map.add(m);_markers.push(m);updateMarkerCount()
+}
+
+function searchAndMark(keyword,city,stepName,color){
+  if(!amapReady||!keyword)return;
+  new AMap.PlaceSearch({city:city||"全国",pageSize:5}).search(keyword,function(s,r){
+    if(s!=="complete"||!r.poiList)return;
+    r.poiList.pois.slice(0,5).forEach(function(p){addMapMarker(p.location.lng,p.location.lat,p.name,(p.address||"")+" | "+keyword,color,stepName)});
+    if(_markers.length)map.setFitView(null,false,[60,60,60,320])
+  })
+}
+
+function stepSearchKeyword(name,dest){var n=name.toLowerCase();if(n.includes("航班")||n.includes("flight"))return dest+" 机场";if(n.includes("酒店")||n.includes("hotel"))return dest+" 酒店";if(n.includes("景点")||n.includes("attraction"))return dest+" 景点";return null}
+
+/* ================================================================
+   PROGRESS
+   ================================================================ */
+function initProgress(steps){
+  _stepNames=steps;_stepDoneCount=0;_progStartTime=Date.now();
+  var box=document.getElementById("progBox");box.style.display="block";
+  var h='<div class="progress-header"><span class="progress-counter">准备中...</span><span class="progress-timer" id="pgTimer">0.0s</span></div>';
+  h+='<div class="progress-track"><div class="progress-fill" id="pgFill" style="width:0%"></div></div><div id="progList">';
+  steps.forEach(function(s,i){h+='<div class="progress-step" id="prg'+i+'"><div class="progress-dot" id="pd'+i+'"></div><span class="progress-label" id="pl'+i+'">'+s+'</span><span class="progress-meta" id="pm'+i+'"></span></div>'});
+  h+='</div>';box.innerHTML=h;
+  if(_progTimer)clearInterval(_progTimer);
+  _progTimer=setInterval(function(){var el=document.getElementById("pgTimer");if(el)el.textContent=((Date.now()-_progStartTime)/1000).toFixed(1)+"s"},100)
+}
+function findStepIdx(name){for(var i=0;i<_stepNames.length;i++)if(_stepNames[i]===name)return i;return -1}
+function updProgress(name,status,meta){
+  var si=findStepIdx(name);if(si<0)return;
+  var d=document.getElementById("pd"+si),l=document.getElementById("pl"+si),m=document.getElementById("pm"+si);
+  if(d)d.className="progress-dot "+(status==="running"?"running":status==="done"?"done":status==="failed"?"failed":"");
+  if(l)l.className="progress-label "+(status==="running"?"active":"");
+  if(m&&meta)m.textContent=meta;
+  if(status==="done"||status==="failed")_stepDoneCount++;
+  var pct=_stepNames.length?Math.round(_stepDoneCount/_stepNames.length*100):0;
+  var fill=document.getElementById("pgFill");if(fill)fill.style.width=pct+"%";
+  var counter=document.querySelector(".progress-counter");if(counter)counter.textContent="已完成 "+_stepDoneCount+"/"+_stepNames.length
+}
+function stopProgressTimer(){if(_progTimer){clearInterval(_progTimer);_progTimer=null}}
+
+/* ================================================================
+   AUTH (simplified, same logic)
+   ================================================================ */
+if(tk)loadU();
+function loadU(){fetch(A+"/auth/me",{headers:{Authorization:"Bearer "+tk}}).then(function(r){if(r.status===401){tk=null;localStorage.removeItem("t");return}return r.json()}).then(function(d){if(d&&d.code===200){document.getElementById("loginBtn").style.display="none";document.getElementById("userBox").style.display="flex";document.getElementById("uNm").textContent=d.data.username;document.getElementById("uAv").textContent=d.data.username[0].toUpperCase()}}).catch(function(){tk=null;localStorage.removeItem("t")})}
+function showLogin(){isReg=false;document.getElementById("loginModal")?closeLogin():null;var m=document.createElement("div");m.id="loginModal";m.className="login-overlay";m.innerHTML='<div class="login-card"><div class="login-title" id="loginTitle">登入账号</div><div class="login-tabs"><button id="tabE" class="login-tab active" onclick="swT(\'email\')">邮箱</button><button id="tabP" class="login-tab" onclick="swT(\'phone\')">手机</button></div><form onsubmit="doLogin(event)" class="login-form"><div id="ef"><input id="lem" class="field" placeholder="邮箱地址"></div><div id="pf" style="display:none"><input id="lph" class="field" placeholder="手机号"></div><input id="lnm" class="field" placeholder="用户名"><input id="lpw" class="field" type="password" placeholder="密码"><button type="submit" class="btn btn-full">登入</button></form><div onclick="tgL()" id="tgLbl" class="login-toggle">没有账号？去注册</div></div>';m.onclick=function(e){if(e.target===m)closeLogin()};document.body.appendChild(m)}
+function closeLogin(){var m=document.getElementById("loginModal");if(m)m.remove()}
+function swT(t){lt=t;var ef=document.getElementById("ef"),pf=document.getElementById("pf"),te=document.getElementById("tabE"),tp=document.getElementById("tabP");ef.style.display=t==="email"?"block":"none";pf.style.display=t==="phone"?"block":"none";te.className="login-tab"+(t==="email"?" active":"");tp.className="login-tab"+(t==="phone"?" active":"")}
+function tgL(){isReg=!isReg;document.getElementById("loginTitle").textContent=isReg?"创建账号":"登入账号";document.getElementById("tgLbl").textContent=isReg?"已有账号？去登入":"没有账号？去注册";document.getElementById("lnm").style.display=isReg?"block":"none"}
+function doLogin(e){e.preventDefault();var em=document.getElementById("lem").value,ph=document.getElementById("lph").value,nm=document.getElementById("lnm").value,pw=document.getElementById("lpw").value;if(isReg){fetch(A+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:em||null,phone:ph||null,username:nm,password:pw})}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU()}else alert(d.message)})}else{var ep=lt==="email"?"/auth/login/email":"/auth/login/phone";var body=lt==="email"?{email:em,password:pw}:{phone:ph,password:pw};fetch(A+ep,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU()}else alert(d.message)})}}
+function logout(){tk=null;localStorage.removeItem("t");location.reload()}
+
+/* ================================================================
+   CHAT
+   ================================================================ */
+function addBubble(role,text){var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";var d=document.createElement("div");d.style.cssText="display:flex;"+(role==="user"?"justify-content:flex-end":"justify-content:flex-start");var cls=role==="user"?"bubble bubble-user":"bubble bubble-ai";var content=role==="assistant"?marked.parse(text):text.replace(/\n/g,"<br>");d.innerHTML='<div class="'+cls+'"><div class="md">'+content+'</div></div>';el.appendChild(d);el.scrollTop=el.scrollHeight;return d}
+
+function addStepCard(name,status,iter,tools,workerType){
+  var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";
+  var ok=status==="done",icon=STEP_ICONS[workerType]||"",color=STEP_COLORS[workerType]||"#0071e3";
+  var detail=(ok?"完成":"失败")+" · "+iter+" 轮推理"+(tools?" · "+tools+" 次工具调用":"");
+  var d=document.createElement("div");d.className="step-card";
+  d.innerHTML='<div class="sc-icon">'+icon+'</div><div class="sc-body"><div class="sc-name">'+name+'</div><div class="sc-detail">'+detail+'</div></div><span class="sc-badge '+(ok?"ok":"fail")+'">'+(ok?"完成":"失败")+'</span>';
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+  // Stagger delay — based on card index
+  var idx=el.querySelectorAll(".step-card").length;
+  d.style.animationDelay=(idx-1)*0.05+"s";
+}
+
+function showTyping(){var el=document.getElementById("chatBox"),t=document.getElementById("typingInd");if(t)t.remove();var d=document.createElement("div");d.id="typingInd";d.style.cssText="display:flex;justify-content:flex-start";d.innerHTML='<div class="bubble bubble-ai" style="padding:8px 18px"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';el.appendChild(d);el.scrollTop=el.scrollHeight}
+function hideTyping(){var t=document.getElementById("typingInd");if(t)t.remove()}
+
+/* ================================================================
+   MAIN FLOW
+   ================================================================ */
+function doGo(){
+  var f=document.getElementById("from").value||"上海",t=document.getElementById("dest").value||"东京",dt=document.getElementById("startDate").value||"";
+  document.getElementById("chatInput").value="从"+f+"去"+t+(dt?"，"+dt+"出发":"")+"，"+document.getElementById("days").value+"天，"+document.getElementById("ppl").value+"人，人均"+document.getElementById("budget").value+"元";
+  send()
+}
+
+async function send(){
+  var msg=document.getElementById("chatInput").value.trim();if(!msg)return;
+  if(!tk){showLogin();return}
+  document.getElementById("chatInput").value="";addBubble("user",msg);showTyping();
+  var btn=document.getElementById("goBtn");btn.disabled=true;btn.textContent="规划中...";
+  _stepNames=[];_stepDoneCount=0;clearMarkers();_stepResults={};
+  try{
+    var r=await fetch(A+"/chat/stream",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({message:msg,conversation_id:cid})});
+    if(r.status===401){tk=null;localStorage.removeItem("t");showLogin();addBubble("assistant","请先登录");btn.disabled=false;btn.textContent="开始规划";hideTyping();return}
+    if(!r.ok){addBubble("assistant","服务器错误: "+r.status);btn.disabled=false;btn.textContent="开始规划";hideTyping();return}
+    var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
+    while(true){var v=await reader.read();if(v.done)break;buf+=decoder.decode(v.value,{stream:true});var lines=buf.split("\n");buf=lines.pop()||"";for(var i=0;i<lines.length;i++){var line=lines[i].trim();if(!line.startsWith("data: "))continue;try{handleSSE(JSON.parse(line.slice(6)))}catch(e){} }}
+  }catch(e){addBubble("assistant","无法连接服务器");hideTyping()}
+  btn.disabled=false;btn.textContent="开始规划";stopProgressTimer()
+}
+
+function handleSSE(evt){
+  var dest=document.getElementById("dest").value||"东京";
+  if(evt.event==="plan"){initProgress(evt.steps||[])}
+  else if(evt.event==="step_start"){updProgress(evt.name,"running",evt.parallel?"并行":"");
+    if(amapReady&&_stepDoneCount===0){new AMap.PlaceSearch({city:dest}).search(dest,function(s,r){if(s==="complete"&&r.poiList&&r.poiList.pois.length)map.setCenter(r.poiList.pois[0].location)})}
+  }else if(evt.event==="step_done"){
+    var ok=evt.status==="done",worker=evt.worker||"";
+    updProgress(evt.name,ok?"done":"failed",(evt.iterations||0)+"轮 · "+(evt.tool_calls||0)+"工具");
+    addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker);
+    _stepResults[evt.name]={status:evt.status,iterations:evt.iterations,tool_calls:evt.tool_calls};
+    if(ok&&amapReady){var kw=stepSearchKeyword(evt.name,dest);if(kw)searchAndMark(kw,dest,evt.name,STEP_COLORS[worker]||"#0071e3")}
+  }else if(evt.event==="done"){
+    hideTyping();
+    for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}
+    var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";
+    var counter=document.querySelector(".progress-counter");if(counter)counter.textContent="全部完成";
+    stopProgressTimer();cid=evt.conversation_id;addBubble("assistant",evt.reply);
+    if(amapReady)searchAndMark(dest,dest,"总览","#6366f1");
+  }else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="汇总方案中..."}
+}
+</script>
+
+<!-- Markdown parser -->
+<script src="static/marked.js"></script>
+</body>
+</html>
