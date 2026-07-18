@@ -4,6 +4,7 @@ import time
 from langgraph.graph import StateGraph, END
 from app.agents.state import AgentState
 from app.agents.intent_router import classify_intent
+from app.agents.planner import generate_plan
 from app.agents.workflow.guard import check
 from app.agents.workers.flight_worker import FlightWorker
 from app.agents.workers.hotel_worker import HotelWorker
@@ -23,6 +24,8 @@ WORKERS = {
 }
 
 WORKER_LIST = "flight(航班) hotel(酒店) attraction(景点) itinerary(日程) budget(预算)"
+
+WORKER_TIMEOUT = 5.0  # seconds per worker
 
 # 常用城市列表
 CHINA_CITIES = ["上海", "北京", "深圳", "广州", "杭州", "成都", "南京", "重庆", "武汉", "西安"]
@@ -121,33 +124,10 @@ async def guard_node(state: AgentState) -> AgentState:
 
 
 async def planner_node(state: AgentState) -> AgentState:
-    msg = state["messages"][-1]["content"]
-    active_workers = state.get("active_workers")
-    plan = _default_plan(msg, active_workers)
-
-    try:
-        prompt = f"""可选Worker: {WORKER_LIST}
-用户: {msg}
-输出JSON数组(至少3项，每项含worker字段):
-[{{"id":1,"name":"...","worker":"flight","description":"..."}}]
-只输出JSON:"""
-        resp = await chat([{"role": "user", "content": prompt}])
-        content = resp.get("content", "").strip()
-        s = content.find("[")
-        e = content.rfind("]")
-        if s != -1 and e != -1:
-            llm_plan = json.loads(content[s:e + 1])
-            if isinstance(llm_plan, dict):
-                llm_plan = list(llm_plan.values())
-            llm_plan = [x for x in llm_plan if isinstance(x, dict) and "worker" in x and x["worker"] in WORKERS]
-            if len(llm_plan) >= 3:
-                plan = llm_plan
-    except Exception:
-        pass  # LLM 解析失败时使用兜底计划
-
+    plan = await generate_plan(state, WORKERS, WORKER_LIST, _extract_cities, _default_plan)
     state["plan_steps"] = plan
     state["current_step_index"] = 0
-    print(f"[Planner] {len(plan)}步计划")
+    print(f"[Planner] {len(plan)}步计划: {[s['name'] for s in plan]}")
     return state
 
 
@@ -175,7 +155,7 @@ Text:
 
 
 async def _run_one_step(step: dict, ctx: list | None) -> None:
-    """执行单个步骤，原地修改 step 的 result/status"""
+    """执行单个步骤，原地修改 step 的 result/status。5秒超时。"""
     w = WORKERS.get(step.get("worker", ""))
     if not w:
         step["status"] = "failed"
@@ -185,9 +165,12 @@ async def _run_one_step(step: dict, ctx: list | None) -> None:
     print(f"  [Executor] {step['name']} 开始...")
     step["status"] = "running"
     try:
-        result = await w.run_structured(
-            query=step.get("description", ""),
-            context=ctx if ctx else None
+        result = await asyncio.wait_for(
+            w.run_structured(
+                query=step.get("description", ""),
+                context=ctx if ctx else None
+            ),
+            timeout=WORKER_TIMEOUT
         )
         step["result"] = result.content
         step["status"] = "done" if result.success else "failed"
@@ -219,6 +202,11 @@ async def _run_one_step(step: dict, ctx: list | None) -> None:
                 pass  # structured extraction is best-effort
 
         print(f"  [Executor] {step['name']} [OK] ({result.iterations}轮, ~{result.tokens_used_estimate}tok)")
+    except asyncio.TimeoutError:
+        step["result"] = "该步骤执行超时，已跳过。请查看其他步骤的结果。"
+        step["status"] = "timeout"
+        step["iterations"] = 0
+        print(f"  [Executor] {step['name']} [TIMEOUT]")
     except Exception as e:
         step["result"] = str(e)
         step["status"] = "failed"
