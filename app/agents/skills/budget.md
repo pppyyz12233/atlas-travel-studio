@@ -22,3 +22,17 @@
 | 交通 | ¥xxxx | |
 | 其他 | ¥xxxx | 签证/保险/备用 |
 | **总计** | **¥xxxx** | **预算xxxx元，剩余xxxx元** |
+
+## 输出要求
+
+在最终回复末尾附上结构化预算表 (JSON):
+
+```json
+{"budget_breakdown": [
+  {"category": "交通", "amount": 5600, "currency": "CNY", "note": "往返机票"},
+  {"category": "住宿", "amount": 4000, "currency": "CNY", "note": "4晚酒店"},
+  {"category": "餐饮", "amount": 2000, "currency": "CNY", "note": "每日约400"},
+  {"category": "门票", "amount": 800, "currency": "CNY", "note": "迪士尼+晴空塔"},
+  {"category": "其他", "amount": 600, "currency": "CNY", "note": "交通卡+纪念品"}
+]}
+```

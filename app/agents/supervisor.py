@@ -151,6 +151,26 @@ Text:
             return StepOutput(**json.loads(content[s:e+1]))
     except Exception:
         pass
+    # Parse budget_breakdown for budget worker
+    if worker_type == "budget":
+        try:
+            bs = text.find("budget_breakdown")
+            if bs != -1:
+                js = text.find("[", bs)
+                je = text.rfind("]", bs)
+                if js != -1 and je != -1:
+                    items_data = json.loads(text[js:je+1])
+                    items = [
+                        TripItem(
+                            name=it.get("category", ""),
+                            detail=it.get("note", ""),
+                            price=f"{it.get('currency','CNY')} {it.get('amount',0):.0f}",
+                        )
+                        for it in items_data
+                    ]
+                    return StepOutput(summary=text[:80], items=items)
+        except Exception:
+            pass
     return StepOutput(summary=text[:80])
 
 
