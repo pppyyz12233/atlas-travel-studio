@@ -1,10 +1,17 @@
 """FastAPI 依赖注入"""
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.security import decode_token
-from app.utils.database import AsyncSessionLocal
+from app.utils.database import AsyncSessionLocal, get_db
 from app.crud.user import get_by_id
+
+
+async def get_current_user_from_token(token: str, db: AsyncSession):
+    """从 token 解析当前用户（需要已创建的 db session）"""
+    payload = decode_token(token)
+    return await get_by_id(db, int(payload["sub"]))
 
 
 async def get_current_user(authorization: str = Header(...)):
@@ -13,12 +20,22 @@ async def get_current_user(authorization: str = Header(...)):
         raise HTTPException(status_code=401, detail="缺少 Bearer Token")
 
     try:
-        payload = decode_token(authorization[7:])
+        async with AsyncSessionLocal() as db:
+            return await get_current_user_from_token(authorization[7:], db)
     except Exception:
         raise HTTPException(status_code=401, detail="Token 无效或已过期")
 
-    async with AsyncSessionLocal() as db:
-        return await get_by_id(db, int(payload["sub"]))
+
+async def get_optional_user(request: Request, db: AsyncSession = Depends(get_db)):
+    """Optional auth — returns user or None for guest access"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    try:
+        token = auth_header.split(" ")[1]
+        return await get_current_user_from_token(token, db)
+    except Exception:
+        return None
 
 
 async def require_admin(user=Depends(get_current_user)):

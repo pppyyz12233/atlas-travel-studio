@@ -4,240 +4,431 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>旅行规划师</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="static/leaflet.css">
-<script src="static/leaflet.js"></script>
-<script src="static/marked.js"></script>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@700,500,400&f[]=jetbrains-mono@400,500&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;background:#f1f5f9;color:#1e293b;height:100vh;overflow:hidden}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-thumb{background:#cbd5e1}
-input,button{font-family:inherit}
-.fld{border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:14px;width:100%;outline:none;background:#fff;transition:.2s}
-.fld:focus{border-color:#2563eb}
-.btn{background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer}
-.btn:hover{background:#1d4ed8}
-.btn:disabled{opacity:.4}
-.msg-u{background:#2563eb;color:#fff;border-radius:16px 16px 4px 16px}
-.msg-a{background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px}
-.dot{width:7px;height:7px;border-radius:50%}
-.dot-w{background:#cbd5e1}
-.dot-a{background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.15);animation:pulse 1.5s infinite}
-.dot-d{background:#22c55e}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(37,99,235,.15)}50%{box-shadow:0 0 0 8px rgba(37,99,235,.05)}}
-.modal-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)}
-.md h2{font-size:1.1em;font-weight:700;color:#2563eb;margin:.5em 0 .2em}
-.md table{width:100%;border-collapse:collapse;margin:.3em 0;font-size:.88em}
-.md th{background:#f1f5f9;font-weight:600;text-align:left;padding:5px 8px;border:1px solid #e2e8f0}
-.md td{padding:5px 8px;border:1px solid #e2e8f0}
+/* ============================================================
+   Aurora Terminal — Dark immersive travel cockpit
+   Palette: void black + aurora green + ion blue + nebula violet
+   Type: Satoshi (sans) + JetBrains Mono (data)
+   Motion: neon glow pulses, aurora mesh breaths, glass refractions
+   ============================================================ */
+:root {
+  --void: #09090B;
+  --space: #131316;
+  --space-lifted: #1A1A20;
+  --aurora: #00E5A0;
+  --aurora-soft: #00E5A033;
+  --ion: #00C6FF;
+  --ion-soft: #00C6FF22;
+  --nebula: #7B2FFF;
+  --nebula-soft: #7B2FFF22;
+  --starlight: #F5F5F6;
+  --starlight-soft: #C4C4CC;
+  --darkmatter: #6B6B75;
+  --void-border: #222229;
+
+  --font-sans: 'Satoshi', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --fast: 120ms; --norm: 200ms; --slow: 350ms;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font-sans);background:var(--void);color:var(--starlight);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Aurora mesh background — subtle, breathing */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 15%, rgba(123,47,255,0.06), transparent 50%),
+    radial-gradient(ellipse 60% 80% at 80% 60%, rgba(0,198,255,0.04), transparent 45%);
+  animation: auroraBreathe 14s ease-in-out infinite alternate;
+}
+@keyframes auroraBreathe{
+  0%{opacity:0.6}50%{opacity:1}100%{opacity:0.7}
+}
+
+/* Scanline overlay — barely visible */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,0.004) 2px,rgba(255,255,255,0.004) 4px);
+  opacity:0.2;
+}
+
+.app{position:relative;z-index:2;display:flex;height:100vh}
+
+/* ============================================================
+   SIDEBAR — Glass cockpit panel
+   ============================================================ */
+.sidebar{
+  width:280px;flex-shrink:0;z-index:10;
+  background:linear-gradient(180deg,rgba(19,19,22,0.92),rgba(26,26,32,0.88));
+  backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
+  border-right:1px solid var(--void-border);
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+}
+/* Glass edge refraction — aurora tinted */
+.sidebar::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  border-right:1px solid rgba(0,229,160,0.12);
+  background:linear-gradient(180deg,rgba(0,229,160,0.04),transparent 30%,rgba(0,198,255,0.03) 70%,transparent);
+}
+
+.sidebar-header{position:relative;z-index:1;padding:24px 22px 20px;border-bottom:1px solid var(--void-border)}
+.sidebar-logo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--aurora),var(--ion));
+  display:flex;align-items:center;justify-content:center;
+  color:var(--void);font-size:17px;font-weight:700;
+  box-shadow:0 0 12px rgba(0,229,160,0.15);
+  margin-bottom:16px;
+}
+.sidebar-title{font-size:18px;font-weight:700;letter-spacing:-0.01em;color:var(--starlight)}
+.sidebar-subtitle{font-family:var(--font-mono);font-size:9px;color:var(--aurora);text-transform:uppercase;letter-spacing:0.12em;margin-top:3px;opacity:0.8}
+
+.sidebar-form{position:relative;z-index:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1}
+.field-group{display:flex;flex-direction:column;gap:4px}
+.field-label{font-family:var(--font-mono);font-size:9px;font-weight:500;color:var(--darkmatter);text-transform:uppercase;letter-spacing:0.08em}
+.field{
+  border:1px solid var(--void-border);border-radius:8px;padding:10px 14px;
+  font-size:13px;font-family:var(--font-sans);width:100%;outline:none;
+  background:rgba(255,255,255,0.04);color:var(--starlight);
+  transition:border-color var(--fast) var(--ease-out),box-shadow var(--fast) var(--ease-out),background var(--fast) var(--ease-out);
+}
+.field:focus{
+  border-color:var(--aurora);background:rgba(0,229,160,0.04);
+  box-shadow:0 0 0 2px rgba(0,229,160,0.12);
+}
+.field::placeholder{color:rgba(255,255,255,0.18)}
+.field-row{display:flex;gap:8px}.field-row .field-group{flex:1}.field-row .field{text-align:center}
+
+.btn{
+  background:linear-gradient(135deg,var(--aurora),#00C98F);color:var(--void);border:none;
+  border-radius:8px;padding:13px 20px;font-size:14px;
+  font-weight:700;font-family:var(--font-sans);cursor:pointer;text-align:center;
+  transition:transform var(--fast) var(--ease-out),box-shadow var(--fast) var(--ease-out),filter var(--fast) var(--ease-out);
+  will-change:transform;position:relative;overflow:hidden;
+}
+.btn::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg,transparent,rgba(255,255,255,0.2),transparent);
+  opacity:0;transition:opacity var(--fast) var(--ease-out);
+}
+.btn:hover::after{opacity:1}
+.btn:hover{box-shadow:0 0 20px rgba(0,229,160,0.15),0 4px 12px rgba(0,229,160,0.08)}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.25;pointer-events:none;filter:grayscale(0.5)}
+
+.sidebar-footer{position:relative;z-index:1;padding:12px 22px;border-top:1px solid var(--void-border);font-size:11px;color:var(--darkmatter)}
+.sidebar-footer a{color:var(--aurora);cursor:pointer;text-decoration:none;font-weight:500;transition:color var(--fast)}
+.sidebar-footer a:hover{color:var(--ion)}
+
+/* Progress — HUD scanning display */
+.progress-box{margin-top:4px}
+.progress-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.progress-counter{font-family:var(--font-mono);font-size:10px;color:var(--starlight-soft)}
+.progress-timer{font-family:var(--font-mono);font-size:10px;color:var(--aurora);opacity:0.8}
+.progress-track{height:2px;background:var(--void-border);border-radius:1px;overflow:hidden;margin-bottom:10px;position:relative}
+.progress-track::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--aurora-soft),transparent);animation:scanLine 2s ease-in-out infinite}
+@keyframes scanLine{0%,100%{transform:translateX(-100%)}50%{transform:translateX(100%)}}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--aurora),var(--ion));border-radius:1px;transition:width var(--slow) var(--ease-out);box-shadow:0 0 6px rgba(0,229,160,0.2);position:relative;z-index:1}
+.progress-step{display:flex;align-items:center;gap:8px;padding:3px 0}
+.progress-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--void-border);transition:all var(--norm) var(--ease-out)}
+.progress-dot.running{background:var(--aurora);box-shadow:0 0 4px rgba(0,229,160,0.4);animation:hudPulse 1.2s infinite}
+@keyframes hudPulse{0%,100%{box-shadow:0 0 3px rgba(0,229,160,0.3)}50%{box-shadow:0 0 6px rgba(0,229,160,0.5)}}
+.progress-dot.done{background:var(--aurora)}
+.progress-dot.failed{background:#FF4466}
+.progress-label{font-size:11px;color:var(--darkmatter);flex:1;transition:color var(--norm) var(--ease-out)}
+.progress-label.active{color:var(--starlight)}
+.progress-meta{font-family:var(--font-mono);font-size:9px;color:var(--darkmatter)}
+
+/* ============================================================
+   CHAT — Transmission signals on void
+   ============================================================ */
+.chat-panel{flex:1;display:flex;flex-direction:column;background:transparent;min-width:0;position:relative}
+.chat-messages{flex:1;overflow-y:auto;padding:24px 28px 16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.chat-input-bar{
+  padding:14px 24px;border-top:1px solid var(--void-border);
+  background:rgba(19,19,22,0.7);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  display:flex;gap:10px;align-items:center;
+}
+.chat-input{
+  flex:1;border:1px solid var(--void-border);border-radius:8px;
+  padding:11px 16px;font-size:14px;font-family:var(--font-sans);outline:none;
+  background:rgba(255,255,255,0.05);color:var(--starlight);
+  transition:border-color var(--fast) var(--ease-out),box-shadow var(--fast) var(--ease-out);
+}
+.chat-input:focus{border-color:var(--ion);box-shadow:0 0 0 2px rgba(0,198,255,0.12)}
+.chat-input::placeholder{color:rgba(255,255,255,0.15)}
+
+.welcome{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+.welcome-ring{
+  width:80px;height:80px;border-radius:50%;
+  background:radial-gradient(circle,rgba(0,229,160,0.2),transparent 70%);
+  display:flex;align-items:center;justify-content:center;margin-bottom:24px;
+  animation:welcomeGlow 3s ease-in-out infinite;
+  position:relative;
+}
+.welcome-ring::before{
+  content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:1px solid rgba(0,229,160,0.2);animation:welcomeSpin 8s linear infinite;
+}
+@keyframes welcomeGlow{0%,100%{box-shadow:0 0 20px rgba(0,229,160,0.08)}50%{box-shadow:0 0 36px rgba(0,229,160,0.14)}}
+@keyframes welcomeSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.welcome-icon{font-size:30px;position:relative;z-index:1}
+.welcome-title{font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--starlight)}
+.welcome-sub{font-size:13px;margin-top:8px;line-height:1.7;color:var(--starlight-soft)}
+.welcome-hint{font-family:var(--font-mono);font-size:10px;margin-top:18px;color:var(--darkmatter)}
+
+/* Messages */
+.msg{max-width:76%;padding:14px 20px;font-size:14px;line-height:1.65;word-wrap:break-word}
+.msg-user{
+  background:linear-gradient(135deg,rgba(0,229,160,0.18),rgba(0,198,255,0.12));
+  border:1px solid rgba(0,229,160,0.2);border-radius:16px 16px 4px 16px;
+  margin-left:auto;color:var(--starlight);
+}
+.msg-ai{
+  background:rgba(255,255,255,0.04);border:1px solid var(--void-border);
+  border-radius:16px 16px 16px 4px;color:var(--starlight);
+}
+
+/* Markdown */
+.md h2{font-size:1.1em;font-weight:700;color:var(--aurora);margin:.5em 0 .2em}
+.md h3{font-size:1em;font-weight:600;color:var(--starlight);margin:.4em 0 .1em}
+.md table{width:100%;border-collapse:collapse;margin:.4em 0;font-size:.85em}
+.md th{background:rgba(255,255,255,0.05);font-weight:600;text-align:left;padding:7px 12px;border:1px solid var(--void-border)}
+.md td{padding:6px 12px;border:1px solid var(--void-border)}
+.md code{font-family:var(--font-mono);font-size:.9em;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px}
+
+/* Step cards — glass shards */
+.step-card{
+  background:rgba(255,255,255,0.03);border:1px solid var(--void-border);border-radius:10px;
+  padding:12px 16px;display:flex;align-items:center;gap:12px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  opacity:0;transform:translateY(6px) scale(0.98);
+  animation:cardEnter var(--slow) var(--ease-spring) forwards;
+  position:relative;overflow:hidden;
+}
+.step-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--void-border);transition:background var(--norm)}
+.step-card.done::before{background:var(--aurora);box-shadow:0 0 8px var(--aurora-soft)}
+.step-card.failed::before{background:#FF4466;box-shadow:0 0 8px rgba(255,68,102,0.3)}
+@keyframes cardEnter{to{opacity:1;transform:translateY(0) scale(1)}}
+.step-card .sc-icon{font-size:17px;flex-shrink:0;filter:grayscale(0.3)}
+.step-card .sc-body{flex:1;min-width:0}
+.step-card .sc-name{font-weight:600;font-size:13px;color:var(--starlight)}
+.step-card .sc-detail{font-family:var(--font-mono);font-size:9px;color:var(--darkmatter);margin-top:2px}
+.step-card .sc-badge{font-family:var(--font-mono);font-size:9px;padding:2px 9px;border-radius:10px;font-weight:500;flex-shrink:0}
+.sc-badge.ok{background:rgba(0,229,160,0.12);color:var(--aurora)}
+.sc-badge.fail{background:rgba(255,68,102,0.12);color:#FF4466}
+
+.typing-dots{display:flex;gap:4px;padding:6px 0}
+.typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--darkmatter);animation:typePulse 1.4s infinite var(--ease-out)}
+.typing-dots span:nth-child(2){animation-delay:0.16s}.typing-dots span:nth-child(3){animation-delay:0.32s}
+@keyframes typePulse{0%,60%,100%{opacity:0.3;transform:scale(0.8)}30%{opacity:1;transform:scale(1.2)}}
+
+/* ============================================================
+   MAP — The abyss, full height
+   ============================================================ */
+.map-panel{width:460px;flex-shrink:0;display:flex;flex-direction:column;background:var(--space);z-index:5;border-left:1px solid var(--void-border)}
+.map-header{
+  padding:10px 18px;border-bottom:1px solid var(--void-border);flex-shrink:0;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--font-mono);font-size:10px;color:var(--darkmatter);text-transform:uppercase;letter-spacing:0.08em;
+}
+.map-container{flex:1;min-height:0;position:relative;background:var(--void)}
+#mapDiv{width:100%;height:100%}
+.map-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--darkmatter);pointer-events:none;z-index:1;background:var(--void);font-family:var(--font-mono);font-size:11px}
+.map-legend{padding:6px 18px;border-top:1px solid var(--void-border);flex-shrink:0;display:flex;gap:12px;flex-wrap:wrap;font-family:var(--font-mono);font-size:9px;color:var(--darkmatter)}
+.legend-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* Info Window */
+.amap-info-content{font-family:var(--font-sans);font-size:12px;line-height:1.5;max-width:200px;color:var(--starlight)}
+.amap-info-content h4{margin:0 0 3px;font-size:13px;font-weight:700;color:var(--aurora)}
+.amap-info-content p{margin:1px 0;color:var(--starlight-soft);font-size:11px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+  .step-card{opacity:1;transform:none}body::before{animation:none}
+}
 </style>
 </head>
-<body style="display:flex;height:100vh">
-
-<div style="width:260px;background:#fff;border-right:1px solid #e2e8f0;overflow-y:auto;display:flex;flex-direction:column;flex-shrink:0">
-  <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:14px">旅行规划师</div>
-  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
-    <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">目的地</div><input id="dest" class="fld" placeholder="东京" value="东京"></div>
-    <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">出发地</div><input id="from" class="fld" placeholder="上海" value="上海"></div>
-    <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">日期</div><input id="startDate" class="fld" type="date" value="2026-08-01"></div>
-    <div style="display:flex;gap:6px">
-      <div style="flex:1"><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">天数</div><input id="days" class="fld" type="number" value="5" style="text-align:center"></div>
-      <div style="flex:1"><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">人数</div><input id="ppl" class="fld" type="number" value="2" style="text-align:center"></div>
-      <div style="flex:1"><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">预算</div><input id="budget" class="fld" type="number" value="8000" style="text-align:center"></div>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">&#9650;</div>
+    <div class="sidebar-title">旅行规划师</div>
+    <div class="sidebar-subtitle">Aurora Navigator</div>
+  </div>
+  <div class="sidebar-form">
+    <div class="field-group"><label class="field-label">目的地</label><input id="dest" class="field" placeholder="东京" value="东京"></div>
+    <div class="field-group"><label class="field-label">出发地</label><input id="from" class="field" placeholder="上海" value="上海"></div>
+    <div class="field-group"><label class="field-label">出发日期</label><input id="startDate" class="field" type="date" value="2026-08-01"></div>
+    <div class="field-row">
+      <div class="field-group"><label class="field-label">天数</label><input id="days" class="field" type="number" value="5"></div>
+      <div class="field-group"><label class="field-label">人数</label><input id="ppl" class="field" type="number" value="2"></div>
+      <div class="field-group"><label class="field-label">预算</label><input id="budget" class="field" type="number" value="8000"></div>
     </div>
-    <button id="goBtn" class="btn" onclick="doGo()" style="width:100%;padding:12px">开始规划</button>
-    <div id="progBox" style="display:none"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px">进度</div><div id="progList"></div></div>
+    <button id="goBtn" class="btn" onclick="doGo()" style="width:100%">Launch</button>
+    <div id="progBox" class="progress-box" style="display:none"></div>
   </div>
-  <div style="margin-top:auto;padding:8px 16px;border-top:1px solid #e2e8f0;font-size:12px">
-    <div id="loginBtn" onclick="showLogin()" style="color:#2563eb;cursor:pointer">登入账号</div>
-    <div id="userBox" style="display:none;align-items:center;gap:4px"><span id="uAv" style="width:20px;height:20px;border-radius:50%;background:#2563eb;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700"></span><span id="uNm" style="font-size:12px"></span><span onclick="logout()" style="color:#94a3b8;cursor:pointer;margin-left:auto;font-size:10px">退出</span></div>
+  <div class="sidebar-footer">
+    <span id="loginBtn" onclick="showLogin()" style="cursor:pointer">Sign In</span>
+    <span id="userBox" style="display:none;align-items:center;gap:6px">
+      <span id="uAv" style="width:18px;height:18px;border-radius:50%;background:var(--aurora);color:var(--void);font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700"></span>
+      <span id="uNm" style="font-weight:500"></span>
+      <span onclick="logout()" style="color:var(--darkmatter);cursor:pointer;margin-left:auto;font-size:10px">Exit</span>
+    </span>
   </div>
-</div>
+</aside>
 
-<div style="flex:1;display:flex;flex-direction:column;background:#f8fafc;min-width:0">
-  <div id="chatBox" style="flex:1;overflow-y:auto;padding:12px 20px;display:flex;flex-direction:column;gap:8px">
-    <div id="welcome" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#94a3b8">
-      <div style="font-size:40px;margin-bottom:8px">🗺</div>
-      <div style="font-size:16px;font-weight:700;color:#475569">想去哪里？</div>
-      <div style="font-size:12px;margin-top:4px">左边填好信息，或直接下方输入</div>
+<main class="chat-panel">
+  <div class="chat-messages" id="chatBox">
+    <div class="welcome" id="welcome">
+      <div class="welcome-ring"><span class="welcome-icon">&#9650;</span></div>
+      <div class="welcome-title">Ready for departure</div>
+      <div class="welcome-sub">Set your destination and launch the mission<br>or describe your journey below</div>
+      <div class="welcome-hint">e.g. "5 days in Tokyo, 2 travelers, 8000/person, Akihabara and Asakusa"</div>
     </div>
   </div>
-  <div style="padding:10px 16px;border-top:1px solid #e2e8f0;background:#fff;display:flex;gap:8px">
-    <input id="chatInput" class="fld" placeholder="描述旅行计划..." onkeydown="if(event.key==='Enter')send()"><button onclick="send()" class="btn">发送</button>
+  <div class="chat-input-bar">
+    <input id="chatInput" class="chat-input" placeholder="Describe your journey..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}">
+    <button class="btn" onclick="send()" style="padding:11px 22px">Send</button>
   </div>
-</div>
+</main>
 
-<div id="rightPanel" style="width:420px;border-left:1px solid #e2e8f0;background:#fff;display:flex;flex-direction:column;flex-shrink:0">
-  <div id="dayBar" style="display:none;padding:6px 12px;border-bottom:1px solid #e2e8f0;gap:6px;overflow-x:auto"></div>
-  <div style="flex:1;position:relative"><div id="mapDiv" style="position:absolute;inset:0;background:#e2e8f0"></div><div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.6);z-index:5;font-size:12px;color:#94a3b8">加载地图中...</div></div>
-</div>
-
-<div id="loginModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeLogin()">
-  <div style="background:#fff;border-radius:16px;padding:24px;width:360px" onclick="event.stopPropagation()">
-    <div style="font-size:16px;font-weight:700;margin-bottom:12px" id="loginTitle">登入账号</div>
-    <div style="display:flex;background:#f1f5f9;border-radius:8px;padding:2px;margin-bottom:12px">
-      <button id="tabE" onclick="swT('email')" style="flex:1;padding:6px;font-size:12px;border-radius:6px;background:#fff;border:none;cursor:pointer;font-weight:500">邮箱</button>
-      <button id="tabP" onclick="swT('phone')" style="flex:1;padding:6px;font-size:12px;border-radius:6px;background:transparent;border:none;cursor:pointer;color:#64748b;font-weight:500">手机</button>
-    </div>
-    <form onsubmit="doLogin(event)" style="display:flex;flex-direction:column;gap:8px">
-      <div id="ef"><input id="lem" class="fld" placeholder="邮箱地址"></div>
-      <div id="pf" style="display:none"><input id="lph" class="fld" placeholder="手机号"></div>
-      <input id="lnm" class="fld" placeholder="用户名（注册时填写）">
-      <input id="lpw" type="password" class="fld" placeholder="密码">
-      <button type="submit" class="btn" style="width:100%">登入</button>
-    </form>
-    <div onclick="tgL()" id="tgLbl" style="text-align:center;margin-top:8px;font-size:11px;color:#64748b;cursor:pointer">没有账号？去注册</div>
+<section class="map-panel" id="rightPanel">
+  <div class="map-header"><span>Navigation Chart</span><span id="markerCount" style="opacity:0.7">0 markers</span></div>
+  <div class="map-container">
+    <div id="mapDiv"></div>
+    <div class="map-placeholder" id="mapPlaceholder">Loading chart...</div>
   </div>
-</div>
-
-<div id="routeLegend" style="display:none;position:absolute;bottom:10px;left:10px;z-index:10;background:#fff;border-radius:8px;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,.1);font-size:11px">
-  <div><span style="display:inline-block;width:20px;height:3px;background:#2563eb;vertical-align:middle;margin-right:4px"></span> 景点路线</div>
-  <div><span style="display:inline-block;width:20px;height:3px;background:#22c55e;vertical-align:middle;margin-right:4px;border-top:2px dashed #22c55e"></span> 步行</div>
-  <div><span style="display:inline-block;width:20px;height:3px;background:#f59e0b;vertical-align:middle;margin-right:4px;border-top:2px dotted #f59e0b"></span> 驾车/地铁</div>
+  <div class="map-legend">
+    <span><span class="legend-dot" style="background:#FF4466"></span> Flight</span>
+    <span><span class="legend-dot" style="background:#00E5A0"></span> Hotel</span>
+    <span><span class="legend-dot" style="background:#00C6FF"></span> Attraction</span>
+    <span><span class="legend-dot" style="background:#7B2FFF"></span> Itinerary</span>
+    <span><span class="legend-dot" style="background:#F59E0B"></span> Budget</span>
+  </div>
+</section>
 </div>
 
 <script>
-var A="http://localhost:8000/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
-var map=null,dayRoutes={},curDay=null;
+window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
+</script>
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
+<script>
+var A="/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
+var map=null,amapReady=false,_markers=[],_infoWindow=null;
+var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null;
+var SCOL={flight:"#FF4466",hotel:"#00E5A0",attraction:"#00C6FF",itinerary:"#7B2FFF",budget:"#F59E0B"};
+var SICO={flight:"&#9992;",hotel:"&#127976;",attraction:"&#127919;",itinerary:"&#128203;",budget:"&#128176;"};
 
-// ===== COORDINATES =====
-var SPOTS={
-"新宿":[35.69,139.70],"涩谷":[35.66,139.70],"浅草寺":[35.714,139.797],"浅草":[35.714,139.797],"银座":[35.672,139.767],"秋叶原":[35.702,139.774],"原宿":[35.670,139.702],"表参道":[35.665,139.712],"六本木":[35.660,139.729],"台场":[35.629,139.775],"池袋":[35.730,139.711],"惠比寿":[35.647,139.710],"代官山":[35.648,139.703],"自由之丘":[35.607,139.668],"吉祥寺":[35.703,139.580],"下北泽":[35.662,139.667],"筑地":[35.665,139.771],"月岛":[35.665,139.783],"人形町":[35.686,139.782],"神乐坂":[35.703,139.737],"高圆寺":[35.705,139.650],"中野":[35.707,139.666],"赤坂":[35.673,139.736],"丸之内":[35.682,139.764],"有乐町":[35.675,139.763],"日比谷":[35.674,139.759],"麻布":[35.658,139.738],"青山":[35.668,139.713],"目黑":[35.634,139.698],"品川":[35.630,139.730],"大久保":[35.702,139.697],"天空树":[35.710,139.813],"晴空塔":[35.710,139.813],"明治神宫":[35.676,139.699],"皇居":[35.685,139.753],"东京塔":[35.659,139.745],"上野公园":[35.714,139.773],"歌舞伎町":[35.694,139.703],"筑地市场":[35.665,139.771],"涩谷十字路口":[35.659,139.701],"忠犬八公像":[35.659,139.701],"东京巨蛋":[35.705,139.752],"新宿御苑":[35.685,139.710],"代代木公园":[35.672,139.698],"成田机场":[35.765,140.386],"羽田机场":[35.549,139.780],"大阪":[34.694,135.502],"京都":[35.012,135.768],"奈良":[34.685,135.833],
-"外滩":[31.240,121.490],"东方明珠":[31.240,121.500],"豫园":[31.227,121.493],"南京路":[31.236,121.475],"陆家嘴":[31.236,121.502],"上海迪士尼":[31.144,121.657],"静安寺":[31.224,121.448],"新天地":[31.220,121.474],"田子坊":[31.210,121.469],"人民广场":[31.232,121.475],"浦东":[31.239,121.540],"虹桥":[31.197,121.399],
-"故宫":[39.918,116.397],"天安门":[39.909,116.397],"颐和园":[39.992,116.275],"天坛":[39.882,116.413],"长城":[40.432,116.570],"鸟巢":[39.993,116.388],"南锣鼓巷":[39.938,116.403],"王府井":[39.914,116.417],"三里屯":[39.933,116.455],"798":[39.984,116.495],
-"埃菲尔铁塔":[48.858,2.294],"卢浮宫":[48.861,2.336],"凯旋门":[48.874,2.295],"巴黎圣母院":[48.853,2.350],"蒙马特":[48.887,2.342],"香榭丽舍":[48.870,2.308],
-"大皇宫":[13.750,100.492],"暹罗广场":[13.746,100.534],
-"鱼尾狮":[1.287,103.854],"滨海湾":[1.282,103.858],
-"悉尼歌剧院":[-33.857,151.215],"大本钟":[51.501,-0.125],"时代广场":[40.758,-73.986],"中央公园":[40.782,-73.966]
+function initMap(){
+  try{var ph=document.getElementById("mapPlaceholder");if(ph)ph.style.display="none";map=new AMap.Map("mapDiv",{zoom:13,center:[113.2644,23.1291],resizeEnable:true});_infoWindow=new AMap.InfoWindow({offset:new AMap.Pixel(0,-30)});amapReady=true;
+  // Verify marker API works
+  var tm=new AMap.Marker({position:[113.2644,23.1291],title:"广州",label:{content:"广州",offset:new AMap.Pixel(12,-6)}});map.add(tm);console.log("[Map] init OK, test marker added")}catch(e){console.error(e)}
+}
+window.onload=function(){
+  if(window.AMap&&typeof AMap.Map==="function"){initMap();return}
+  var t=0,iv=setInterval(function(){t++;if(window.AMap&&typeof AMap.Map==="function"){clearInterval(iv);initMap()}else if(t>50){clearInterval(iv)}},200);
 };
 
-var CITY={"东京":[35.682,139.760],"上海":[31.230,121.474],"北京":[39.905,116.397],"巴黎":[48.857,2.352],"曼谷":[13.756,100.502],"新加坡":[1.352,103.820],"伦敦":[51.507,-0.128],"纽约":[40.713,-74.006],"悉尼":[-33.869,151.209],"首尔":[37.567,126.978],"迪拜":[25.204,55.271]};
-
-// ===== MAP INIT =====
-setTimeout(function(){
-  try{
-    map=L.map("mapDiv",{zoomControl:false,attributionControl:false}).setView([35.68,139.76],5);
-    L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",{maxZoom:18}).addTo(map);
-    L.control.zoom({position:"bottomright"}).addTo(map);
-    var ml=document.getElementById("mapLoading");if(ml)ml.style.display="none";
-  }catch(e){console.log(e)}
-},300);
-
-// ===== ROUTE DRAWING =====
-function drawRoutes(text){
-  if(!map){setTimeout(function(){drawRoutes(text)},600);return}
-  document.getElementById("mapLoading").style.display="none";
-
-  // Clear old
-  map.eachLayer(function(l){if(l instanceof L.Marker||l instanceof L.Polyline||l instanceof L.Polygon){map.removeLayer(l)}});
-
-  var found=[],seen={};
-  // Step 1: Find all matching SPOTS in the text
-  for(var k in SPOTS){if(text.indexOf(k)!==-1&&!seen[k]){seen[k]=true;found.push(k)}}
-  console.log("Found places:",found);
-
-  if(found.length===0){
-    var city=document.getElementById("dest").value||"东京";
-    if(CITY[city]){map.setView(CITY[city],12);L.marker(CITY[city]).addTo(map).bindPopup(city).openPopup()}
-    return;
-  }
-
-  // Step 2: Try to group by day
-  var days={},cur=null,lines=text.split(/\n/);
-  for(var i=0;i<lines.length;i++){
-    var m=lines[i].match(/(?:Day|第)\s*(\d+)/i);
-    if(m){cur=parseInt(m[1]);if(!days[cur])days[cur]=[];continue}
-    if(cur!==null){for(var j=0;j<found.length;j++){if(lines[i].indexOf(found[j])!==-1&&days[cur].indexOf(found[j])===-1)days[cur].push(found[j])}}
-  }
-
-  // If day grouping worked, use it. Otherwise just show all found places
-  var hasDays=false;
-  for(var d in days){if(days[d].length>1)hasDays=true}
-  
-  if(hasDays){
-    dayRoutes={};
-    for(var d in days){dayRoutes[d]=[];for(var j=0;j<days[d].length;j++){var nm=days[d][j];dayRoutes[d].push({name:nm,lat:SPOTS[nm][0],lng:SPOTS[nm][1]})};if(dayRoutes[d].length<2)delete dayRoutes[d]}
-    
-    var keys=Object.keys(dayRoutes).map(Number).sort(function(a,b){return a-b});
-    var bar=document.getElementById("dayBar");bar.innerHTML="";bar.style.display=keys.length?"flex":"none";
-    for(var ki=0;ki<keys.length;ki++){(function(d){
-      var b=document.createElement("button");b.style.cssText="padding:3px 10px;font-size:11px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;margin:0 2px";
-      b.textContent="Day "+d;
-      b.onclick=function(){
-        var bs=bar.querySelectorAll("button");for(var bi=0;bi<bs.length;bi++)bs[bi].style.cssText="padding:3px 10px;font-size:11px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;margin:0 2px";
-        b.style.background="#2563eb";b.style.color="#fff";b.style.borderColor="#2563eb";
-        curDay=d;drawDay(d);
-      };
-      bar.appendChild(b);
-    })(keys[ki])}
-    if(keys.length>0){bar.children[0].click();curDay=keys[0];drawDay(keys[0])}
-  } else {
-    // Just show all found places on one route
-    document.getElementById("dayBar").style.display="none";
-    var lls=[];
-    for(var i=0;i<found.length;i++){
-      var s=SPOTS[found[i]];
-      L.marker([s[0],s[1]],{icon:L.divIcon({html:'<div style="background:#2563eb;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+(i+1)+'</div>',iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map).bindPopup(found[i]);
-      lls.push([s[0],s[1]]);
-    }
-    if(lls.length>1){L.polyline(lls,{color:"#2563eb",weight:3,opacity:.7}).addTo(map)}
-    if(lls.length)map.fitBounds(lls,{padding:[40,40]});
-  }
+function clearMarkers(){if(map)map.clearMap();_markers=[];updateMarkerCount()}
+function updateMarkerCount(){var el=document.getElementById("markerCount");if(el)el.textContent=_markers.length+" markers"}
+function addMapMarker(lng,lat,title,subtitle,color,stepName){
+  if(!amapReady||!map)return;
+  // Most reliable: default icon + label. No content, no CSS vars, no DOM issues.
+  var m=new AMap.Marker({
+    position:[lng,lat],
+    title:title,
+    label:{content:title.substring(0,10),offset:new AMap.Pixel(12,-6)},
+    zIndex:100,
+    extData:{step:stepName,color:color,title:title,subtitle:subtitle}
+  });
+  m.on("click",function(){
+    var d=m.getExtData();
+    _infoWindow.setContent('<div class="amap-info-content"><span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;color:#fff;background:'+(d.color||"#00E5A0")+';margin-bottom:4px">'+d.step+'</span><h4>'+d.title+'</h4><p>'+d.subtitle+'</p></div>');
+    _infoWindow.open(map,m.getPosition());
+  });
+  map.add(m);_markers.push(m);updateMarkerCount();
 }
-
-function drawDay(d){
-  if(!map||!dayRoutes[d])return;
-  map.eachLayer(function(l){if(l instanceof L.Marker||l instanceof L.Polyline)map.removeLayer(l)});
-  var pts=dayRoutes[d],lls=[];
-  for(var i=0;i<pts.length;i++){
-    var s=pts[i];
-    L.marker([s.lat,s.lng],{icon:L.divIcon({html:'<div style="background:#2563eb;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+(i+1)+'</div>',iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map).bindPopup(s.name);
-    lls.push([s.lat,s.lng]);
-  }
-  if(lls.length>1)L.polyline(lls,{color:"#2563eb",weight:3,opacity:.7}).addTo(map);
-  if(lls.length)map.fitBounds(lls,{padding:[40,40]});
+function searchAndMark(keyword,city,stepName,color){
+  if(!amapReady||!keyword)return;
+  new AMap.PlaceSearch({city:city||"全国",pageSize:5}).search(keyword,function(s,r){if(s!=="complete"||!r||!r.poiList||!r.poiList.pois.length)return;r.poiList.pois.slice(0,5).forEach(function(p){addMapMarker(p.location.lng,p.location.lat,p.name,(p.address||"")+" | "+keyword,color,stepName)});if(_markers.length)map.setFitView(null,false,[60,60,60,340])})
 }
+function stepKW(name,dest){var n=name.toLowerCase();if(n.includes("航班")||n.includes("flight"))return dest+" 机场";if(n.includes("酒店")||n.includes("hotel"))return dest+" 酒店";if(n.includes("景点")||n.includes("attraction"))return dest+" 景点";return null}
 
-// ===== AUTH =====
+function initProgress(steps){
+  _stepNames=steps;_stepDoneCount=0;_progStartTime=Date.now();var box=document.getElementById("progBox");box.style.display="block";
+  var h='<div class="progress-header"><span class="progress-counter">Initializing...</span><span class="progress-timer" id="pgTimer">T+0.0s</span></div><div class="progress-track"><div class="progress-fill" id="pgFill" style="width:0%"></div></div><div id="progList">';
+  steps.forEach(function(s,i){h+='<div class="progress-step"><div class="progress-dot" id="pd'+i+'"></div><span class="progress-label" id="pl'+i+'">'+s+'</span><span class="progress-meta" id="pm'+i+'"></span></div>'});
+  h+='</div>';box.innerHTML=h;
+  if(_progTimer)clearInterval(_progTimer);_progTimer=setInterval(function(){var el=document.getElementById("pgTimer");if(el)el.textContent="T+"+((Date.now()-_progStartTime)/1000).toFixed(1)+"s"},100)
+}
+function findStepIdx(name){for(var i=0;i<_stepNames.length;i++)if(_stepNames[i]===name)return i;return -1}
+function updProgress(name,status,meta){
+  var si=findStepIdx(name);if(si<0)return;var d=document.getElementById("pd"+si),l=document.getElementById("pl"+si),m=document.getElementById("pm"+si);
+  if(d)d.className="progress-dot "+(status==="running"?"running":status==="done"?"done":status==="failed"?"failed":"");
+  if(l)l.className="progress-label "+(status==="running"?"active":"");if(m&&meta)m.textContent=meta;
+  if(status==="done"||status==="failed")_stepDoneCount++;
+  var pct=_stepNames.length?Math.round(_stepDoneCount/_stepNames.length*100):0,fill=document.getElementById("pgFill");if(fill)fill.style.width=pct+"%";
+  var c=document.querySelector(".progress-counter");if(c)c.textContent="Completed "+_stepDoneCount+"/"+_stepNames.length
+}
+function stopTimer(){if(_progTimer){clearInterval(_progTimer);_progTimer=null}}
+
 if(tk)loadU();
-function loadU(){fetch(A+"/auth/me",{headers:{Authorization:"Bearer "+tk}}).then(function(r){return r.json()}).then(function(d){if(d.code===200){document.getElementById("loginBtn").style.display="none";document.getElementById("userBox").style.display="flex";document.getElementById("uNm").textContent=d.data.username;document.getElementById("uAv").textContent=d.data.username[0].toUpperCase()}}).catch(function(){tk=null;localStorage.removeItem("t")})}
-function showLogin(){isReg=false;document.getElementById("loginTitle").textContent="登入账号";document.getElementById("tgLbl").textContent="没有账号？去注册";document.getElementById("lnm").parentElement.style.display="none";document.getElementById("loginModal").style.display="flex"}
-function closeLogin(){document.getElementById("loginModal").style.display="none";isReg=false;document.getElementById("loginTitle").textContent="登入账号";document.getElementById("tgLbl").textContent="没有账号？去注册"}
-function swT(t){lt=t;document.getElementById("ef").style.display=t==="email"?"block":"none";document.getElementById("pf").style.display=t==="phone"?"block":"none";var te=document.getElementById("tabE"),tp=document.getElementById("tabP");te.style.cssText=t==="email"?"flex:1;padding:6px;font-size:12px;border-radius:6px;background:#fff;border:none;cursor:pointer;font-weight:500":"flex:1;padding:6px;font-size:12px;border-radius:6px;background:transparent;border:none;cursor:pointer;color:#64748b;font-weight:500";tp.style.cssText=t==="phone"?"flex:1;padding:6px;font-size:12px;border-radius:6px;background:#fff;border:none;cursor:pointer;font-weight:500":"flex:1;padding:6px;font-size:12px;border-radius:6px;background:transparent;border:none;cursor:pointer;color:#64748b;font-weight:500"}
-function tgL(){isReg=!isReg;document.getElementById("loginTitle").textContent=isReg?"创建账号":"登入账号";document.getElementById("tgLbl").textContent=isReg?"已有账号？去登入":"没有账号？去注册";document.getElementById("lnm").parentElement.style.display=isReg?"block":"none"}
-function doLogin(e){e.preventDefault();var em=document.getElementById("lem").value,ph=document.getElementById("lph").value,nm=document.getElementById("lnm").value,pw=document.getElementById("lpw").value;if(isReg){fetch(A+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:em||null,phone:ph||null,username:nm,password:pw})}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU();alert("注册成功，已自动登录")}else alert(d.message)})}else{var ep=lt==="email"?"/auth/login/email":"/auth/login/phone";var body=lt==="email"?{email:em,password:pw}:{phone:ph,password:pw};fetch(A+ep,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU();alert("注册成功，已自动登录")}else alert(d.message)})}}
+function loadU(){fetch(A+"/auth/me",{headers:{Authorization:"Bearer "+tk}}).then(function(r){if(r.status===401){tk=null;localStorage.removeItem("t");return}return r.json()}).then(function(d){if(d&&d.code===200){document.getElementById("loginBtn").style.display="none";document.getElementById("userBox").style.display="flex";document.getElementById("uNm").textContent=d.data.username;document.getElementById("uAv").textContent=d.data.username[0].toUpperCase()}}).catch(function(){tk=null;localStorage.removeItem("t")})}
+function showLogin(){isReg=false;var m=document.createElement("div");m.id="loginModal";m.style.cssText="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(9,9,11,0.7);backdrop-filter:blur(8px)";m.onclick=function(e){if(e.target===m)closeLogin()};m.innerHTML='<div style="background:var(--space-lifted);border:1px solid var(--void-border);border-radius:14px;padding:28px;width:380px;box-shadow:0 24px 64px rgba(0,0,0,0.5)" onclick="event.stopPropagation()"><div style="font-size:18px;font-weight:700;margin-bottom:20px;letter-spacing:-0.01em" id="loginTitle">Sign In</div><div style="display:flex;background:rgba(255,255,255,0.04);border-radius:8px;padding:2px;margin-bottom:16px"><button id="tabE" onclick="swT(\'email\')" style="flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:rgba(255,255,255,0.06);font-weight:500;color:var(--starlight)">Email</button><button id="tabP" onclick="swT(\'phone\')" style="flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--darkmatter);font-weight:500">Phone</button></div><form onsubmit="doLogin(event)" style="display:flex;flex-direction:column;gap:10px"><div id="ef"><input id="lem" class="field" placeholder="Email"></div><div id="pf" style="display:none"><input id="lph" class="field" placeholder="Phone"></div><input id="lnm" class="field" placeholder="Username"><input id="lpw" class="field" type="password" placeholder="Password"><button type="submit" class="btn" style="width:100%">Sign In</button></form><div onclick="tgL()" id="tgLbl" style="text-align:center;margin-top:14px;font-size:11px;color:var(--darkmatter);cursor:pointer">No account? Register</div></div>';document.body.appendChild(m)}
+function closeLogin(){var m=document.getElementById("loginModal");if(m)m.remove()}
+function swT(t){lt=t;var ef=document.getElementById("ef"),pf=document.getElementById("pf"),te=document.getElementById("tabE"),tp=document.getElementById("tabP");ef.style.display=t==="email"?"block":"none";pf.style.display=t==="phone"?"block":"none";te.style.cssText=t==="email"?"flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:rgba(255,255,255,0.06);font-weight:500;color:var(--starlight)":"flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--darkmatter);font-weight:500";tp.style.cssText=t==="phone"?"flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:rgba(255,255,255,0.06);font-weight:500;color:var(--starlight)":"flex:1;padding:7px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--darkmatter);font-weight:500"}
+function tgL(){isReg=!isReg;document.getElementById("loginTitle").textContent=isReg?"Register":"Sign In";document.getElementById("tgLbl").textContent=isReg?"Have an account? Sign In":"No account? Register";document.getElementById("lnm").style.display=isReg?"block":"none"}
+function doLogin(e){e.preventDefault();var em=document.getElementById("lem").value,ph=document.getElementById("lph").value,nm=document.getElementById("lnm").value,pw=document.getElementById("lpw").value;if(isReg){fetch(A+"/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:em||null,phone:ph||null,username:nm,password:pw})}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU()}else alert(d.message)})}else{var ep=lt==="email"?"/auth/login/email":"/auth/login/phone";var body=lt==="email"?{email:em,password:pw}:{phone:ph,password:pw};fetch(A+ep,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){if(d.code===200){tk=d.data.access_token;localStorage.setItem("t",tk);closeLogin();loadU()}else alert(d.message)})}}
 function logout(){tk=null;localStorage.removeItem("t");location.reload()}
 
-// ===== CHAT =====
-function addBubble(role,text){
-  var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";
-  var d=document.createElement("div");d.style.cssText="display:flex;"+(role==="user"?"justify-content:flex-end":"justify-content:flex-start");
-  d.innerHTML='<div style="max-width:85%;padding:10px 16px;font-size:14px;line-height:1.6;word-wrap:break-word;'+(role==="user"?"background:#2563eb;color:#fff;border-radius:16px 16px 4px 16px":"background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px")+'"><div class="md">'+(role==="assistant"?marked.parse(text):text.replace(/\n/g,"<br>"))+'</div></div>';
-  el.appendChild(d);el.scrollTop=el.scrollHeight;
+function addBubble(role,text){var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";var d=document.createElement("div");d.style.cssText="display:flex;"+(role==="user"?"justify-content:flex-end":"justify-content:flex-start");var cls=role==="user"?"msg msg-user":"msg msg-ai";var content=role==="assistant"?marked.parse(text):text.replace(/\n/g,"<br>");d.innerHTML='<div class="'+cls+'"><div class="md">'+content+'</div></div>';el.appendChild(d);el.scrollTop=el.scrollHeight;return d}
+function addStepCard(name,status,iter,tools,wt){
+  var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";var ok=status==="done",icon=SICO[wt]||"";var detail=(ok?"Completed":"Failed")+" - "+iter+" rounds"+(tools?" - "+tools+" tool calls":"");var d=document.createElement("div");d.className="step-card"+(ok?" done":" failed");d.innerHTML='<span class="sc-icon">'+icon+'</span><div class="sc-body"><div class="sc-name">'+name+'</div><div class="sc-detail">'+detail+'</div></div><span class="sc-badge '+(ok?"ok":"fail")+'">'+(ok?"Done":"Fail")+'</span>';el.appendChild(d);el.scrollTop=el.scrollHeight;var idx=el.querySelectorAll(".step-card").length;d.style.animationDelay=(idx-1)*0.04+"s"
 }
+function showTyping(){var el=document.getElementById("chatBox"),t=document.getElementById("typingInd");if(t)t.remove();var d=document.createElement("div");d.id="typingInd";d.style.cssText="display:flex;justify-content:flex-start";d.innerHTML='<div class="msg msg-ai" style="padding:10px 20px"><div class="typing-dots"><span></span><span></span><span></span></div></div>';el.appendChild(d);el.scrollTop=el.scrollHeight}
+function hideTyping(){var t=document.getElementById("typingInd");if(t)t.remove()}
 
-function doGo(){
-  var f=document.getElementById("from").value||"上海",t=document.getElementById("dest").value||"东京",dt=document.getElementById("startDate").value||"";
-  document.getElementById("chatInput").value="从"+f+"去"+t+(dt?"，"+dt+"出发":"")+"，"+document.getElementById("days").value+"天，"+document.getElementById("ppl").value+"人，人均"+document.getElementById("budget").value+"元";
-  send();
-}
+function doGo(){var f=document.getElementById("from").value||"Shanghai",t=document.getElementById("dest").value||"Tokyo",dt=document.getElementById("startDate").value||"";document.getElementById("chatInput").value="From "+f+" to "+t+(dt?", "+dt:"")+", "+document.getElementById("days").value+" days, "+document.getElementById("ppl").value+" travelers, "+document.getElementById("budget").value+"/person";send()}
 
 async function send(){
-  var msg=document.getElementById("chatInput").value.trim();if(!msg)return;if(!tk){showLogin();return}
-  document.getElementById("chatInput").value="";addBubble("user",msg);
-  var btn=document.getElementById("goBtn");btn.disabled=true;btn.textContent="规划中...";
-  document.getElementById("progBox").style.display="block";
-  var st=["安全检查","信息确认","拆任务","查航班","找酒店","荐景点","排日程","算预算","汇总"];
-  document.getElementById("progList").innerHTML=st.map(function(s,i){return'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div class="dot dot-w" id="sd'+i+'"></div><span style="font-size:10px;color:#94a3b8" id="sl'+i+'">'+s+'</span></div>'}).join("");
-  for(var i=0;i<st.length;i++){await new Promise(function(r){setTimeout(r,80+i*40)});document.getElementById("sd"+i).className="dot dot-a";document.getElementById("sl"+i).style.cssText="color:#1e293b;font-weight:500"}
+  var msg=document.getElementById("chatInput").value.trim();if(!msg)return;
+  document.getElementById("chatInput").value="";addBubble("user",msg);showTyping();
+  var btn=document.getElementById("goBtn");btn.disabled=true;btn.textContent="Mission Active...";
+  _stepNames=[];_stepDoneCount=0;clearMarkers();
+
+  var headers={"Content-Type":"application/json"};
+  if(tk) headers["Authorization"]="Bearer "+tk;
+
   try{
-    var r=await fetch(A+"/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({message:msg,conversation_id:cid})});var d=await r.json();
-    if(d.code===200){cid=d.data.conversation_id;for(var i=0;i<st.length;i++){document.getElementById("sd"+i).className="dot dot-d";document.getElementById("sl"+i).style.color="#94a3b8"}addBubble("assistant",d.data.reply);if(map){map.eachLayer(function(l){if(l instanceof L.Marker||l instanceof L.Polyline)map.removeLayer(l)})};setTimeout(function(){try{drawRoutes(d.data.reply)}catch(e){console.log(e)};var c=document.getElementById('dest').value||'东京';if(CITY[c]){map.setView(CITY[c],12);L.marker(CITY[c]).addTo(map).bindPopup(c)}},300)}
-    else addBubble("assistant","失败: "+d.message)
-  }catch(e){addBubble("assistant","无法连接服务器")}
-  btn.disabled=false;btn.textContent="开始规划";
+    var r=await fetch(A+"/chat/stream",{method:"POST",headers:headers,body:JSON.stringify({message:msg,conversation_id:cid})});
+    if(!r.ok){addBubble("assistant","Server error: "+r.status);btn.disabled=false;btn.textContent="Launch";hideTyping();return}
+    var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
+    while(true){var v=await reader.read();if(v.done)break;buf+=decoder.decode(v.value,{stream:true});var lines=buf.split("\n");buf=lines.pop()||"";for(var i=0;i<lines.length;i++){var line=lines[i].trim();if(!line.startsWith("data: "))continue;try{handleSSE(JSON.parse(line.slice(6)))}catch(e){}}}
+  }catch(e){addBubble("assistant","Connection lost");hideTyping()}
+  btn.disabled=false;btn.textContent="Launch";stopTimer()
+}
+
+function handleSSE(evt){
+  var dest=document.getElementById("dest").value||"Tokyo";
+  if(evt.event==="plan"){initProgress(evt.steps||[])}
+  else if(evt.event==="step_start"){updProgress(evt.name,"running",evt.parallel?"Parallel":"");if(amapReady&&_stepDoneCount===0){new AMap.PlaceSearch({city:dest}).search(dest,function(s,r){if(s==="complete"&&r.poiList&&r.poiList.pois.length)map.setCenter(r.poiList.pois[0].location)})}}
+  else if(evt.event==="step_done"){var ok=evt.status==="done",worker=evt.worker||"";updProgress(evt.name,ok?"done":"failed",(evt.iterations||0)+"r - "+(evt.tool_calls||0)+" calls");addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker);if(ok&&amapReady){var locs=evt.locations||[];if(locs.length){locs.forEach(function(l){addMapMarker(l.lng,l.lat,l.name||l.type,l.address||"",SCOL[worker]||"#00E5A0",evt.name)});if(_markers.length)map.setFitView(null,false,[60,60,60,340])}else{var kw=stepKW(evt.name,dest);if(kw)searchAndMark(kw,dest,evt.name,SCOL[worker]||"#00E5A0")}}}
+  else if(evt.event==="done"){hideTyping();for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";var c=document.querySelector(".progress-counter");if(c)c.textContent="Mission Complete";stopTimer();cid=evt.conversation_id;addBubble("assistant",evt.reply);if(amapReady)searchAndMark(dest,dest,"Overview","#00E5A0")}
+  else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="Aggregating..."}
 }
 </script>
+<script src="static/marked.js"></script>
 </body>
 </html>
