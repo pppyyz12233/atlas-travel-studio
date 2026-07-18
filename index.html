@@ -326,7 +326,7 @@ window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
 <script src="https://webapi.amap.com/maps?v=1.4.15&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
 <script>
 var A="/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
-var map=null,amapReady=false,_markers=[],_infoWindow=null;
+var map=null,amapReady=false,_markers=[],_infoWindow=null,_routeLines=[];
 var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null;
 var SCOL={flight:"#FF4466",hotel:"#00E5A0",attraction:"#00C6FF",itinerary:"#7B2FFF",budget:"#F59E0B"};
 var SICO={flight:"&#9992;",hotel:"&#127976;",attraction:"&#127919;",itinerary:"&#128203;",budget:"&#128176;"};
@@ -341,7 +341,7 @@ window.onload=function(){
   var t=0,iv=setInterval(function(){t++;if(window.AMap&&typeof AMap.Map==="function"){clearInterval(iv);initMap()}else if(t>50){clearInterval(iv)}},200);
 };
 
-function clearMarkers(){if(map)map.clearMap();_markers=[];updateMarkerCount()}
+function clearMarkers(){clearRoutes();if(map)map.clearMap();_markers=[];updateMarkerCount()}
 function updateMarkerCount(){var el=document.getElementById("markerCount");if(el)el.textContent=_markers.length+" markers"}
 function addMapMarker(lng,lat,title,subtitle,color,stepName){
   if(!amapReady||!map)return;
@@ -360,6 +360,8 @@ function addMapMarker(lng,lat,title,subtitle,color,stepName){
   });
   map.add(m);_markers.push(m);updateMarkerCount();
 }
+function clearRoutes(){_routeLines.forEach(function(line){if(map)map.remove(line)});_routeLines=[]}
+function drawRoutes(){clearRoutes();if(!map||_markers.length<2)return;var positions=[];_markers.forEach(function(m){if(m.getPosition)positions.push(m.getPosition())});if(positions.length<2)return;var line=new AMap.Polyline({path:positions,strokeColor:"#00E5A0",strokeWeight:2,strokeOpacity:0.5,strokeStyle:"dashed",strokeDasharray:[8,6],showDir:true,zIndex:50});map.add(line);_routeLines.push(line)}
 function searchAndMark(keyword,city,stepName,color){
   if(!amapReady||!keyword)return;
   new AMap.PlaceSearch({city:city||"全国",pageSize:5}).search(keyword,function(s,r){if(s!=="complete"||!r||!r.poiList||!r.poiList.pois.length)return;r.poiList.pois.slice(0,5).forEach(function(p){addMapMarker(p.location.lng,p.location.lat,p.name,(p.address||"")+" | "+keyword,color,stepName)});if(_markers.length)map.setFitView(null,false,[60,60,60,340])})
@@ -425,7 +427,7 @@ function handleSSE(evt){
   if(evt.event==="plan"){initProgress(evt.steps||[])}
   else if(evt.event==="step_start"){updProgress(evt.name,"running",evt.parallel?"Parallel":"");if(amapReady&&_stepDoneCount===0){new AMap.PlaceSearch({city:dest}).search(dest,function(s,r){if(s==="complete"&&r.poiList&&r.poiList.pois.length)map.setCenter(r.poiList.pois[0].location)})}}
   else if(evt.event==="step_done"){var ok=evt.status==="done",worker=evt.worker||"";updProgress(evt.name,ok?"done":"failed",(evt.iterations||0)+"r - "+(evt.tool_calls||0)+" calls");addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker);if(ok&&amapReady){var locs=evt.locations||[];if(locs.length){locs.forEach(function(l){addMapMarker(l.lng,l.lat,l.name||l.type,l.address||"",SCOL[worker]||"#00E5A0",evt.name)});if(_markers.length)map.setFitView(null,false,[60,60,60,340])}else{var kw=stepKW(evt.name,dest);if(kw)searchAndMark(kw,dest,evt.name,SCOL[worker]||"#00E5A0")}}}
-  else if(evt.event==="done"){hideTyping();for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";var c=document.querySelector(".progress-counter");if(c)c.textContent="Mission Complete";stopTimer();cid=evt.conversation_id;addBubble("assistant",evt.reply);if(amapReady)searchAndMark(dest,dest,"Overview","#00E5A0")}
+  else if(evt.event==="done"){hideTyping();for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";var c=document.querySelector(".progress-counter");if(c)c.textContent="Mission Complete";stopTimer();cid=evt.conversation_id;addBubble("assistant",evt.reply);if(amapReady)searchAndMark(dest,dest,"Overview","#00E5A0");setTimeout(function(){drawRoutes()},800)}
   else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="Aggregating..."}
 }
 </script>
