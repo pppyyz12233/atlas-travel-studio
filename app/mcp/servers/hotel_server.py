@@ -1,5 +1,15 @@
-"""MCP 酒店工具 —— 内置 15 家模拟酒店，覆盖 4 个城市"""
+"""酒店工具 —— 内置 15 家模拟酒店数据，覆盖 4 个热门城市
 
+提供工具函数:
+  - search_hotels: 按城市和预算档位搜索酒店
+
+数据均为模拟数据，仅供演示使用。
+"""
+
+# ── 酒店数据库（模拟数据）──────────────────────────────────────
+# 每条记录包含: ID、名称、城市、价格（人民币/晚）、档位、评分、
+#              位置、描述
+# 档位说明: low(300-500元) / mid(500-1000元) / high(1000+元)
 HOTELS = [
     # ── 东京 ──
     {
@@ -87,14 +97,18 @@ HOTELS = [
 
 
 def search_hotels(city: str, budget: str = "mid") -> list[dict]:
-    """
-    按城市和预算档位搜索酒店。
-    budget: "low"（低档）、"mid"（中档）、"high"（高档）、"all"（全部）
+    """按城市和预算档位搜索酒店。
+
+    参数:
+        city:   城市名（如 "东京"、"巴黎"、"曼谷"、"新加坡"）
+        budget: 预算档位 —— "low"(经济) / "mid"(舒适) / "high"(豪华) / "all"(全部)
+
+    返回:
+        匹配的酒店列表，按评分从高到低排序
     """
     results = []
     for h in HOTELS:
         if h["city"] == city:
             if budget == "all" or h["level"] == budget:
                 results.append(h)
-    # 按评分从高到低排序
     return sorted(results, key=lambda x: x["rating"], reverse=True)

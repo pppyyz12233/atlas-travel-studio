@@ -1,5 +1,8 @@
-"""上下文管理 —— 对话太长时自动裁剪"""
+"""上下文管理 —— 对话太长时自动裁剪
 
+注意：使用 cl100k_base tokenizer (GPT-4 编码)。DeepSeek 的 tokenizer 与此有 ~10-20% 偏差，
+但 Compress 的保守上限 (4000 token) 留有足够余量，不会导致功能问题。
+"""
 import tiktoken
 
 
@@ -20,14 +23,19 @@ class ContextManager:
 
         system_msg = messages[0] if messages[0]["role"] == "system" else None
 
-        # 从后往前保留
         kept = []
         for m in reversed(messages):
-            if self.count(kept + [m]) > self.max_tokens:
+            candidate = kept + [m]
+            if self.count(candidate) > self.max_tokens:
+                if not kept:
+                    content = (m.get("content") or "")[:self.max_tokens // 2]
+                    m = {**m, "content": content + "\n...(内容过长已截断)"}
+                    kept.insert(0, m)
                 break
             kept.insert(0, m)
 
         if system_msg and system_msg not in kept:
-            kept.insert(0, system_msg)
+            if self.count([system_msg] + kept) <= self.max_tokens:
+                kept.insert(0, system_msg)
 
         return kept

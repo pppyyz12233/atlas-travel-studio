@@ -1,7 +1,7 @@
 ﻿"""用户数据操作"""
 
 from fastapi import HTTPException
-from sqlalchemy import select, or_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -13,12 +13,12 @@ async def create_user(db: AsyncSession, email: str | None, phone: str | None, us
     # 邮箱唯一
     if email:
         result = await db.execute(select(User).where(User.email == email))
-    if result.scalar_one_or_none():
+        if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="该邮箱已注册")
     # 手机号唯一
     if phone:
         result = await db.execute(select(User).where(User.phone == phone))
-    if result.scalar_one_or_none():
+        if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="该手机号已注册")
 
     user = User(email=email, phone=phone, username=username, password=hash_password(password))

@@ -1,20 +1,43 @@
-"""MCP 天气工具 —— 接 wttr.in 真实天气（免费，无需 API Key）"""
+"""天气工具 —— 接入 wttr.in 实时天气数据
 
-import requests
+提供两个异步工具函数:
+  - get_weather:  查询当前天气
+  - get_forecast: 查询未来几天预报
+
+数据来源: https://wttr.in （免费，无需 API Key）
+"""
+
+import aiohttp
 
 
-def _fetch(city: str) -> dict:
-    """调 wttr.in，拿原始 JSON 数据"""
+async def _fetch(city: str) -> dict:
+    """调用 wttr.in API，获取原始 JSON 天气数据。
+
+    参数:
+        city: 英文城市名（如 "Tokyo", "Paris"）
+
+    返回:
+        wttr.in 的完整 JSON 响应
+    """
     url = f"https://wttr.in/{city}?format=j1"
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
 
-def get_weather(city: str) -> dict:
-    """查当前天气"""
+async def get_weather(city: str) -> dict:
+    """查询城市当前天气。
+
+    参数:
+        city: 英文城市名（如 "Tokyo", "Paris", "Bangkok"）
+
+    返回:
+        {"city": ..., "temp_c": ..., "weather": ..., "humidity": ..., "wind_kmh": ..., "feels_like": ...}
+        查询失败时返回各字段为 "N/A" 的降级结果
+    """
     try:
-        data = _fetch(city)
+        data = await _fetch(city)
         cur = data["current_condition"][0]
         return {
             "city": city,
@@ -25,28 +48,30 @@ def get_weather(city: str) -> dict:
             "feels_like": cur["FeelsLikeC"],
         }
     except Exception:
-        # wttr.in 挂了时返回默认数据，不中断主流程
         return {
-            "city": city,
-            "temp_c": "N/A",
-            "weather": "获取失败",
-            "humidity": "N/A",
-            "wind_kmh": "N/A",
-            "feels_like": "N/A",
+            "city": city, "temp_c": "N/A", "weather": "获取失败",
+            "humidity": "N/A", "wind_kmh": "N/A", "feels_like": "N/A",
         }
 
 
-def get_forecast(city: str, days: int = 3) -> list[dict]:
-    """查未来几天预报"""
+async def get_forecast(city: str, days: int = 3) -> list[dict]:
+    """查询城市未来几天天气预报。
+
+    参数:
+        city: 英文城市名（如 "Tokyo", "Paris"）
+        days: 预报天数，默认3天
+
+    返回:
+        [{"date": ..., "max_c": ..., "min_c": ..., "avg_c": ..., "sun_hours": ...}, ...]
+        查询失败时返回空列表
+    """
     try:
-        data = _fetch(city)
+        data = await _fetch(city)
         forecasts = []
         for day in data["weather"][:days]:
             forecasts.append({
-                "date": day["date"],
-                "max_c": day["maxtempC"],
-                "min_c": day["mintempC"],
-                "avg_c": day["avgtempC"],
+                "date": day["date"], "max_c": day["maxtempC"],
+                "min_c": day["mintempC"], "avg_c": day["avgtempC"],
                 "sun_hours": day["sunHour"],
             })
         return forecasts

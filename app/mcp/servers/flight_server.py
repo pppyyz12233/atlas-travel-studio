@@ -1,6 +1,15 @@
-"""MCP 航班工具 —— 内置 8 条模拟航班，覆盖 6 条航线"""
+"""航班工具 —— 内置 8 条模拟航班数据，覆盖 6 条国际航线
 
-# 航班数据库
+提供两个工具函数:
+  - search_flights: 按出发地、目的地、日期搜索航班
+  - get_flight_price: 按航班号查询价格
+
+数据均为模拟数据，仅供演示使用。
+"""
+
+# ── 航班数据库（模拟数据）──────────────────────────────────────
+# 每条记录包含: 航班号、出发/目的城市及三字码、日期、起降时间、
+#              价格（人民币）、航空公司、机型
 FLIGHTS = [
     {
         "id": "MU523", "origin": "上海", "origin_code": "SHA",
@@ -54,19 +63,34 @@ FLIGHTS = [
 
 
 def search_flights(origin: str, destination: str, date: str = "2026-08-01") -> list[dict]:
-    """查航班：出发地、目的地可以是中文名或三字码"""
+    """搜索航班：出发地、目的地支持中文城市名或三字码。
+
+    参数:
+        origin:      出发城市（如 "上海" 或 "SHA"）
+        destination: 目的城市（如 "东京" 或 "TYO"）
+        date:        出发日期，格式 YYYY-MM-DD
+
+    返回:
+        匹配的航班列表，按价格从低到高排序
+    """
     results = []
     for f in FLIGHTS:
         match_origin = origin in (f["origin"], f["origin_code"])
         match_dest = destination in (f["dest"], f["dest_code"])
-        if match_origin and match_dest :
+        if match_origin and match_dest:
             results.append(f)
-    # 按价格从低到高排序
     return sorted(results, key=lambda x: x["price"])
 
 
 def get_flight_price(flight_id: str) -> dict | None:
-    """查单个航班的价格"""
+    """查询指定航班号的价格和航空公司。
+
+    参数:
+        flight_id: 航班号，如 "MU523"、"CA929"
+
+    返回:
+        {"flight_id": ..., "price": ..., "airline": ...} 或 None
+    """
     for f in FLIGHTS:
         if f["id"] == flight_id:
             return {"flight_id": flight_id, "price": f["price"], "airline": f["airline"]}

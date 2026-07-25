@@ -64,8 +64,11 @@ async def classify_intent(message: str) -> IntentResult:
         e = content.rfind("}")
         if s != -1 and e != -1:
             data = json.loads(content[s:e + 1])
-            intent_str = data.get("intent", "full_trip")
-            intent = Intent(intent_str) if intent_str in Intent.__members__ else Intent.FULL_TRIP
+            intent_str = data.get("intent") or data.get("category", "full_trip")
+            try:
+                intent = Intent(intent_str)
+            except ValueError:
+                intent = Intent.FULL_TRIP
             return IntentResult(
                 intent=intent,
                 workers=INTENT_WORKERS.get(intent, INTENT_WORKERS[Intent.FULL_TRIP]),

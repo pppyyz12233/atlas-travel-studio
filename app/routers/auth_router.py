@@ -1,7 +1,7 @@
 """认证接口"""
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import user
@@ -44,24 +44,30 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     try:
         new_user = await user.create_user(db, req.email, req.phone, req.username, req.password)
         return _token_response(new_user)
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"code": 500, "message": str(e), "data": None}
+        raise HTTPException(status_code=500, detail="注册失败，请稍后重试")
 
 
 @router.post("/login/email")
 async def login_email(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)):
     try:
         return _token_response(await user.login_by_email(db, req.email, req.password))
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"code": 401, "message": str(e), "data": None}
+        raise HTTPException(status_code=500, detail="登录失败，请稍后重试")
 
 
 @router.post("/login/phone")
 async def login_phone(req: PhoneLoginRequest, db: AsyncSession = Depends(get_db)):
     try:
         return _token_response(await user.login_by_phone(db, req.phone, req.password))
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"code": 401, "message": str(e), "data": None}
+        raise HTTPException(status_code=500, detail="登录失败，请稍后重试")
 
 
 @router.get("/me")

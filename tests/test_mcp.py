@@ -1,5 +1,6 @@
 ﻿"""MCP 工具层测试"""
 
+import pytest
 from app.mcp.registry import init_registry, ToolRegistry
 from app.mcp.servers.flight_server import search_flights, get_flight_price
 from app.mcp.servers.hotel_server import search_hotels
@@ -41,7 +42,8 @@ def test_hotel_search_low():
     assert len(results) >= 1
 
 
-def test_registry_call():
+@pytest.mark.asyncio
+async def test_registry_call():
     """测试：通过注册表调工具"""
-    result = ToolRegistry.call("search_flights", origin="上海", destination="东京")
+    result = await ToolRegistry.call("search_flights", origin="上海", destination="东京")
     assert "MU523" in result or "CA929" in result

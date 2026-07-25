@@ -1,4 +1,4 @@
-"""对话会话数据操作"""
+"""对话数据操作"""
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -24,6 +24,18 @@ async def list_by_user(db: AsyncSession, user_id: int):
         .order_by(Conversation.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+#验证对话归属（纯 assertion，不返回）
+async def verify_owner(db: AsyncSession, conv_id: int, user_id: int):
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == user_id,
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="无权访问该对话")
 
 
 #删除对话

@@ -1,6 +1,7 @@
 
-import hashlib
+import bcrypt
 import secrets
+import string
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -9,19 +10,17 @@ from app.utils.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS
 
 
 def hash_password(password: str) -> str:
-    """返回 salt$hash 格式"""
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((password + salt).encode()).hexdigest()
-    return f"{salt}${hashed}"
+    """bcrypt 哈希，返回 salt+hash 字符串"""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """验证密码"""
-    parts = hashed.split("$")
-    if len(parts) != 2:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
         return False
-    salt, stored = parts
-    return hashlib.sha256((plain + salt).encode()).hexdigest() == stored
 
 
 def create_token(user_id: int, role: str) -> str:

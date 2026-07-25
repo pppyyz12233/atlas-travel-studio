@@ -15,8 +15,7 @@ async def get_db():
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
+        # async with 退出时自动 close，无需显式调用
 
 
 async def init_db():

@@ -4,7 +4,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.database import get_db
-from app.auth.dependencies import get_optional_user
+from app.auth.dependencies import get_current_user
 from app.crud import message
 from app.utils.pdf_export import build_markdown, markdown_to_html, html_to_pdf
 
@@ -16,10 +16,10 @@ async def export_trip(
     conversation_id: int,
     format: str = Query("md", pattern="^(md|pdf)$"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_optional_user),
+    user=Depends(get_current_user),
 ):
-    """导出旅行方案为 Markdown 或 PDF"""
-    msgs = await message.get_history(db, conversation_id)
+    """导出旅行方案为 Markdown 或 PDF（需登录）"""
+    msgs = await message.get_history(db, conversation_id, user_id=user.id)
     assistant_msgs = [m for m in msgs if m.role == "assistant"]
     if not assistant_msgs:
         raise HTTPException(404, "未找到方案内容")
