@@ -1,10 +1,3 @@
-"""标准 MCP 服务器 —— 基于 FastMCP，通过 stdio 暴露旅行规划工具
-
-启动方式:
-    python -m app.mcp.server
-
-兼容 Claude Desktop 等标准 MCP 客户端。
-"""
 
 from mcp.server.fastmcp import FastMCP
 

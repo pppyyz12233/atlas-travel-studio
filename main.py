@@ -10,7 +10,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
 from app.utils.database import init_db, engine
-from app.mcp.registry import init_registry
 from app.routers import router as api_router
 
 # LangGraph 持久化
@@ -35,7 +34,6 @@ class LogMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     global _agent
     await init_db()
-    init_registry()
 
     # 初始化 LangGraph Agent（带 Checkpointer + Memory Store）
     checkpointer = SqliteSaver.from_conn_string("travel.db")

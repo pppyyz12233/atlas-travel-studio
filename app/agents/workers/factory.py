@@ -16,7 +16,7 @@ from langgraph.graph import StateGraph, END, START
 
 from app.utils.llm import chat
 from app.agents.skill_loader import load_skill
-from app.agents.tools import WORKER_TOOLS_MAP
+from app.mcp.registry import WORKER_TOOLS_MAP
 from app.utils.config import MAX_TOOL_ITERATIONS
 
 

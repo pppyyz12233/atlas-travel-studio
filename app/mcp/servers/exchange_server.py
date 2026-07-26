@@ -1,13 +1,3 @@
-"""汇率工具 —— 接入 exchangerate-api.com 实时汇率 + 内置离线降级
-
-提供工具函数:
-  - get_exchange_rate: 查询两种货币之间的实时汇率
-
-数据来源:
-  在线: https://api.exchangerate-api.com （免费，无需 API Key）
-  离线: 内置 5 种常用货币对的估算汇率
-"""
-
 import aiohttp
 
 

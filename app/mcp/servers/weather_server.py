@@ -1,16 +1,7 @@
-"""天气工具 —— 接入 wttr.in 实时天气数据
-
-提供两个异步工具函数:
-  - get_weather:  查询当前天气
-  - get_forecast: 查询未来几天预报
-
-数据来源: https://wttr.in （免费，无需 API Key）
-"""
-
 import aiohttp
 
 
-async def _fetch(city: str) -> dict:
+async def _fetch(city: str):
     """调用 wttr.in API，获取原始 JSON 天气数据。
 
     参数:
@@ -26,7 +17,7 @@ async def _fetch(city: str) -> dict:
             return await resp.json()
 
 
-async def get_weather(city: str) -> dict:
+async def get_weather(city: str):
     """查询城市当前天气。
 
     参数:
@@ -54,7 +45,7 @@ async def get_weather(city: str) -> dict:
         }
 
 
-async def get_forecast(city: str, days: int = 3) -> list[dict]:
+async def get_forecast(city: str, days: int = 3):
     """查询城市未来几天天气预报。
 
     参数:
