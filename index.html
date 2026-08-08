@@ -233,9 +233,119 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 .login-tab.active{background:var(--blue,#007aff);color:#fff}
 .login-form{display:flex;flex-direction:column;gap:12px}
 .login-toggle{text-align:center;margin-top:12px;color:var(--blue,#007aff);cursor:pointer;font-size:13px}
+
+/* ============================================================
+   AGENT WORKFLOW VISUALIZER — Synthesis-inspired
+   ============================================================ */
+.graph-box{background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:14px;padding:12px 14px;margin:0 0 12px;box-shadow:0 4px 20px rgba(0,0,0,0.06)}
+.graph-header{font-size:10px;font-weight:700;color:var(--text-tertiary);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.graph-track{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+.graph-node{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px;padding:7px 5px;border-radius:10px;transition:all .3s ease;opacity:.45;flex-shrink:0}
+.graph-node.running{opacity:1;background:rgba(255,149,0,.10);animation:pulse 1.2s ease-in-out infinite}
+.graph-node.done{opacity:1;background:rgba(52,199,89,.10)}
+.graph-node.failed{opacity:1;background:rgba(255,59,48,.10)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.gn-icon{font-size:15px;line-height:1}
+.gn-name{font-size:8px;font-weight:600;color:var(--text-secondary);letter-spacing:.02em}
+.gn-state{font-size:9px}
+.graph-arrow{color:var(--text-tertiary);font-size:9px;flex-shrink:0;opacity:.6}
+.graph-meta{font-size:10px;color:var(--text-tertiary);text-align:center;margin-top:8px;font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   P1-5: DARK MODE — 2025–26 trend
+   ============================================================ */
+:root {
+  --bg:#f5f5f7;--card:#fff;--surface:#faf9f5;--text:#1d1d1f;
+  --text-secondary:#6e6e73;--text-tertiary:#a1a1a6;
+  --border:rgba(0,0,0,0.08);
+}
+.dark {
+  --bg:#0B0F14;--card:#141A21;--surface:#1a1e24;--text:#f5f5f7;
+  --text-secondary:#a0a0b0;--text-tertiary:#6e6e80;
+  --glass-bg:rgba(20,26,33,0.85);--glass-border:rgba(255,255,255,0.08);
+  --border:rgba(255,255,255,0.08);
+}
+.theme-btn{position:fixed;top:12px;right:12px;width:32px;height:32px;border-radius:50%;
+  border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;z-index:100;transition:all .2s}
+.theme-btn:hover{transform:scale(1.1)}
+
+/* ============================================================
+   P0-1: TYPEWRITER CURSOR
+   ============================================================ */
+.typewriter-cursor{display:inline-block;width:2px;height:1em;background:var(--blue,#007aff);
+  margin-left:2px;animation:blink 0.8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ============================================================
+   P0-2: BUTTON STATE MACHINE
+   ============================================================ */
+.btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   P0-3: SCROLL TO BOTTOM FAB
+   ============================================================ */
+.scroll-fab{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);width:36px;height:36px;
+  border-radius:50%;background:var(--blue,#007aff);color:#fff;border:none;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,113,227,.35);z-index:50;display:none;align-items:center;justify-content:center;
+  font-size:18px;transition:all .25s;animation:fabIn .3s ease}
+.scroll-fab:hover{transform:translateX(-50%) scale(1.1)}
+@keyframes fabIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ============================================================
+   P1-4: TRIP CARDS — Wanderlog-inspired
+   ============================================================ */
+.trip-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:16px;margin:10px 0;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:all .2s}
+.trip-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.08)}
+.trip-card .tc-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:700;font-size:15px}
+.trip-card table{width:100%;border-collapse:collapse;font-size:13px}
+.trip-card th{text-align:left;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;
+  letter-spacing:.06em;padding:6px 8px 4px;border-bottom:1px solid var(--border)}
+.trip-card td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.trip-card tr:last-child td{border-bottom:none}
+
+/* ============================================================
+   P2-9: SUGGESTION CHIPS
+   ============================================================ */
+.suggest-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.suggest-chip{padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--border);
+  font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.suggest-chip:hover{background:var(--blue,#007aff);color:#fff;border-color:var(--blue,#007aff);transform:scale(1.03)}
+
+/* ============================================================
+   P2-10: WELCOME GRADIENT
+   ============================================================ */
+.welcome{background:linear-gradient(135deg,rgba(99,102,241,.08) 0%,rgba(14,165,164,.08) 50%,rgba(249,115,22,.06) 100%)}
+
+/* ============================================================
+   P2-8: BUDGET PIE SVG
+   ============================================================ */
+.budget-pie{display:block;margin:12px auto;max-width:200px}
+.budget-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;justify-content:center;font-size:11px}
+.budget-legend-item{display:flex;align-items:center;gap:4px}
+.budget-legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* ============================================================
+   P2-7: TIMELINE
+   ============================================================ */
+.timeline{position:relative;padding-left:32px;margin:16px 0}
+.timeline::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:2px;background:var(--border)}
+.timeline-day{margin-bottom:20px;position:relative}
+.timeline-day::before{content:'';position:absolute;left:-22px;top:4px;width:18px;height:18px;border-radius:50%;
+  background:var(--blue,#007aff);border:3px solid var(--card);z-index:1}
+.timeline-day-header{font-weight:700;margin-bottom:8px;color:var(--blue,#007aff)}
+.timeline-stop{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
+.timeline-stop-icon{font-size:16px}
+.timeline-stop-distance{font-size:10px;color:var(--text-tertiary);background:var(--surface);border-radius:10px;padding:2px 8px}
+
 </style>
 </head>
 <body>
+<button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切换深色模式">🌙</button>
+<div class="scroll-fab" id="scrollFab" onclick="scrollToBottom()">↓</div>
 
 <div class="app">
 <!-- ===== SIDEBAR — glass ===== -->
@@ -254,6 +364,25 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
       <div class="field-group"><label class="field-label">预算</label><input id="budget" class="field" type="number" value="8000" style="text-align:center"></div>
     </div>
     <button id="goBtn" class="btn btn-full" onclick="doGo()">开始规划</button>
+    <div id="graphBox" class="graph-box" style="display:none">
+      <div class="graph-header"><span>Agent 工作流</span><span id="graphTimer">0.0s</span></div>
+      <div class="graph-track" id="graphTrack">
+        <div class="graph-node" id="gn-guard"><div class="gn-icon">🛡️</div><div class="gn-name">guard</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-memory_reader"><div class="gn-icon">🧠</div><div class="gn-name">记忆</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-intent_router"><div class="gn-icon">🎯</div><div class="gn-name">意图</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-planner"><div class="gn-icon">📝</div><div class="gn-name">规划</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-executor"><div class="gn-icon">⚙️</div><div class="gn-name">执行</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-aggregator"><div class="gn-icon">📊</div><div class="gn-name">汇总</div><div class="gn-state">⏳</div></div>
+        <div class="graph-arrow">→</div>
+        <div class="graph-node" id="gn-memory_writer"><div class="gn-icon">💾</div><div class="gn-name">记忆</div><div class="gn-state">⏳</div></div>
+      </div>
+      <div class="graph-meta" id="graphMeta">等待开始</div>
+    </div>
     <div id="progBox" class="progress-box" style="display:none"></div>
   </div>
   <div class="sidebar-footer">
@@ -270,10 +399,15 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 <main class="chat-panel">
   <div class="chat-messages" id="chatBox">
     <div class="welcome" id="welcome">
-      <div class="welcome-icon">🗺</div>
+      <div class="welcome-icon">🛫</div>
       <div class="welcome-title">想去哪里旅行？</div>
       <div class="welcome-sub">填写左边信息开始规划<br>或在下方直接描述你的旅行计划</div>
       <div class="welcome-hint">例："从上海去东京5天，人均8000，想去秋叶原和浅草寺"</div>
+      <div class="suggest-chips">
+        <span class="suggest-chip" onclick="quickSend('从上海去东京5天，人均8000，想去秋叶原和浅草寺')">✈️ 上海→东京5天</span>
+        <span class="suggest-chip" onclick="quickSend('广州一日游，预算500')">🏙️ 广州一日游</span>
+        <span class="suggest-chip" onclick="quickSend('北京三日游，预算3000')">🏯 北京三日游</span>
+      </div>
     </div>
   </div>
   <div class="chat-input-bar">
@@ -310,11 +444,34 @@ window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
 
 <script>
 /* ================================================================
+   P1-5: DARK MODE
+   ================================================================ */
+(function(){var d=localStorage.getItem("theme");if(d==="dark")document.documentElement.classList.add("dark");
+  var btn=document.getElementById("themeBtn");if(d==="dark")btn.textContent="☀️"})();
+function toggleTheme(){var h=document.documentElement;h.classList.toggle("dark");
+  var is=h.classList.contains("dark");var btn=document.getElementById("themeBtn");
+  btn.textContent=is?"☀️":"🌙";localStorage.setItem("theme",is?"dark":"light")}
+
+/* ================================================================
+   P0-3: SCROLL TO BOTTOM
+   ================================================================ */
+function setupScrollFab(){var box=document.getElementById("chatBox");if(!box)return;
+  var fab=document.getElementById("scrollFab");
+  box.addEventListener("scroll",function(){
+    var dist=box.scrollHeight-box.scrollTop-box.clientHeight;
+    fab.style.display=dist>200?"flex":"none"
+  })}
+function scrollToBottom(){var box=document.getElementById("chatBox");
+  box.scrollTo({top:box.scrollHeight,behavior:"smooth"})}
+document.addEventListener("DOMContentLoaded",setupScrollFab);
+
+/* ================================================================
    STATE
    ================================================================ */
+
 var A="/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
 var map=null,amapReady=false,_markers=[],_infoWindow=null,_stepResults={};
-var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null;
+var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null,_graphTimer=null,_graphStart=0;
 
 var STEP_COLORS={flight:"#ff3b30",hotel:"#0071e3",attraction:"#34c759",itinerary:"#af52de",budget:"#ff9500"};
 var STEP_ICONS={flight:"✈️",hotel:"🏨",attraction:"🎯",itinerary:"📋",budget:"💰"};
@@ -365,6 +522,33 @@ function searchAndMark(keyword,city,stepName,color){
 function stepSearchKeyword(name,dest){var n=name.toLowerCase();if(n.includes("航班")||n.includes("flight"))return dest+" 机场";if(n.includes("酒店")||n.includes("hotel"))return dest+" 酒店";if(n.includes("景点")||n.includes("attraction"))return dest+" 景点";return null}
 
 /* ================================================================
+   GRAPH STATE VISUALIZER
+   ================================================================ */
+function resetGraph(){
+  ["guard","memory_reader","intent_router","planner","executor","aggregator","memory_writer"].forEach(function(n){
+    var el=document.getElementById("gn-"+n);if(el){el.className="graph-node";var st=el.querySelector(".gn-state");if(st)st.textContent="⏳"}
+  });
+  var box=document.getElementById("graphBox");if(box)box.style.display="none";
+  var meta=document.getElementById("graphMeta");if(meta)meta.textContent="等待开始";
+  var tm=document.getElementById("graphTimer");if(tm)tm.textContent="0.0s";
+  if(_graphTimer)clearInterval(_graphTimer);_graphTimer=null;
+}
+function graphState(node,status){
+  var box=document.getElementById("graphBox");
+  if(box&&box.style.display==="none"){box.style.display="block";_graphStart=Date.now();
+    if(_graphTimer)clearInterval(_graphTimer);
+    _graphTimer=setInterval(function(){var tm=document.getElementById("graphTimer");if(tm)tm.textContent=((Date.now()-_graphStart)/1000).toFixed(1)+"s"},100)}
+  var el=document.getElementById("gn-"+node);if(!el)return;
+  el.className="graph-node "+status;
+  var st=el.querySelector(".gn-state");
+  if(st)st.textContent=status==="done"?"✅":status==="running"?"🔄":status==="failed"?"❌":"⏳";
+  var done=document.querySelectorAll(".graph-node.done").length;
+  var total=document.querySelectorAll(".graph-node").length;
+  var meta=document.getElementById("graphMeta");
+  if(meta)meta.textContent="已完成 "+done+"/"+total+(status==="running"?" · 当前: "+node:"");
+}
+
+/* ================================================================
    PROGRESS
    ================================================================ */
 function initProgress(steps){
@@ -404,9 +588,26 @@ function doLogin(e){e.preventDefault();var em=document.getElementById("lem").val
 function logout(){tk=null;localStorage.removeItem("t");location.reload()}
 
 /* ================================================================
+   P2-9: QUICK SEND
+   ================================================================ */
+function quickSend(msg){document.getElementById("chatInput").value=msg;send()}
+
+/* ================================================================
    CHAT
    ================================================================ */
-function addBubble(role,text){var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";var d=document.createElement("div");d.style.cssText="display:flex;"+(role==="user"?"justify-content:flex-end":"justify-content:flex-start");var cls=role==="user"?"bubble bubble-user":"bubble bubble-ai";var content=role==="assistant"?marked.parse(text):text.replace(/\n/g,"<br>");d.innerHTML='<div class="'+cls+'"><div class="md">'+content+'</div></div>';el.appendChild(d);el.scrollTop=el.scrollHeight;return d}
+
+function addBubble(role,text){var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";var d=document.createElement("div");d.style.cssText="display:flex;"+(role==="user"?"justify-content:flex-end":"justify-content:flex-start");var cls=role==="user"?"bubble bubble-user":"bubble bubble-ai";
+  if(role==="user"){d.innerHTML='<div class="'+cls+'"><div class="md">'+text.replace(/\n/g,"<br>")+'</div></div>'}
+  else{d.innerHTML='<div class="'+cls+'" id="bubble-ai-latest"><div class="md"></div></div>';
+    el.appendChild(d);el.scrollTop=el.scrollHeight;
+    // P0-1: typewriter
+    var target=d.querySelector(".md"),full=marked.parse(text),i=0,len=full.length;
+    if(!target)return d;
+    function tick(){i+=3;if(i>=len){target.innerHTML=full;el.scrollTop=el.scrollHeight;return}
+      target.innerHTML=full.slice(0,i)+'<span class="typewriter-cursor"></span>';
+      el.scrollTop=el.scrollHeight;requestAnimationFrame(function(){setTimeout(tick,10)})}
+    tick();return d}
+  el.appendChild(d);el.scrollTop=el.scrollHeight;return d}
 
 function addStepCard(name,status,iter,tools,workerType){
   var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";
@@ -434,10 +635,10 @@ function doGo(){
 
 async function send(){
   var msg=document.getElementById("chatInput").value.trim();if(!msg)return;
-  if(!tk){showLogin();return}
+  if(!tk){/* 匿名模式——跳过登录，允许试用 */}
   document.getElementById("chatInput").value="";addBubble("user",msg);showTyping();
-  var btn=document.getElementById("goBtn");btn.disabled=true;btn.textContent="规划中...";
-  _stepNames=[];_stepDoneCount=0;clearMarkers();_stepResults={};
+  var btn=document.getElementById("goBtn");btn.disabled=true;btn.innerHTML='<span class="btn-spinner"></span>';
+  _stepNames=[];_stepDoneCount=0;clearMarkers();_stepResults={};resetGraph();
   try{
     var r=await fetch(A+"/chat/stream",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({message:msg,conversation_id:cid})});
     if(r.status===401){tk=null;localStorage.removeItem("t");showLogin();addBubble("assistant","请先登录");btn.disabled=false;btn.textContent="开始规划";hideTyping();return}
@@ -445,10 +646,11 @@ async function send(){
     var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
     while(true){var v=await reader.read();if(v.done)break;buf+=decoder.decode(v.value,{stream:true});var lines=buf.split("\n");buf=lines.pop()||"";for(var i=0;i<lines.length;i++){var line=lines[i].trim();if(!line.startsWith("data: "))continue;try{handleSSE(JSON.parse(line.slice(6)))}catch(e){} }}
   }catch(e){addBubble("assistant","无法连接服务器");hideTyping()}
-  btn.disabled=false;btn.textContent="开始规划";stopProgressTimer()
+  btn.disabled=false;btn.innerHTML='开始规划';stopProgressTimer()
 }
 
 function handleSSE(evt){
+  if(evt.event==="graph_state"){graphState(evt.node,evt.status);return}
   var dest=document.getElementById("dest").value||"东京";
   if(evt.event==="plan"){initProgress(evt.steps||[])}
   else if(evt.event==="step_start"){updProgress(evt.name,"running",evt.parallel?"并行":"");
@@ -459,12 +661,20 @@ function handleSSE(evt){
     addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker);
     _stepResults[evt.name]={status:evt.status,iterations:evt.iterations,tool_calls:evt.tool_calls};
     if(ok&&amapReady){var kw=stepSearchKeyword(evt.name,dest);if(kw)searchAndMark(kw,dest,evt.name,STEP_COLORS[worker]||"#0071e3")}
+    // P1-6: map hover — bind to step card
+    var cards=document.querySelectorAll(".step-card");if(cards.length>0){
+      var last=cards[cards.length-1];last.addEventListener("mouseenter",function(){
+        if(_markers.length){map.setZoomAndCenter(14,_markers[_markers.length-1].getPosition())}})}
   }else if(evt.event==="done"){
     hideTyping();
     for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}
     var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";
     var counter=document.querySelector(".progress-counter");if(counter)counter.textContent="全部完成";
-    stopProgressTimer();cid=evt.conversation_id;addBubble("assistant",evt.reply);
+    stopProgressTimer();cid=evt.conversation_id;
+    // P2-8: budget pie
+    var reply=evt.reply;var budgetSection=reply.match(/## 💰.*?(?=##|$)/s);
+    if(budgetSection){var pieData=parseBudgetTable(budgetSection[0]);if(pieData.length){var pieSvg=drawBudgetPie(pieData);reply=reply.replace(/## 💰.*?(?=##|$)/s,"## 💰 预算\n\n"+pieSvg)}}
+    addBubble("assistant",reply);
     if(amapReady)searchAndMark(dest,dest,"总览","#6366f1");
   }else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="汇总方案中..."}
 }

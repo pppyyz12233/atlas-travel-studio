@@ -1,8 +1,3 @@
-"""对话接口 —— SSE 流式 + 非流式
-
-依赖 LangGraph Checkpointer 自动存档/恢复历史。
-调用方只需传 thread_id，不用手工加载/保存消息。
-"""
 
 import json
 import asyncio
@@ -10,12 +5,13 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.utils.database import get_db
+from app.utils.database import get_db, AsyncSessionLocal
 from app.auth.dependencies import get_current_user, get_optional_user
 from app.schemas.chat import ChatRequest
 from app.agents.workflow.guard import check
 from app.agents.supervisor import (
     build_graph, intent_router_node, planner_node, aggregator_node,
+    memory_reader_node, memory_writer_node,
     _build_execution_layers, _build_context, _infer_depends_on,
     _run_step_with_subgraph,
 )
@@ -115,11 +111,14 @@ async def chat(
 async def chat_stream(
     req: ChatRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user=Depends(get_optional_user),
 ):
     """SSE 流式对话：每个步骤完成时推送进度"""
     await limiter.check(_client_key(request))
+
+    def _gs(node, status):
+        """graph_state 事件：Agent 工作流节点状态"""
+        return f"data: {json.dumps({'event': 'graph_state', 'node': node, 'status': status}, ensure_ascii=False)}\n\n"
 
     async def event_stream():
         msg = req.message
@@ -135,7 +134,9 @@ async def chat_stream(
         uid = str(user.id) if user else "anonymous"
         conv_id = req.conversation_id
         if user and conv_id:
-            await conversation.verify_owner(db, conv_id, user.id)
+            async with AsyncSessionLocal() as _s:
+                await conversation.verify_owner(_s, conv_id, user.id)
+                await _s.commit()
 
         # 3. 获取 agent
         from main import get_agent
@@ -155,12 +156,26 @@ async def chat_stream(
             "intent": "full_trip", "active_workers": [], "trip_state": {},
         }
 
+        # 加载长期记忆（如有）
+        from main import get_store
+        store = get_store()
+        yield _gs("memory_reader", "running")
+        if store:
+            state = await memory_reader_node(state, config, store=store)
+        yield _gs("memory_reader", "done")
+
+        yield _gs("intent_router", "running")
         state = await intent_router_node(state)
+        yield _gs("intent_router", "done")
+
+        yield _gs("planner", "running")
         state = await planner_node(state)
+        yield _gs("planner", "done")
         steps = state["plan_steps"]
         yield f"data: {json.dumps({'event': 'plan', 'steps': [s['name'] for s in steps], 'count': len(steps)}, ensure_ascii=False)}\n\n"
 
         # 5. Executor（手动分层执行，推送每步进度）
+        yield _gs("executor", "running")
         for s in steps:
             if "depends_on" not in s or not s["depends_on"]:
                 s["depends_on"] = _infer_depends_on(s, steps)
@@ -184,17 +199,29 @@ async def chat_stream(
                 result_snippet = result_text[:150] if len(result_text) > 150 else result_text
                 yield f"data: {json.dumps({'event': 'step_done', 'name': s['name'], 'worker': s.get('worker', ''), 'status': s.get('status', 'failed'), 'result_snippet': result_snippet, 'summary': s.get('summary', ''), 'locations': s.get('locations', [])}, ensure_ascii=False)}\n\n"
 
+        yield _gs("executor", "done")
+
         # 6. Aggregator
+        yield _gs("aggregator", "running")
         yield f"data: {json.dumps({'event': 'aggregating'}, ensure_ascii=False)}\n\n"
         state = await aggregator_node(state)
+        yield _gs("aggregator", "done")
 
-        # 7. 保存消息
+        # 7. 保存长期记忆（提取偏好）
+        yield _gs("memory_writer", "running")
+        if store:
+            state = await memory_writer_node(state, config, store=store)
+        yield _gs("memory_writer", "done")
+
+        # 8. 保存消息（独立短会话，避免长期锁）
         if user is not None:
-            if not conv_id:
-                conv = await conversation.create_conversation(db, user.id, msg[:30])
-                conv_id = conv.id
-            await message.add_message(db, conv_id, "user", msg)
-            await message.add_message(db, conv_id, "assistant", state["final_answer"])
+            async with AsyncSessionLocal() as _s:
+                if not conv_id:
+                    conv = await conversation.create_conversation(_s, user.id, msg[:30])
+                    conv_id = conv.id
+                await message.add_message(_s, conv_id, "user", msg)
+                await message.add_message(_s, conv_id, "assistant", state["final_answer"])
+                await _s.commit()
 
         yield f"data: {json.dumps({'event': 'done', 'reply': state['final_answer'], 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
 
