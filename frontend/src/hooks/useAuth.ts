@@ -1,8 +1,24 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { ApiResponse, UserInfo, LoginResponse } from '../types'
+import type { UserInfo } from '../types'
 
 const TOKEN_KEY = 'travel_token'
 const USER_KEY = 'travel_user'
+
+/** Extract error message from any API error shape (FastAPI detail / Pydantic / custom) */
+function errMsg(json: Record<string, unknown>): string {
+  if (typeof json.message === 'string') return json.message
+  if (typeof json.detail === 'string') return json.detail
+  if (Array.isArray(json.detail)) {
+    const first = json.detail[0] as Record<string, unknown> | undefined
+    if (first?.msg) return String(first.msg)
+  }
+  return ''
+}
+
+interface LoginResponse {
+  user_id: number; username: string; email: string | null; phone: string | null
+  role: string; access_token: string; token_type: string
+}
 
 export function useAuth() {
   const [user, setUser] = useState<UserInfo | null>(() => {
@@ -35,13 +51,14 @@ export function useAuth() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
-    const json: ApiResponse<LoginResponse> = await res.json()
+    const json = await res.json() as Record<string, unknown>
     if (json.code === 200 && json.data) {
-      const { access_token, ...userInfo } = json.data
+      const d = json.data as LoginResponse
+      const { access_token, ...userInfo } = d
       saveAuth(access_token, userInfo)
       return null
     }
-    return json.message || '登录失败'
+    return errMsg(json) || '登录失败'
   }, [saveAuth])
 
   const loginByPhone = useCallback(async (phone: string, password: string): Promise<string | null> => {
@@ -50,13 +67,14 @@ export function useAuth() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, password }),
     })
-    const json: ApiResponse<LoginResponse> = await res.json()
+    const json = await res.json() as Record<string, unknown>
     if (json.code === 200 && json.data) {
-      const { access_token, ...userInfo } = json.data
+      const d = json.data as LoginResponse
+      const { access_token, ...userInfo } = d
       saveAuth(access_token, userInfo)
       return null
     }
-    return json.message || '登录失败'
+    return errMsg(json) || '登录失败'
   }, [saveAuth])
 
   const register = useCallback(async (
@@ -67,37 +85,30 @@ export function useAuth() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, email: email || null, phone: phone || null }),
     })
-    const json: ApiResponse<LoginResponse> = await res.json()
+    const json = await res.json() as Record<string, unknown>
     if (json.code === 200 && json.data) {
-      const { access_token, ...userInfo } = json.data
+      const d = json.data as LoginResponse
+      const { access_token, ...userInfo } = d
       saveAuth(access_token, userInfo)
       return null
     }
-    return json.message || '注册失败'
+    return errMsg(json) || '注册失败'
   }, [saveAuth])
 
-  // 启动时验证 token 有效性
+  // 启动时验证 token
   useEffect(() => {
     if (token && !user) {
-      fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json())
-        .then((json: ApiResponse<UserInfo>) => {
+        .then((json: Record<string, unknown>) => {
           if (json.code === 200 && json.data) {
             localStorage.setItem(USER_KEY, JSON.stringify(json.data))
-            setUser(json.data)
-          } else {
-            logout()
-          }
+            setUser(json.data as UserInfo)
+          } else { logout() }
         })
         .catch(() => logout())
     }
   }, [token, user, logout])
 
-  return {
-    user, token, isLoggedIn,
-    login, loginByPhone, register, logout,
-    showAuthModal, setShowAuthModal,
-  }
+  return { user, token, isLoggedIn, login, loginByPhone, register, logout, showAuthModal, setShowAuthModal }
 }

@@ -10,9 +10,9 @@ from app.agents.supervisor import build_graph
 graph = build_graph()
 
 
-def _run(msg: str) -> str:
+async def _run(msg: str) -> str:
     """调一次 Agent，返回 final_answer"""
-    r = graph.invoke({
+    r = await graph.ainvoke({
         "messages": [{"role": "user", "content": msg}],
         "plan_steps": [], "current_step_index": 0,
         "final_answer": "", "guard_blocked": False, "guard_reason": "",
@@ -36,7 +36,8 @@ CASES = [
 ]
 
 
-def test_deepeval():
+@pytest.mark.asyncio
+async def test_deepeval():
     """可选开关：装 deepeval 才能跑"""
     pytest.importorskip("deepeval", reason="需要装 deepeval：pip install deepeval")
 
@@ -46,7 +47,7 @@ def test_deepeval():
 
     test_cases = []
     for msg, desc in CASES:
-        reply = _run(msg)
+        reply = await _run(msg)
         test_cases.append(LLMTestCase(
             input=msg,
             actual_output=reply,
@@ -63,8 +64,9 @@ def test_deepeval():
         print(f"[{CASES[i][1]}] 相关性={r.score:.2f} 通过={r.success}")
 
 
-def test_quick_check():
+@pytest.mark.asyncio
+async def test_quick_check():
     """不装 deepeval 也能跑的快速验证"""
     for msg, desc in CASES:
-        reply = _run(msg)
+        reply = await _run(msg)
         assert reply, f"{desc} 返回为空"

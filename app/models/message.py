@@ -1,4 +1,3 @@
-"""对话消息表"""
 
 import datetime
 

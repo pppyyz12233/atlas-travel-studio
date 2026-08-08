@@ -1,4 +1,4 @@
-"""数据库引擎 —— MySQL + aiomysql"""
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.utils.config import DB_URL
@@ -19,7 +19,9 @@ async def get_db():
 
 
 async def init_db():
-    """启动时自动建表"""
+    """启动时自动建表 + 启用 WAL 模式避免锁"""
     from app.models import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # WAL 模式允许并发读 + 单写，避免 "database is locked"
+        await conn.exec_driver_sql("PRAGMA journal_mode=WAL")

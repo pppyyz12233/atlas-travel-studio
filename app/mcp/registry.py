@@ -1,8 +1,3 @@
-"""LangGraph 标准工具 —— 封装 MCP 函数为 @tool 格式
-
-Worker 子图和 ToolNode 依赖此模块。
-每个工具函数返回字符串（LLM 可读），内部调用 MCP 原始函数。
-"""
 
 import json
 from langchain_core.tools import tool
@@ -13,14 +8,13 @@ from app.mcp.servers.weather_server import get_weather, get_forecast
 from app.mcp.servers.exchange_server import get_exchange_rate
 
 
-# ── 航班工具 ──────────────────────────────────────────────────
-
+#航班工具
 @tool
 async def search_flights_tool(
     origin: str,
     destination: str,
     date: str = "2026-08-01",
-) -> str:
+):
     """搜索航班：根据出发地、目的地和日期查询可用航班。
 
     Args:
@@ -37,14 +31,13 @@ async def get_flight_price_tool(flight_id: str) -> str:
     """查询指定航班号的价格和航空公司信息。
 
     Args:
-        flight_id: 航班号，如 MU523、CA929
+        flight_id: 航班号
     """
     result = get_flight_price(flight_id)
     return json.dumps(result, ensure_ascii=False) if result else "未找到该航班"
 
 
-# ── 酒店工具 ──────────────────────────────────────────────────
-
+#酒店工具
 @tool
 async def search_hotels_tool(city: str, budget: str = "mid") -> str:
     """搜索酒店：按城市和预算档位查询酒店列表。
@@ -57,8 +50,7 @@ async def search_hotels_tool(city: str, budget: str = "mid") -> str:
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-# ── 天气工具 ──────────────────────────────────────────────────
-
+#天气工具
 @tool
 async def get_weather_tool(city: str) -> str:
     """查询城市当前天气（温度、天气状况、湿度、风速）。
@@ -82,8 +74,7 @@ async def get_forecast_tool(city: str, days: int = 3) -> str:
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-# ── 汇率工具 ──────────────────────────────────────────────────
-
+#汇率工具
 @tool
 async def get_exchange_rate_tool(from_currency: str = "CNY", to_currency: str = "JPY") -> str:
     """查询实时汇率，支持主流货币互转。
@@ -96,17 +87,16 @@ async def get_exchange_rate_tool(from_currency: str = "CNY", to_currency: str = 
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-# ── 工具分组（供 Worker 子图使用）─────────────────────────────
-
+#工具分组（供 Worker 子图使用）
 FLIGHT_TOOLS = [search_flights_tool, get_flight_price_tool]
 HOTEL_TOOLS = [search_hotels_tool]
-ATTRACTION_TOOLS = []  # 景点 Worker 无工具，纯 LLM 推理
+ATTRACTION_TOOLS = []
 ITINERARY_TOOLS = [get_weather_tool, get_forecast_tool]
 BUDGET_TOOLS = [get_exchange_rate_tool]
 
 ALL_TOOLS = FLIGHT_TOOLS + HOTEL_TOOLS + ITINERARY_TOOLS + BUDGET_TOOLS
 
-# 按 Worker 名获取工具
+#按Worker名获取工具
 WORKER_TOOLS_MAP = {
     "flight": FLIGHT_TOOLS,
     "hotel": HOTEL_TOOLS,

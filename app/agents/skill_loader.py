@@ -3,7 +3,7 @@ import os
 _skill_cache = {}
 
 def load_skill(name: str) -> str:
-    """load skills/{name}.md, cached. use __file__ relative path."""
+    """加载skill到提示词"""
     if name in _skill_cache:
         return _skill_cache[name]
     

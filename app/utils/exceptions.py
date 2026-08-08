@@ -1,5 +1,3 @@
-"""全局异常定义"""
-
 
 class NotFoundError(Exception):
     """资源不存在  →  HTTP 404"""

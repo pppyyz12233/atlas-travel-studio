@@ -1,9 +1,9 @@
-"""意图分类 —— 决定该跑哪些 Worker"""
+
 import json
 from enum import StrEnum
 from dataclasses import dataclass, field
 
-from app.utils.llm import chat
+from app.utils.llm import chat, parse_tool_call
 
 
 class Intent(StrEnum):
@@ -24,6 +24,8 @@ INTENT_WORKERS = {
     Intent.ITINERARY_MODIFY: ["itinerary"],
 }
 
+VALID_INTENTS = {i.value for i in Intent}
+
 
 @dataclass
 class IntentResult:
@@ -36,46 +38,71 @@ class IntentResult:
     description: str = ""
 
 
-INTENT_PROMPT = """分析用户的旅行请求，输出 JSON。
-
-类别:
-- full_trip: 完整旅行规划 (含目的地+天数)
-- flight_only: 只查航班
-- hotel_only: 只找酒店
-- attractions_only: 只推荐景点
-- budget_only: 只算预算
-- itinerary_modify: 修改已有行程
-
-提取: destination(目的地), origin(出发地), description(一句话任务描述)
-
-用户: {message}
-
-只输出 JSON:"""
+CLASSIFY_TOOL = [{
+    "type": "function",
+    "function": {
+        "name": "classify_intent",
+        "description": "分类用户的旅行意图",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "intent": {
+                    "type": "string",
+                    "enum": ["full_trip", "flight_only", "hotel_only",
+                             "attractions_only", "budget_only", "itinerary_modify"],
+                    "description": "意图类别"
+                },
+                "origin": {
+                    "type": "string",
+                    "description": "出发城市"
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "目的城市"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "出行日期"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "一句话任务描述"
+                },
+            },
+            "required": ["intent", "origin", "destination"]
+        }
+    }
+}]
 
 
 async def classify_intent(message: str) -> IntentResult:
     """分类用户意图"""
     try:
-        resp = await chat([
-            {"role": "user", "content": INTENT_PROMPT.format(message=message)}
-        ])
-        content = resp.get("content", "{}").strip()
-        s = content.find("{")
-        e = content.rfind("}")
-        if s != -1 and e != -1:
-            data = json.loads(content[s:e + 1])
-            intent_str = data.get("intent") or data.get("category", "full_trip")
-            try:
-                intent = Intent(intent_str)
-            except ValueError:
-                intent = Intent.FULL_TRIP
-            return IntentResult(
-                intent=intent,
-                workers=INTENT_WORKERS.get(intent, INTENT_WORKERS[Intent.FULL_TRIP]),
-                destination=data.get("destination", ""),
-                origin=data.get("origin", ""),
-                description=data.get("description", message),
-            )
+        resp = await chat(
+            [{"role": "user", "content": f"分析意图: {message}"}],
+            tools=CLASSIFY_TOOL,
+        )
+        tool_calls = resp.get("tool_calls", [])
+
+        if not tool_calls:
+            return IntentResult()
+
+        args = parse_tool_call(resp)
+        if args is None:
+            return IntentResult()
+
+        intent_str = args.get("intent", "full_trip")
+        if intent_str not in VALID_INTENTS:
+            intent_str = "full_trip"
+
+        intent = Intent(intent_str)
+        return IntentResult(
+            intent=intent,
+            workers=INTENT_WORKERS.get(intent, INTENT_WORKERS[Intent.FULL_TRIP]),
+            destination=args.get("destination", ""),
+            origin=args.get("origin", ""),
+            description=args.get("description", message),
+        )
     except Exception:
         pass
     return IntentResult()

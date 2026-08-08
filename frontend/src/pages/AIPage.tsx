@@ -1,327 +1,472 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Plus, MessageSquare, LogIn, Loader2, StopCircle } from 'lucide-react'
-import ChatBubble from '../components/ChatBubble'
-import ResultCard from '../components/ResultCard'
-import MarkdownView from '../components/MarkdownView'
-import MapView from '../components/MapView'
+import { useState, useRef, useEffect, useCallback, useReducer, useMemo } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { api } from '../hooks/useApi'
-import type { SSEEvent, PlanStep, Conversation, Location, Message } from '../types'
+import MapView from '../components/MapView'
+import TripResult from '../components/TripResult'
+import type { SSEEvent, Location, Conversation } from '../types'
 import type { useAuth } from '../hooks/useAuth'
+import type { useTheme } from '../hooks/useTheme'
 
-interface AIPageProps {
-  auth: ReturnType<typeof useAuth>
+/* ================================================================
+   Constants
+   ================================================================ */
+const WC: Record<string, string> = { flight: '#ef4444', hotel: '#3b82f6', attraction: '#10b981', itinerary: '#8b5cf6', budget: '#f59e0b' }
+const WI: Record<string, string> = { flight: '✈️', hotel: '🏨', attraction: '🎯', itinerary: '📋', budget: '💰' }
+type MapAPI = { searchAndMark: (kw: string, city: string, step: string, color: string) => void; clearMarkers: () => void }
+
+let _m: { parse: (s: string) => string } | null = null
+function md(s: string): string {
+  if (!_m) { const w = window as unknown as Record<string, unknown>; _m = (w.marked as { parse: (s: string) => string }) || { parse: (s: string) => s.replace(/\n/g, '<br>') } }
+  return _m.parse(s)
 }
 
-// 收集所有 step_done 的 locations
-function collectLocations(steps: PlanStep[]): Location[] {
-  const seen = new Set<string>()
-  const all: Location[] = []
-  for (const s of steps) {
-    for (const loc of s.locations) {
-      const key = `${loc.lng},${loc.lat}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        all.push(loc)
-      }
+/* ================================================================
+   Session — React's killer feature: isolated state per tab
+
+   In vanilla JS, switching between sessions means manually
+   hiding/showing DOM, saving/restoring scroll positions,
+   and praying event listeners don't cross-fire.
+
+   In React, it's just: swap the activeSessionId → re-render.
+   ================================================================ */
+
+interface Step { name: string; worker: string; status: 'pending' | 'running' | 'done' | 'failed'; summary: string; locations: Location[] }
+interface Message { role: 'user' | 'assistant'; content: string }
+
+interface Session {
+  id: string
+  title: string
+  conversationId: number | null
+  messages: Message[]
+  steps: Step[]
+  finalReply: string
+  locations: Location[]
+  hasStarted: boolean
+  dest: string; from: string; date: string; days: number; people: number; budget: number
+}
+
+type SessionAction =
+  | { type: 'ADD_SESSION' }
+  | { type: 'REMOVE_SESSION'; id: string }
+  | { type: 'SET_ACTIVE'; id: string }
+  | { type: 'UPDATE_SESSION'; id: string; patch: Partial<Session> }
+  | { type: 'LOAD_CONV'; id: string; conv: Conversation }
+
+function newSession(): Session {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  return { id, title: '新规划', conversationId: null, messages: [], steps: [], finalReply: '', locations: [], hasStarted: false, dest: '东京', from: '上海', date: new Date().toISOString().slice(0, 10), days: 5, people: 2, budget: 8000 }
+}
+
+function sessionReducer(state: { sessions: Session[]; active: string }, action: SessionAction): { sessions: Session[]; active: string } {
+  switch (action.type) {
+    case 'ADD_SESSION': {
+      const s = newSession()
+      return { sessions: [...state.sessions, s], active: s.id }
     }
+    case 'REMOVE_SESSION': {
+      const next = state.sessions.filter(s => s.id !== action.id)
+      if (next.length === 0) {
+        const fallback = newSession()
+        return { sessions: [fallback], active: fallback.id }
+      }
+      return { sessions: next, active: state.active === action.id ? next[0].id : state.active }
+    }
+    case 'SET_ACTIVE':
+      return { ...state, active: action.id }
+    case 'UPDATE_SESSION':
+      return {
+        ...state,
+        sessions: state.sessions.map(s => s.id === action.id ? { ...s, ...action.patch } : s),
+      }
+    case 'LOAD_CONV': {
+      const existing = state.sessions.find(s => s.conversationId === action.conv.id)
+      if (existing) return { ...state, active: existing.id }
+      const s = newSession()
+      s.title = action.conv.title; s.conversationId = action.conv.id; s.hasStarted = true
+      return { sessions: [...state.sessions, s], active: s.id }
+    }
+    default:
+      return state
   }
-  return all
 }
 
-export default function AIPage({ auth }: AIPageProps) {
-  const { user, token, isLoggedIn, setShowAuthModal } = auth
+/* ================================================================
+   Sub-components
+   ================================================================ */
+
+function Field({ l, v, s, t = 'text', p = '', n = false }: { l: string; v: string; s: (v: string) => void; t?: string; p?: string; n?: boolean }) {
+  return (
+    <div className={n ? 'flex-1' : ''}>
+      <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text3)] mb-1 block">{l}</label>
+      <input type={t} value={v} onChange={e => s(e.target.value)} placeholder={p}
+        className="w-full h-9 px-3 rounded-lg bg-[var(--surface)] border-0 text-[13px] text-[var(--text)] outline-none focus:ring-2 focus:ring-[var(--blue)]/15 transition-all placeholder:text-[var(--text3)]" />
+    </div>
+  )
+}
+
+function MapWrap({ locs, onAPI, onCount }: { locs: Location[]; onAPI: (a: MapAPI) => void; onCount: (n: number) => void }) {
+  const h = useCallback((api: MapAPI) => {
+    onAPI({ searchAndMark: (kw, c, st, cl) => { api.searchAndMark(kw, c, st, cl); setTimeout(() => onCount(document.querySelectorAll('.amap-marker').length), 600) }, clearMarkers: () => { api.clearMarkers(); onCount(0) } })
+  }, [onAPI, onCount])
+  return <MapView locations={locs} onMapReady={h} />
+}
+
+/* ================================================================
+   Chat area — pure function of session state
+   ================================================================ */
+function ChatArea({ session, isStreaming, finalReply, onSearchMap }: { session: Session; isStreaming: boolean; finalReply: string; onSearchMap: (kw: string, city: string) => void }) {
+  const endRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [session.messages, session.steps, finalReply])
+
+  const cardS = { background: 'var(--card)', boxShadow: 'var(--shadow)' }
+  const btnG = { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }
+
+  if (!session.hasStarted) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center select-none">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #2563eb, #0891b2)' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <h1 className="text-[18px] font-bold tracking-tight text-[var(--text)]">想去哪里旅行？</h1>
+        <p className="text-[13px] text-[var(--text2)] mt-2 leading-relaxed">填写左侧信息一键规划，或在下方直接描述</p>
+        <div className="text-xs mt-5 px-4 py-2 rounded-lg bg-[var(--surface)] text-[var(--text3)]">例："从上海去东京5天，人均8000，想去秋叶原和浅草寺"</div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {session.messages.map((m, i) => (
+        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} style={{ animation: 'fadeIn .25s cubic-bezier(.16,1,.3,1) both' }}>
+          <div className={`max-w-[78%] px-4 py-2.5 text-[13px] leading-relaxed ${m.role === 'user' ? 'text-white rounded-[16px_16px_4px_16px]' : 'rounded-[16px_16px_16px_4px]'}`} style={m.role === 'user' ? btnG : cardS}>
+            {m.role === 'assistant'
+              ? <span className="text-[var(--text2)] italic">方案已生成，详见下方卡片 ↓</span>
+              : m.content
+            }
+          </div>
+        </div>
+      ))}
+
+      {session.steps.map((s, i) => (
+        <div key={`st${i}`} className="flex justify-start" style={{ animation: `stepIn .3s cubic-bezier(.16,1,.3,1) ${i * 0.04}s both` }}>
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] max-w-[92%]" style={cardS}>
+            <span className="text-[15px]">{WI[s.worker] || '📌'}</span>
+            <div className="min-w-0 flex-1"><div className="font-semibold text-[12px] text-[var(--text)]">{s.name}</div>{s.summary && <div className="text-[11px] mt-0.5 line-clamp-2 text-[var(--text2)]">{s.summary}</div>}</div>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${s.status === 'done' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : s.status === 'failed' ? 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400' : s.status === 'running' ? 'bg-blue-50 text-[var(--blue)] dark:bg-blue-500/10 dark:text-blue-400' : 'bg-gray-100 text-gray-400'}`}>{s.status === 'done' ? '完成' : s.status === 'failed' ? '失败' : s.status === 'running' ? '执行中' : ''}</span>
+          </div>
+        </div>
+      ))}
+
+      {isStreaming && !finalReply && (
+        <div className="flex justify-start"><div className="flex gap-1 px-4 py-3 rounded-[16px_16px_16px_4px]" style={cardS}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div></div>
+      )}
+
+      {/* React advantage: AI result → interactive cards, not dead markdown */}
+      {finalReply && !isStreaming && (
+        <TripResult
+          markdown={finalReply}
+          onSearchMap={onSearchMap}
+          city={session.dest}
+        />
+      )}
+
+      <div ref={endRef} />
+    </>
+  )
+}
+
+/* ================================================================
+   MAIN
+   ================================================================ */
+interface Props { auth: ReturnType<typeof useAuth>; theme: ReturnType<typeof useTheme> }
+
+export default function AIPage({ auth, theme }: Props) {
+  const { user, token, isLoggedIn, setShowAuthModal, logout } = auth
+  const { isDark, toggle: toggleTheme } = theme
   const { isStreaming, startStream, stopStream } = useSSE()
 
-  const [input, setInput] = useState('')
-  const [conversationId, setConversationId] = useState<number | null>(null)
-  const [steps, setSteps] = useState<PlanStep[]>([])
-  const [finalReply, setFinalReply] = useState('')
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [loadingConvs, setLoadingConvs] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // ---- Multi-tab sessions — the React advantage ----
+  const [{ sessions, active }, dispatch] = useReducer(sessionReducer, { sessions: [newSession()], active: '' })
+  // Init first session
+  useEffect(() => { if (!active && sessions[0]) dispatch({ type: 'SET_ACTIVE', id: sessions[0].id }) }, [])
 
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const activeSession = useMemo(() => sessions.find(s => s.id === active) || sessions[0] || newSession(), [sessions, active])
+
+  const update = useCallback((patch: Partial<Session>) => { dispatch({ type: 'UPDATE_SESSION', id: activeSession.id, patch }) }, [activeSession.id])
+
+  // ---- Conversations ----
+  const [convs, setConvs] = useState<Conversation[]>([])
+  const [convsLoading, setConvsLoading] = useState(false)
+  useEffect(() => { if (isLoggedIn) { setConvsLoading(true); api.get<Conversation[]>('/chat/conversations').then(setConvs).catch(() => {}).finally(() => setConvsLoading(false)) } }, [isLoggedIn])
+
+  // ---- Map ----
+  const [markerCount, setMarkerCount] = useState(0)
+  const mapRef = useRef<MapAPI | null>(null)
+
+  // ---- Timer ----
+  const [startTime, setStartTime] = useState(0)
+  const [elapsed, setElapsed] = useState('0.0s')
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (isStreaming && startTime) { timerRef.current = setInterval(() => setElapsed(((Date.now() - startTime) / 1000).toFixed(1) + 's'), 100) }
+    else { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null } }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [isStreaming, startTime])
+
+  // ---- Input ----
+  const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 自动滚动
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatMessages, steps, finalReply])
+  // ---- Derived ----
+  const doneCount = useMemo(() => activeSession.steps.filter(s => s.status === 'done' || s.status === 'failed').length, [activeSession.steps])
+  const percent = useMemo(() => activeSession.steps.length ? Math.round(doneCount / activeSession.steps.length * 100) : 0, [activeSession.steps, doneCount])
 
-  // 加载对话列表
-  useEffect(() => {
-    if (!isLoggedIn) return
-    setLoadingConvs(true)
-    api.get<Conversation[]>('/chat/conversations')
-      .then(setConversations)
-      .catch(() => {})
-      .finally(() => setLoadingConvs(false))
-  }, [isLoggedIn])
+  // ---- Load conversation ----
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
 
-  // 切换对话
-  const loadConversation = useCallback(async (convId: number) => {
-    setConversationId(convId)
-    setSteps([])
-    setFinalReply('')
-    try {
-      const msgs = await api.get<Message[]>(`/chat/history?conversation_id=${convId}`)
-      setChatMessages(msgs.map(m => ({ role: m.role, content: m.content })))
-    } catch {
-      setChatMessages([])
+  const loadConv = useCallback(async (conv: Conversation) => {
+    // If already loaded, just switch to it
+    const existing = sessionsRef.current.find(s => s.conversationId === conv.id)
+    if (existing) {
+      dispatch({ type: 'SET_ACTIVE', id: existing.id })
+      return
     }
+    // Create new session and load messages
+    dispatch({ type: 'LOAD_CONV', id: '', conv })
+    try {
+      const ms = await api.get<{ role: string; content: string }[]>(`/chat/history?conversation_id=${conv.id}`)
+      // After dispatch + re-render, sessionsRef is updated. Find the new session.
+      const target = sessionsRef.current.find(s => s.conversationId === conv.id)
+      if (target) {
+        dispatch({ type: 'UPDATE_SESSION', id: target.id, patch: { messages: ms.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })), hasStarted: true } })
+      }
+    } catch { /* */ }
   }, [])
 
-  // 新建对话
-  const newChat = useCallback(() => {
-    setConversationId(null)
-    setSteps([])
-    setFinalReply('')
-    setChatMessages([])
-    inputRef.current?.focus()
-  }, [])
+  // ---- Send ----
+  const go = useCallback(() => {
+    const s = activeSession
+    const text = `从${s.from}去${s.dest}，${s.date}出发，${s.days}天，${s.people}人，人均${s.budget}元`
+    setInput(text); send(text)
+  }, [activeSession])
 
-  // 发送消息
-  const handleSend = useCallback(() => {
-    const msg = input.trim()
-    if (!msg || isStreaming) return
+  const send = useCallback((text: string) => {
+    if (!text.trim() || isStreaming) return
+    if (!token) { setShowAuthModal(true); return }
 
-    setInput('')
-    setSteps([])
-    setFinalReply('')
-    setChatMessages(prev => [...prev, { role: 'user', content: msg }])
+    setInput(''); setStartTime(Date.now())
+    update({ steps: [], finalReply: '', locations: [], hasStarted: true, messages: [...activeSession.messages, { role: 'user' as const, content: text }] })
+    mapRef.current?.clearMarkers(); setMarkerCount(0)
 
-    startStream(msg, conversationId, token, {
-      onEvent: (event: SSEEvent) => {
-        switch (event.event) {
-          case 'guard':
-            if (event.blocked) {
-              setFinalReply(`⚠️ 内容被拦截：${event.reason || '请修改后重试'}`)
-            }
-            break
-
+    startStream(text, activeSession.conversationId, token, {
+      onEvent(e: SSEEvent) {
+        switch (e.event) {
+          case 'guard': if (e.blocked) update({ finalReply: `⚠️ ${e.reason || '被拦截'}` }); break
           case 'plan':
-            // 初始化所有步骤
-            if (event.steps) {
-              setSteps(event.steps.map((name, i) => ({
-                name,
-                worker: '',
-                status: 'pending' as const,
-                summary: '',
-                locations: [],
-                items: [],
-              })))
-            }
+            if (e.steps) update({ steps: e.steps.map(n => ({ name: n, worker: '', status: 'pending' as const, summary: '', locations: [] })) })
             break
-
           case 'step_start':
-            setSteps(prev => prev.map(s =>
-              s.name === event.name
-                ? { ...s, worker: event.worker || s.worker, status: 'running' as const }
-                : s
-            ))
+            dispatch({ type: 'UPDATE_SESSION', id: activeSession.id, patch: { steps: activeSession.steps.map(s => s.name === e.name ? { ...s, worker: e.worker || '', status: 'running' as const } : s) } })
             break
-
-          case 'step_done':
-            setSteps(prev => prev.map(s =>
-              s.name === event.name
-                ? {
-                    ...s,
-                    worker: event.worker || s.worker,
-                    status: (event.status === 'failed' ? 'failed' : 'done') as PlanStep['status'],
-                    summary: event.summary || event.result_snippet || '',
-                    locations: event.locations || [],
-                  }
-                : s
-            ))
+          case 'step_done': {
+            const w = e.worker || '', color = WC[w] || '#3b82f6', k = (() => { const n = (e.name || '').toLowerCase(); if (n.includes('航班') || n.includes('flight')) return activeSession.dest + ' 机场'; if (n.includes('酒店') || n.includes('hotel')) return activeSession.dest + ' 酒店'; if (n.includes('景点') || n.includes('attraction')) return activeSession.dest + ' 景点'; return null })()
+            dispatch({ type: 'UPDATE_SESSION', id: activeSession.id, patch: {
+              steps: activeSession.steps.map(s => s.name === e.name ? { ...s, worker: w || s.worker, status: (e.status === 'failed' ? 'failed' : 'done') as Step['status'], summary: e.summary || e.result_snippet || '', locations: e.locations || [] } : s),
+              locations: [...activeSession.locations, ...(e.locations || [])],
+            }})
+            if (e.status !== 'failed' && mapRef.current && k) mapRef.current.searchAndMark(k, activeSession.dest, e.name || w, color)
+            if (e.locations?.length) setMarkerCount(c => c + e.locations!.length)
             break
-
+          }
           case 'done':
-            if (event.reply) {
-              setFinalReply(event.reply)
-              setChatMessages(prev => [...prev, { role: 'assistant', content: event.reply! }])
+            if (e.reply) {
+              dispatch({ type: 'UPDATE_SESSION', id: activeSession.id, patch: { finalReply: e.reply, messages: [...activeSession.messages, { role: 'assistant' as const, content: e.reply }], conversationId: e.conversation_id || activeSession.conversationId } })
             }
-            if (event.conversation_id) {
-              setConversationId(event.conversation_id)
-              // 刷新对话列表
-              if (isLoggedIn) {
-                api.get<Conversation[]>('/chat/conversations').then(setConversations).catch(() => {})
-              }
-            }
+            if (e.conversation_id) { if (isLoggedIn) api.get<Conversation[]>('/chat/conversations').then(setConvs).catch(() => {}) }
+            if (mapRef.current) mapRef.current.searchAndMark(activeSession.dest, activeSession.dest, '总览', '#6366f1')
             break
         }
       },
-      onError: (error) => {
-        setFinalReply(`❌ 连接出错：${error}`)
-      },
+      onError(err) { update({ finalReply: `❌ ${err}` }) },
     })
-  }, [input, isStreaming, conversationId, token, startStream, isLoggedIn])
+  }, [isStreaming, token, activeSession, startStream, update, setShowAuthModal, isLoggedIn, dispatch])
 
-  const allLocations = collectLocations(steps)
+  const handleSend = useCallback(() => { const t = input.trim(); if (t) send(t) }, [input, send])
+
+  // ---- Session switching — restore map ----
+  useEffect(() => {
+    // When switching sessions, update map markers
+    if (mapRef.current && activeSession.locations.length > 0) {
+      mapRef.current.clearMarkers()
+      activeSession.locations.forEach(loc => {
+        const color = WC[loc.type] || '#3b82f6'
+        mapRef.current?.searchAndMark(loc.name, activeSession.dest, loc.type, color)
+      })
+    }
+    setMarkerCount(activeSession.locations.length)
+  }, [active])
+
+  // ---- Render ----
+  const btnG = { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }
 
   return (
-    <div className="flex h-full">
-      {/* 桌面端左侧对话列表 */}
-      {isLoggedIn && (
-        <aside className={`hidden md:flex flex-col glass-sidebar border-r border-[var(--border)] transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'
-        }`}>
-          <div className="p-4 border-b border-[var(--border)]">
-            <button
-              onClick={newChat}
-              className="w-full flex items-center gap-2 px-3 py-2.5 bg-[#0071e3] text-white text-sm font-medium rounded-xl hover:bg-[#0077ed] transition-colors active:scale-[0.98]"
-            >
-              <Plus size={16} />
-              新建对话
-            </button>
+    <div className="flex h-full bg-[var(--bg)]">
+      {/* ==================== SIDEBAR ==================== */}
+      <aside className="hidden md:flex flex-col w-[272px] flex-shrink-0 border-r border-[var(--line)] bg-[var(--bg)]">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 px-5 h-[52px] border-b border-[var(--line)]">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, #2563eb, #0891b2)' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {loadingConvs ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 size={20} className="animate-spin text-[var(--text-tertiary)]" />
-              </div>
-            ) : conversations.length === 0 ? (
-              <p className="text-xs text-[var(--text-tertiary)] text-center py-8">暂无对话</p>
-            ) : (
-              conversations.map(conv => (
-                <button
-                  key={conv.id}
-                  onClick={() => loadConversation(conv.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
-                    conv.id === conversationId
-                      ? 'bg-blue-50 dark:bg-blue-500/10 text-[#0071e3] font-medium'
-                      : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-[var(--text-primary)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={14} className="flex-shrink-0" />
-                    <span className="truncate">{conv.title}</span>
-                  </div>
-                  <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 ml-6">
-                    {conv.created_at?.slice(0, 10)}
-                  </p>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-      )}
-
-      {/* 主聊天区 */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* 顶部栏 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] glass">
-          <div className="flex items-center gap-3">
-            {isLoggedIn && (
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="hidden md:block p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-secondary)]"
-              >
-                <MessageSquare size={18} />
-              </button>
-            )}
-            <h2 className="font-semibold text-sm">
-              {conversationId ? '对话详情' : 'AI 行程定制'}
-            </h2>
-          </div>
-
-          {!isLoggedIn && (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0071e3] bg-blue-50 dark:bg-blue-500/10 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
-            >
-              <LogIn size={14} />
-              登录
-            </button>
-          )}
+          <span className="text-[14px] font-semibold tracking-tight text-[var(--text)]">旅行规划师</span>
         </div>
 
-        {/* 聊天内容 */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* 历史消息 */}
-          {chatMessages.map((msg, i) => (
-            <ChatBubble key={i} role={msg.role} content={msg.content} />
-          ))}
+        {/* ===== SESSION TABS — the React advantage ===== */}
+        <div className="px-3 pt-3 pb-1 border-b border-[var(--line)]">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            {sessions.map(s => (
+              <button
+                key={s.id}
+                onClick={() => dispatch({ type: 'SET_ACTIVE', id: s.id })}
+                className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0 max-w-[120px] ${
+                  s.id === active
+                    ? 'bg-[var(--blue)]/8 text-[var(--blue)]'
+                    : 'text-[var(--text2)] hover:bg-[var(--surface)]'
+                }`}
+                title={s.title}
+              >
+                <span className="truncate">{s.title}</span>
+                {sessions.length > 1 && (
+                  <span
+                    onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_SESSION', id: s.id }) }}
+                    className="opacity-0 group-hover:opacity-100 text-[var(--text3)] hover:text-[var(--coral)] transition-all text-[14px] leading-none"
+                  >×</span>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => dispatch({ type: 'ADD_SESSION' })}
+              className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text3)] hover:bg-[var(--surface)] hover:text-[var(--blue)] transition-all text-sm font-medium"
+              title="新建规划标签"
+            >+</button>
+          </div>
+        </div>
 
-          {/* Worker 执行进度卡片（流式进行中） */}
-          {steps.length > 0 && (
-            <div className="space-y-3 animate-fade-in">
-              <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
-                📋 执行计划 · {steps.filter(s => s.status === 'done').length}/{steps.length} 步骤完成
-              </p>
-              <div className="space-y-2">
-                {steps.map((step, i) => (
-                  <ResultCard key={`${step.name}-${i}`} step={step} />
+        {/* Form — driven by active session */}
+        <div className="px-4 py-4 space-y-3 overflow-y-auto flex-1">
+          <div className="flex gap-2">
+            <Field l="目的地" v={activeSession.dest} s={v => update({ dest: v })} p="东京" n />
+            <Field l="出发地" v={activeSession.from} s={v => update({ from: v })} p="上海" n />
+          </div>
+          <Field l="出发日期" v={activeSession.date} s={v => update({ date: v })} t="date" />
+          <div className="flex gap-2">
+            <Field l="天数" v={String(activeSession.days)} s={v => update({ days: +v || 1 })} n />
+            <Field l="人数" v={String(activeSession.people)} s={v => update({ people: +v || 1 })} n />
+            <Field l="预算/人" v={String(activeSession.budget)} s={v => update({ budget: +v || 0 })} n />
+          </div>
+
+          <button onClick={go} disabled={isStreaming}
+            className="w-full h-10 rounded-lg text-white text-[13px] font-semibold transition-all active:scale-[0.97] disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30"
+            style={btnG}>
+            {isStreaming ? '规划中...' : '开始规划'}
+          </button>
+
+          {/* Progress */}
+          {activeSession.steps.length > 0 && (
+            <div className="pt-1">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[11px] font-medium text-[var(--text2)]">{isStreaming ? `${doneCount}/${activeSession.steps.length} 步` : '✓ 全部完成'}</span>
+                <span className="text-[11px] font-mono text-[var(--text3)]">{elapsed}</span>
+              </div>
+              <div className="h-1 rounded-full mb-3 overflow-hidden bg-[var(--surface)]">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, background: 'linear-gradient(90deg, #2563eb, #0891b2)' }} />
+              </div>
+              <div className="space-y-0.5">
+                {activeSession.steps.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 py-[3px]">
+                    <div className={`w-[6px] h-[6px] rounded-full flex-shrink-0 ${s.status === 'running' ? 'bg-[var(--blue)] ring-[3px] ring-[var(--blue)]/20' : s.status === 'done' ? 'bg-emerald-500' : s.status === 'failed' ? 'bg-red-500' : 'bg-[var(--text3)]'}`} />
+                    <span className={`text-[11px] flex-1 truncate ${s.status === 'running' ? 'font-semibold text-[var(--text)]' : 'text-[var(--text3)]'}`}>{WI[s.worker]} {s.name}</span>
+                  </div>
                 ))}
               </div>
-              {/* 地图打点 */}
-              {allLocations.length > 0 && (
-                <MapView locations={allLocations} />
-              )}
             </div>
           )}
 
-          {/* 最终 Markdown 结果 */}
-          {finalReply && steps.length > 0 && (
-            <div className="glass rounded-2xl p-5 animate-slide-up">
-              <MarkdownView content={finalReply} />
+          {/* History — load into new tab */}
+          {isLoggedIn && (
+            <div className="pt-3 border-t border-[var(--line)]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text3)]">历史</span>
+              </div>
+              <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
+                {convsLoading ? <p className="text-[11px] text-[var(--text3)] text-center py-3">加载中...</p>
+                : convs.length === 0 ? <p className="text-[11px] text-[var(--text3)] text-center py-3">暂无记录</p>
+                : convs.map(c => (
+                  <button key={c.id} onClick={() => loadConv(c)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg text-[12px] transition-colors truncate block ${sessions.some(s => s.conversationId === c.id) ? 'bg-[var(--blue)]/8 text-[var(--blue)] font-medium' : 'hover:bg-[var(--surface)] text-[var(--text)]'}`}>
+                    {c.title}<span className="block text-[10px] text-[var(--text3)] mt-0.5">{c.created_at?.slice(0, 10)}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-
-          {/* 流式进行中的提示 */}
-          {isStreaming && !finalReply && (
-            <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] animate-pulse-soft">
-              <Loader2 size={16} className="animate-spin" />
-              AI 正在规划您的行程...
-            </div>
-          )}
-
-          <div ref={chatEndRef} />
         </div>
 
-        {/* 底部输入区 */}
-        <div className="p-4 border-t border-[var(--border)] glass">
-          <div className="max-w-3xl mx-auto flex items-center gap-2">
-            <div className="flex-1 flex items-center bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl px-4 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-200 dark:focus-within:ring-blue-800 transition-all">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                placeholder="输入旅行需求，如：帮我规划上海到东京5天行程..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--text-tertiary)]"
-                disabled={isStreaming}
-              />
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-[var(--line)] flex items-center justify-between text-xs">
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0" style={{ background: 'linear-gradient(135deg, #2563eb, #0891b2)' }}>{user?.username?.charAt(0).toUpperCase()}</div>
+              <span className="font-medium text-[12px] text-[var(--text)] truncate">{user?.username}</span>
+              <button onClick={logout} className="text-[var(--text3)] hover:text-[var(--text2)] transition-colors">退出</button>
             </div>
+          ) : <button onClick={() => setShowAuthModal(true)} className="text-[var(--blue)] font-medium">登录</button>}
+          <button onClick={toggleTheme} className="text-sm text-[var(--text3)] hover:text-[var(--text2)] p-1" aria-label={isDark ? '亮色' : '暗色'}>{isDark ? '☀️' : '🌙'}</button>
+        </div>
+      </aside>
 
+      {/* ==================== CHAT ==================== */}
+      <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg)]">
+        <div className="md:hidden flex items-center justify-between h-11 px-4 glass border-b border-[var(--line)]">
+          <span className="font-semibold text-[13px] text-[var(--text)]">🗺 旅行规划师</span>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleTheme} className="text-sm">{isDark ? '☀️' : '🌙'}</button>
+            {isLoggedIn ? <><span className="text-xs">{user?.username}</span><button onClick={logout} className="text-[10px] text-[var(--text3)]">退出</button></> : <button onClick={() => setShowAuthModal(true)} className="text-xs text-[var(--blue)]">登录</button>}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 md:px-8 py-6 space-y-2">
+          <ChatArea session={activeSession} isStreaming={isStreaming} finalReply={activeSession.finalReply}
+            onSearchMap={(kw, city) => { if (mapRef.current) mapRef.current.searchAndMark(kw, city, kw, '#6366f1') }} />
+        </div>
+
+        <div className="p-3 md:p-4 border-t border-[var(--line)] glass">
+          <div className="flex gap-2.5 items-center max-w-3xl mx-auto">
+            <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder="描述旅行计划，或输入修改请求..." disabled={isStreaming}
+              className="flex-1 h-10 px-4 rounded-xl bg-[var(--card)] border border-[var(--line)] text-[13px] outline-none focus:ring-2 focus:ring-[var(--blue)]/15 transition-all placeholder:text-[var(--text3)] text-[var(--text)]"
+              aria-label="输入消息" />
             {isStreaming ? (
-              <button
-                onClick={stopStream}
-                className="p-2.5 rounded-full bg-[#ff3b30] text-white shadow-md hover:bg-red-600 transition-all active:scale-90"
-              >
-                <StopCircle size={20} />
-              </button>
+              <button onClick={stopStream} className="h-10 px-5 rounded-xl bg-[var(--coral)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-95">停止</button>
             ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="p-2.5 rounded-full bg-[#0071e3] text-white shadow-md hover:bg-[#0077ed] transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Send size={20} />
-              </button>
+              <button onClick={handleSend} disabled={!input.trim()} className="h-10 px-5 rounded-xl text-white text-[13px] font-semibold active:scale-95 disabled:opacity-30" style={btnG}>发送</button>
             )}
           </div>
-
-          {!isLoggedIn && (
-            <p className="text-[10px] text-[var(--text-tertiary)] text-center mt-2">
-              未登录模式 · 登录后可保存和查看历史对话
-            </p>
-          )}
+          {!isLoggedIn && <p className="text-[10px] text-center mt-2 text-[var(--text3)]">未登录也可使用，登录后保存对话</p>}
         </div>
-      </div>
+      </main>
+
+      {/* ==================== MAP ==================== */}
+      <section className="hidden lg:flex flex-col w-[380px] xl:w-[420px] flex-shrink-0 border-l border-[var(--line)] bg-[var(--bg)]">
+        <div className="flex justify-between items-center px-4 h-10 border-b border-[var(--line)] text-xs font-medium text-[var(--text2)]">
+          <span>地图标注</span><span className="font-normal text-[var(--text3)]">{markerCount} 个标记</span>
+        </div>
+        <div className="flex-1 relative"><MapWrap locs={activeSession.locations} onAPI={a => { mapRef.current = a }} onCount={setMarkerCount} /></div>
+        <div className="flex gap-3 px-4 py-2 border-t border-[var(--line)] text-[10px] text-[var(--text3)]" role="list">
+          {Object.entries(WC).map(([k, c]) => (<span key={k} className="flex items-center gap-1" role="listitem"><span className="w-1.5 h-1.5 rounded-full" style={{ background: c }} />{WI[k]}</span>))}
+        </div>
+      </section>
     </div>
   )
 }

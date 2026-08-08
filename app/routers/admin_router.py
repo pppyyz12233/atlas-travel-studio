@@ -1,4 +1,3 @@
-"""管理接口"""
 
 import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -21,7 +20,7 @@ def _safe_path(filename: str) -> str:
     return os.path.join(UPLOAD_DIR, safe_name)
 
 
-# 用户列表
+#用户列表
 @router.get("/users")
 async def list_users(db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
     users = await user.list_users(db)
@@ -35,21 +34,21 @@ async def list_users(db: AsyncSession = Depends(get_db), admin=Depends(require_a
     }
 
 
-# 设为管理员
+#设为管理员
 @router.put("/users/{user_id}/promote")
 async def promote(user_id: int, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
     u = await user.set_admin(db, user_id)
     return {"code": 200, "message": "已设为管理员", "data": {"id": u.id, "username": u.username}}
 
 
-# 删除用户
+#删除用户
 @router.delete("/users/{user_id}")
 async def delete(user_id: int, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
     await user.delete_user(db, user_id)
     return {"code": 200, "message": "删除成功", "data": None}
 
 
-# 上传文档
+#上传文档
 @router.post("/upload")
 async def upload(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
     # 检查文件扩展名
@@ -78,7 +77,7 @@ async def upload(file: UploadFile = File(...), db: AsyncSession = Depends(get_db
     }
 
 
-# 文档列表
+#文档列表
 @router.get("/documents")
 async def list_docs(db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
     docs = await document.list_documents(db)

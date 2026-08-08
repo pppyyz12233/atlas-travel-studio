@@ -1,5 +1,3 @@
-"""启动入口"""
-
 import time
 from contextlib import asynccontextmanager
 
@@ -12,13 +10,14 @@ from starlette.middleware.cors import CORSMiddleware
 from app.utils.database import init_db, engine
 from app.routers import router as api_router
 
-# LangGraph 持久化
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.store.memory import InMemoryStore
+import aiosqlite
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.store.sqlite import AsyncSqliteStore
 from app.agents.supervisor import build_graph
 
 # 全局 agent 实例（带 checkpointer + store）
 _agent = None
+_store = None
 
 
 class LogMiddleware(BaseHTTPMiddleware):
@@ -32,17 +31,22 @@ class LogMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _agent
+    global _agent, _store
     await init_db()
 
     # 初始化 LangGraph Agent（带 Checkpointer + Memory Store）
-    checkpointer = SqliteSaver.from_conn_string("travel.db")
-    store = InMemoryStore()
+    conn = await aiosqlite.connect("checkpoint.db")
+    await conn.execute("PRAGMA journal_mode=WAL")
+    checkpointer = AsyncSqliteSaver(conn)
+    _store = AsyncSqliteStore(conn)
+    await _store.setup()
+    store = _store
     _agent = build_graph(checkpointer=checkpointer, store=store)
-    print(f"[Agent] 已初始化 (checkpointer=SqliteSaver, store=InMemoryStore)")
+    print(f"[Agent] 已初始化 (checkpointer=AsyncSqliteSaver, store=AsyncSqliteStore)")
 
     yield
 
+    await conn.close()
     await engine.dispose()
 
 
@@ -51,13 +55,20 @@ def get_agent():
     return _agent
 
 
+def get_store():
+    """获取全局 store 实例（供 router 手动调用 memory 节点）"""
+    return _store
+
+
 app = FastAPI(title="智能旅行规划师", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(LogMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=False,
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

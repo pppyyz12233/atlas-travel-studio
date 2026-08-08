@@ -197,7 +197,7 @@ async def chat_stream(
             for s in layer:
                 result_text = s.get("result", "") or ""
                 result_snippet = result_text[:150] if len(result_text) > 150 else result_text
-                yield f"data: {json.dumps({'event': 'step_done', 'name': s['name'], 'worker': s.get('worker', ''), 'status': s.get('status', 'failed'), 'result_snippet': result_snippet, 'summary': s.get('summary', ''), 'locations': s.get('locations', [])}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'event': 'step_done', 'name': s['name'], 'worker': s.get('worker', ''), 'status': s.get('status', 'failed'), 'result_snippet': result_snippet, 'summary': s.get('summary', ''), 'locations': s.get('locations', []), 'iterations': s.get('iterations', 0), 'tool_calls': s.get('tool_calls', 0)}, ensure_ascii=False)}\n\n"
 
         yield _gs("executor", "done")
 

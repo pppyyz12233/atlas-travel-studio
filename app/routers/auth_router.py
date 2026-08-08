@@ -1,4 +1,3 @@
-"""认证接口"""
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
@@ -47,7 +46,10 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail="注册失败，请稍后重试")
+        import traceback
+        print(f"[REGISTER ERROR] {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"注册失败: {e}")
 
 
 @router.post("/login/email")

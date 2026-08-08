@@ -1,6 +1,6 @@
-"""DeepSeek API 封装 —— 重试 + 超时"""
 
 import asyncio
+import json
 from openai import AsyncOpenAI, APIError, APITimeoutError
 from app.utils.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
@@ -43,7 +43,30 @@ async def chat(messages: list[dict], tools: list[dict] | None = None,
                 raise
 
     msg = response.choices[0].message
-    return {"content": msg.content or "", "tool_calls": msg.tool_calls or []}
+    # 转 dict 避免调用方踩坑（新版 SDK tool_calls 是 Pydantic 对象，不可下标访问）
+    tc_list = []
+    if msg.tool_calls:
+        for tc in msg.tool_calls:
+            tc_list.append({
+                "id": tc.id,
+                "type": tc.type,
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            })
+    return {"content": msg.content or "", "tool_calls": tc_list, "raw_message": msg}
+
+
+def parse_tool_call(resp: dict, index: int = 0) -> dict | None:
+    """从 chat() 返回的响应中提取第 index 个 tool_call 的参数 dict。
+
+    封装了 '列表取元素 -> 取 arguments 字符串 -> json.loads' 三步。
+    tool_calls 为空或 index 越界时返回 None。
+    """
+    tc_list = resp.get("tool_calls", [])
+    if not tc_list or index >= len(tc_list):
+        return None
+    tc = tc_list[index]
+    args_str = tc["function"]["arguments"]
+    return json.loads(args_str)
 
 
 async def chat_stream(messages: list[dict]) -> str:

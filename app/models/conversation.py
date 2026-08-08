@@ -1,4 +1,4 @@
-"""对话会话表"""
+
 
 import datetime
 

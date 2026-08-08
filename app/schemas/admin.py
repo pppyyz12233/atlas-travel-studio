@@ -1,5 +1,3 @@
-"""管理接口 Schema"""
-
 from pydantic import BaseModel
 
 

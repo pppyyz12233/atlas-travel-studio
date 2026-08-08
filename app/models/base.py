@@ -1,4 +1,4 @@
-"""SQLAlchemy 声明基类"""
+
 
 from sqlalchemy.orm import DeclarativeBase
 

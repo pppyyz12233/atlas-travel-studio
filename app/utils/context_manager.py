@@ -1,8 +1,4 @@
-"""上下文管理 —— 对话太长时自动裁剪
 
-注意：使用 cl100k_base tokenizer (GPT-4 编码)。DeepSeek 的 tokenizer 与此有 ~10-20% 偏差，
-但 Compress 的保守上限 (4000 token) 留有足够余量，不会导致功能问题。
-"""
 import tiktoken
 
 

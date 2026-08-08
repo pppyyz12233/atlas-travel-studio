@@ -1,4 +1,3 @@
-"""用户级简单限流器 —— asyncio.Lock 保护并发安全"""
 
 import asyncio
 import time

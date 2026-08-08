@@ -260,14 +260,25 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
   --border:rgba(0,0,0,0.08);
 }
 .dark {
-  --bg:#0B0F14;--card:#141A21;--surface:#1a1e24;--text:#f5f5f7;
+  --bg:#0B0F14;--card:#141A21;--surface:#1a1e24;--text:#e8e8ed;
   --text-secondary:#a0a0b0;--text-tertiary:#6e6e80;
   --glass-bg:rgba(20,26,33,0.85);--glass-border:rgba(255,255,255,0.08);
   --border:rgba(255,255,255,0.08);
+  --blue:#3b82f6;--content-bg:#141A21;--sidebar-bg:rgba(20,26,33,0.95);
 }
-.theme-btn{position:fixed;top:12px;right:12px;width:32px;height:32px;border-radius:50%;
-  border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;
-  display:flex;align-items:center;justify-content:center;z-index:100;transition:all .2s}
+.dark .sidebar{background:var(--sidebar-bg)}
+.dark .bubble-ai{background:rgba(255,255,255,0.06)}
+.dark .bubble-user{background:var(--blue)}
+.dark .chat-panel{background:var(--bg)}
+.dark .map-panel{background:var(--bg)}
+.dark .field{background:var(--card);color:var(--text);border-color:var(--border)}
+.dark .step-card{background:var(--card);border-color:var(--border)}
+.dark .trip-card{background:var(--card);border-color:var(--border)}
+.dark .welcome{background:linear-gradient(135deg,rgba(99,102,241,.12) 0%,rgba(14,165,164,.12) 50%,rgba(249,115,22,.08) 100%)}
+.dark .graph-box{background:var(--glass-bg)}
+.theme-btn{width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;margin-left:auto}
 .theme-btn:hover{transform:scale(1.1)}
 
 /* ============================================================
@@ -344,7 +355,6 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 </style>
 </head>
 <body>
-<button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切换深色模式">🌙</button>
 <div class="scroll-fab" id="scrollFab" onclick="scrollToBottom()">↓</div>
 
 <div class="app">
@@ -353,6 +363,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
   <div class="sidebar-header">
     <div class="sidebar-logo">🗺</div>
     <span class="sidebar-title">旅行规划师</span>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切换深色模式">🌙</button>
   </div>
   <div class="sidebar-form">
     <div class="field-group"><label class="field-label">目的地</label><input id="dest" class="field" placeholder="东京" value="东京"></div>

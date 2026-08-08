@@ -1,14 +1,4 @@
-"""Supervisor 主图 —— Plan-and-Execute + Worker 子图
 
-图结构:
-    guard → memory_reader → intent_router → planner → executor → memory_writer → aggregator → END
-                              ↑ Worker 子图由 executor 动态调用
-
-支持:
-  - Checkpointer: 自动存档/加载对话历史（传 thread_id 即可）
-  - Memory Store: 跨对话记住用户偏好
-  - Worker 子图: 每个 Worker 是独立的 StateGraph
-"""
 
 import json, asyncio, time, os, re, logging, uuid
 from langgraph.graph import StateGraph, END, START
@@ -20,12 +10,12 @@ from app.agents.planner import generate_plan
 from app.agents.workflow.guard import check
 from app.agents.workers.factory import WORKER_SUBGRAPHS
 from app.agents.skill_loader import load_skill
-from app.utils.llm import chat
+from app.utils.llm import chat, parse_tool_call
 from app.schemas.trip import TripState, Location, TripItem, StepOutput
 
 logger = logging.getLogger(__name__)
 
-# ── 常量 ────────────────────────────────────────────────────
+#常量
 
 WORKER_LIST = "flight(航班) hotel(酒店) attraction(景点) itinerary(日程) budget(预算)"
 WORKER_TIMEOUT = 120.0
@@ -34,8 +24,7 @@ CHINA_CITIES = ["上海", "北京", "深圳", "广州", "杭州", "成都", "南
 OVERSEAS_CITIES = ["东京", "巴黎", "曼谷", "新加坡", "伦敦", "纽约", "悉尼", "迪拜", "首尔", "大阪", "京都"]
 
 
-# ── 城市提取（纯确定性，不调 LLM）─────────────────────────────
-
+#城市提取（纯确定性，不调 LLM）
 def _extract_cities(msg: str) -> tuple[str, str]:
     from_city, to_city = "出发地", "目的地"
     patterns = [
@@ -99,24 +88,68 @@ def _default_plan(msg: str, active_workers: list[str] | None = None) -> list[dic
 
 # ── 结构化提取 ──────────────────────────────────────────────
 
+# Function Calling schema for structured extraction
+EXTRACT_TOOL = [{
+    "type": "function",
+    "function": {
+        "name": "extract_travel_data",
+        "description": "从旅行助手输出中提取结构化数据",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "前80字摘要"},
+                "locations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "lng": {"type": "number", "description": "经度"},
+                            "lat": {"type": "number", "description": "纬度"},
+                            "name": {"type": "string", "description": "地点名称"},
+                            "address": {"type": "string", "description": "地址"},
+                            "type": {"type": "string", "description": "airport/hotel/attraction/station/other"},
+                        }
+                    }
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "名称"},
+                            "detail": {"type": "string", "description": "详情"},
+                            "price": {"type": "string", "description": "价格"},
+                            "date": {"type": "string", "description": "日期"},
+                        }
+                    }
+                },
+            },
+            "required": ["summary"]
+        }
+    }
+}]
+
 async def _extract_structured(text: str, worker_type: str) -> StepOutput:
-    prompt = f"""Extract structured data from this travel assistant output. Return ONLY valid JSON.
-Output format:
-{{"summary": "前80字摘要",
- "locations": [{{"lng": 经度, "lat": 纬度, "name": "名称", "address": "地址", "type": "airport/hotel/attraction/station/other"}}],
- "items": [{{"name": "名称", "detail": "详情", "price": "价格", "date": "日期"}}]}}
-Worker type: {worker_type}
-Text:
-{text[:3000]}"""
     try:
-        resp = await chat([{"role": "user", "content": prompt}])
-        content = resp.get("content", "{}").strip()
-        s = content.find("{")
-        e = content.rfind("}")
-        if s != -1 and e != -1:
-            return StepOutput(**json.loads(content[s:e+1]))
+        resp = await chat(
+            [{"role": "user", "content": f"Worker: {worker_type}\nText:\n{text[:3000]}"}],
+            tools=EXTRACT_TOOL,
+        )
+        tool_calls = resp.get("tool_calls", [])
+        if not tool_calls:
+            return _extract_structured_fallback(text, worker_type)
+
+        args = parse_tool_call(resp)
+        if args is None:
+            return _extract_structured_fallback(text, worker_type)
+        return StepOutput(**args)
     except Exception:
         logger.warning(f"structured extraction failed for {worker_type}", exc_info=True)
+    return _extract_structured_fallback(text, worker_type)
+
+
+def _extract_structured_fallback(text: str, worker_type: str) -> StepOutput:
+    """结构化提取兜底：budget 特殊处理，其他返回原文前80字"""
     if worker_type == "budget":
         try:
             bs = text.find("budget_breakdown")
@@ -204,14 +237,10 @@ def _build_trip_state(steps: list[dict]) -> TripState:
     return ts
 
 
-# ══════════════════════════════════════════════════════════════
 # 图节点
-# ══════════════════════════════════════════════════════════════
-
-# ── Guard（安全门卫）─────────────────────────────────────────
-
+#Guard（安全门卫）
 async def guard_node(state: AgentState) -> AgentState:
-    """正则拦截违规输入，零 Token 消耗"""
+    """正则拦截违规输入"""
     msg = state["messages"][-1]["content"]
     blocked, reason = check(msg)
     state["guard_blocked"] = blocked
@@ -221,16 +250,15 @@ async def guard_node(state: AgentState) -> AgentState:
     return state
 
 
-# ── Memory Reader（加载长期记忆）─────────────────────────────
-
+#加载长期记忆
 async def memory_reader_node(state: AgentState, config, *, store) -> AgentState:
-    """每次对话开始时，从 Store 加载用户历史偏好，注入 system prompt"""
+    """每次对话开始时，从Store加载用户历史偏好，注入system prompt"""
     if store is None:
         return state
 
     try:
         uid = config.get("configurable", {}).get("user_id", "anonymous")
-        memories = list(store.search((uid, "preferences")))
+        memories = await store.asearch((uid, "preferences"))
         if memories:
             pref_lines = [f"- {m.key}: {m.value.get('value', '')}" for m in memories]
             pref_text = "用户历史偏好:\n" + "\n".join(pref_lines)
@@ -245,10 +273,9 @@ async def memory_reader_node(state: AgentState, config, *, store) -> AgentState:
     return state
 
 
-# ── Intent Router ──────────────────────────────────────────
-
+#意图函数
 async def intent_router_node(state: AgentState) -> AgentState:
-    """分类用户意图，决定跑哪些 Worker"""
+    """分类用户意图，决定跑哪些Worker"""
     msg = state["messages"][-1]["content"]
     result = await classify_intent(msg)
     state["intent"] = result.intent.value
@@ -257,8 +284,7 @@ async def intent_router_node(state: AgentState) -> AgentState:
     return state
 
 
-# ── Planner ────────────────────────────────────────────────
-
+#规划节点
 async def planner_node(state: AgentState) -> AgentState:
     """根据意图生成执行计划"""
     plan = await generate_plan(state, WORKER_SUBGRAPHS, WORKER_LIST, _extract_cities, _default_plan)
@@ -268,10 +294,9 @@ async def planner_node(state: AgentState) -> AgentState:
     return state
 
 
-# ── Executor（调用 Worker 子图）─────────────────────────────
-
+#执行节点（调用 Worker 子图）
 async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
-    """对单个步骤调用对应的 Worker 子图"""
+    """对单个步骤调用对应的Worker子图"""
     worker_name = step.get("worker", "")
     subgraph = WORKER_SUBGRAPHS.get(worker_name)
 
@@ -283,7 +308,7 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
     print(f"  [Executor] {step['name']} 开始...")
     step["status"] = "running"
 
-    # 构建子图输入消息
+    #构建子图输入消息
     task_msg = step.get("description", "")
     context_msg = ""
     if ctx:
@@ -300,7 +325,7 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
             timeout=WORKER_TIMEOUT
         )
 
-        # 子图的最终回复是 messages 的最后一条
+        #子图的最终回复是 messages 的最后一条
         final_msgs = result.get("messages", [])
         final_content = ""
         for m in reversed(final_msgs):
@@ -310,8 +335,12 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
 
         step["result"] = final_content or "Worker 无输出"
         step["status"] = "done" if final_content else "failed"
+        # 统计 Worker 的推理轮数和工具调用次数
+        raw_msgs = result.get("messages", [])
+        step["iterations"] = sum(1 for m in raw_msgs if m.get("role") == "assistant")
+        step["tool_calls"] = sum(1 for m in raw_msgs if m.get("role") == "tool")
 
-        # 结构化提取
+        #结构化提取
         if final_content:
             try:
                 structured = await _extract_structured(final_content, worker_name)
@@ -380,7 +409,31 @@ async def executor_node(state: AgentState) -> AgentState:
     return state
 
 
-# ── Memory Writer（提取并保存长期记忆）───────────────────────
+#提取保存长期记忆
+PREF_TOOL = [{
+    "type": "function",
+    "function": {
+        "name": "extract_preferences",
+        "description": "从旅行对话中提取用户偏好",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string", "description": "偏好项名称，如 预算档位/出行季节/酒店偏好"},
+                            "value": {"type": "string", "description": "偏好值，如 经济型/春季/快捷酒店"},
+                        },
+                        "required": ["key", "value"]
+                    }
+                }
+            },
+            "required": ["preferences"]
+        }
+    }
+}]
 
 async def memory_writer_node(state: AgentState, config, *, store) -> AgentState:
     """从本次对话中提取用户偏好，存入 Store"""
@@ -390,35 +443,29 @@ async def memory_writer_node(state: AgentState, config, *, store) -> AgentState:
     try:
         uid = config.get("configurable", {}).get("user_id", "anonymous")
 
-        # 用 LLM 从最终回复中提取用户偏好
-        extract_prompt = f"""从以下旅行对话提取用户的偏好和习惯。只输出 JSON:
-对话内容:
-用户: {state['messages'][-1]['content'] if state['messages'] else ''}
-方案概要: {state['final_answer'][:500]}
+        # 收集所有用户消息（不含 system）
+        user_msgs = [m["content"] for m in state["messages"] if m.get("role") == "user"]
+        user_text = "\n".join(f"- {msg}" for msg in user_msgs[-5:])
 
-格式:
-{{"preferences": [{{"key": "偏好项", "value": "偏好值"}}]}}
+        resp = await chat([
+            {"role": "user", "content": f"从对话提取用户偏好:\n用户消息:\n{user_text}\n方案概要:\n{state['final_answer'][:800]}"}
+        ], tools=PREF_TOOL)
+        tool_calls = resp.get("tool_calls", [])
 
-偏好项示例: "预算档位", "出行季节", "酒店偏好", "航空公司偏好", "饮食偏好", "景点偏好"
-如果没发现新偏好，输出 {{"preferences": []}}
-只输出 JSON:"""
-
-        resp = await chat([{"role": "user", "content": extract_prompt}])
-        content = resp.get("content", "{}").strip()
-        s = content.find("{")
-        e = content.rfind("}")
-        if s == -1 or e == -1:
+        if not tool_calls:
             return state
 
-        data = json.loads(content[s:e+1])
-        prefs = data.get("preferences", [])
+        args = parse_tool_call(resp)
+        if args is None:
+            return state
+        prefs = args.get("preferences", [])
 
         for p in prefs:
             key = p.get("key", "")
             value = p.get("value", "")
             if key and value:
                 namespace = (uid, "preferences")
-                store.put(namespace, key, {"value": value})
+                await store.aput(namespace, key, {"value": value})
                 print(f"[Memory] 保存偏好: {key} = {value}")
 
         if prefs:
@@ -430,8 +477,7 @@ async def memory_writer_node(state: AgentState, config, *, store) -> AgentState:
     return state
 
 
-# ── Aggregator（汇总）───────────────────────────────────────
-
+#汇总
 async def aggregator_node(state: AgentState) -> AgentState:
     """汇总所有步骤结果，生成最终旅行方案"""
     steps = state.get("plan_steps", [])
@@ -463,47 +509,38 @@ async def aggregator_node(state: AgentState) -> AgentState:
     return state
 
 
-# ── 路由 ───────────────────────────────────────────────────
-
+#路由
 def route_guard(s: AgentState):
-    """Guard 拦截 → 直接结束；放行 → 进入主流程"""
+    """Guard 拦截 → 直接结束；
+    放行 → 进入主流程
+    """
     return "end" if s.get("guard_blocked") else "memory_reader"
 
 
-# ══════════════════════════════════════════════════════════════
-# 构建图（单例 + checkpointer/store 支持）
-# ══════════════════════════════════════════════════════════════
 
+#构图
 _graph = None
 _graph_with_checkpointer = None
 
 
 def build_graph(checkpointer=None, store=None):
-    """构建主图。
-
-    参数:
-        checkpointer: LangGraph Checkpointer（如 SqliteSaver），None 则不存档
-        store:        LangGraph Store（如 InMemoryStore），None 则不用长期记忆
-
-    返回:
-        编译后的 CompiledStateGraph
-    """
+    """构建主图。"""
     global _graph, _graph_with_checkpointer
 
-    # 无 checkpointer → 复用单例（向后兼容）
+    #无checkpointer → 复用单例（向后兼容）
     if checkpointer is None and store is None:
         if _graph is None:
             _graph = _build(checkpointer=None, store=None)
         return _graph
 
-    # 有 checkpointer/store → 每次创建新实例（不缓存，因为外部可能换 store）
+    # 有checkpointer/store → 每次创建新实例
     return _build(checkpointer=checkpointer, store=store)
 
 
 def _build(checkpointer, store):
     g = StateGraph(AgentState)
 
-    # 添加节点
+    #定义节点
     g.add_node("guard", guard_node)
     g.add_node("memory_reader", memory_reader_node)
     g.add_node("intent_router", intent_router_node)
@@ -512,7 +549,7 @@ def _build(checkpointer, store):
     g.add_node("memory_writer", memory_writer_node)
     g.add_node("aggregator", aggregator_node)
 
-    # 连线
+    #连线
     g.set_entry_point("guard")
     g.add_conditional_edges("guard", route_guard, {
         "end": END,
@@ -521,8 +558,8 @@ def _build(checkpointer, store):
     g.add_edge("memory_reader", "intent_router")
     g.add_edge("intent_router", "planner")
     g.add_edge("planner", "executor")
-    g.add_edge("executor", "memory_writer")
-    g.add_edge("memory_writer", "aggregator")
-    g.add_edge("aggregator", END)
+    g.add_edge("executor", "aggregator")
+    g.add_edge("aggregator", "memory_writer")
+    g.add_edge("memory_writer", END)
 
     return g.compile(checkpointer=checkpointer, store=store)

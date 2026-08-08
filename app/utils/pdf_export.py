@@ -1,5 +1,3 @@
-"""Markdown/PDF 导出 —— 把旅行方案转成可下载文件"""
-
 
 def build_markdown(reply: str, destination: str = "", dates: str = "") -> str:
     """把 aggregator 输出的 Markdown 包装成完整文档"""

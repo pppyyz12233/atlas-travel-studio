@@ -1,5 +1,3 @@
-"""认证相关 Schema"""
-
 from pydantic import BaseModel, Field, model_validator
 
 

@@ -1,22 +1,21 @@
-"""行程结构化模型 —— 用于 Worker 输出提取和跨步骤状态传递"""
 from pydantic import BaseModel, Field
 
 
 class Location(BaseModel):
-    """地理位置"""
-    lng: float = Field(description="经度")
-    lat: float = Field(description="纬度")
+    """地理位置（lng/lat 可选——LLM 有时只给名称不给坐标）"""
+    lng: float = Field(default=0.0, description="经度")
+    lat: float = Field(default=0.0, description="纬度")
     name: str = Field(description="地点名称", default="")
     address: str = Field(description="地址", default="")
     type: str = Field(description="类型: airport/hotel/attraction/station/other", default="other")
 
 
 class TripItem(BaseModel):
-    """行程中的单个条目 (航班/酒店/景点等)"""
-    name: str = Field(description="名称")
-    detail: str = Field(description="详细信息", default="")
-    price: str = Field(description="价格", default="")
-    date: str = Field(description="日期", default="")
+    """行程中的单个条目 (航班/酒店/景点等)——所有字段可选，LLM 不一定填全"""
+    name: str = Field(default="", description="名称")
+    detail: str = Field(default="", description="详细信息")
+    price: str = Field(default="", description="价格")
+    date: str = Field(default="", description="日期")
 
 
 class StepOutput(BaseModel):

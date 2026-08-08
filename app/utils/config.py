@@ -1,4 +1,3 @@
-"""全局配置 —— Pydantic Settings，启动时 schema 校验"""
 
 import warnings
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,9 +26,7 @@ class Settings(BaseSettings):
     @property
     def effective_db_url(self) -> str:
         """优先 SQLite，没有才用 MySQL"""
-        import os
-        sqlite = os.getenv("SQLITE_PATH", "")
-        return sqlite if sqlite else self.db_url
+        return self.sqlite_path if self.sqlite_path else self.db_url
 
 
 settings = Settings()
