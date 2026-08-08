@@ -52,7 +52,7 @@ async def chat(messages: list[dict], tools: list[dict] | None = None,
                 "type": tc.type,
                 "function": {"name": tc.function.name, "arguments": tc.function.arguments},
             })
-    return {"content": msg.content or "", "tool_calls": tc_list, "raw_message": msg}
+    return {"role": msg.role or "assistant", "content": msg.content or "", "tool_calls": tc_list, "raw_message": msg}
 
 
 def parse_tool_call(resp: dict, index: int = 0) -> dict | None:

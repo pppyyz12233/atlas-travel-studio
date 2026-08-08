@@ -335,28 +335,10 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
 
         step["result"] = final_content or "Worker 无输出"
         step["status"] = "done" if final_content else "failed"
-        # 统计 Worker 的推理轮数和工具调用次数
-        raw_msgs = result.get("messages", [])
-        print(f"  [Executor] {step['name']} result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
-        print(f"  [Executor] {step['name']} raw_msgs count: {len(raw_msgs)}")
-        for i, m in enumerate(raw_msgs):
-            if isinstance(m, dict):
-                print(f"  [Executor]   msg[{i}]: type=dict, keys={list(m.keys())}, role={m.get('role','?')}")
-            else:
-                print(f"  [Executor]   msg[{i}]: type={type(m).__name__}, has role={hasattr(m,'role')}, has type={hasattr(m,'type')}")
-        its = tc = 0
-        for m in raw_msgs:
-            if isinstance(m, dict):
-                r = m.get("role", "")
-                if r == "assistant": its += 1
-                elif r == "tool": tc += 1
-            else:
-                r = str(getattr(m, "type", getattr(m, "role", "")))
-                if "ai" in r.lower() or "assistant" in r.lower(): its += 1
-                elif "tool" in r.lower(): tc += 1
-        step["iterations"] = its
-        step["tool_calls"] = tc
-        print(f"  [Executor] {step['name']} 统计结果: its={its}, tc={tc}")
+        # 从子图 state 直接读取计数器（由 llm_node / tool_node 维护）
+        step["iterations"] = result.get("iteration_count", 0)
+        step["tool_calls"] = result.get("tool_call_count", 0)
+        print(f"  [Executor] {step['name']} 统计: {step['iterations']}轮 · {step['tool_calls']}工具")
 
         #结构化提取
         if final_content:

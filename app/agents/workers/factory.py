@@ -14,6 +14,8 @@ from app.agents.skill_loader import load_skill
 class WorkerState(TypedDict):
     """每个Worker子图的内部State"""
     messages: list[dict]
+    iteration_count: int          # LLM 推理轮数
+    tool_call_count: int          # 工具调用次数（tool 消息条数）
 
 
 #构建单个Worker子图
@@ -32,15 +34,11 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
     system_prompt = load_skill(worker_name) or f"You are a {worker_name} expert."
     tools = WORKER_TOOLS_MAP.get(worker_name, [])
 
-    _iteration_count = 0  # 闭包计数器，跟踪循环次数
-
 
 #LLM节点
     async def llm_node(state: WorkerState):
         """调用 LLM，binding工具列表"""
-        nonlocal _iteration_count
-        _iteration_count += 1
-        print(f"  [{worker_name}] LLM 思考 (第{_iteration_count}轮)")
+        print(f"  [{worker_name}] LLM 思考 (第{state.get('iteration_count', 0) + 1}轮)")
 
         #动态promp
         if build_prompt and state["messages"]:
@@ -77,7 +75,10 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
         if resp.get("tool_calls") and not resp.get("content"):
             resp.pop("content", None)
         #list[dict]无reducer→必须返回累积后的完整列表，否则旧消息丢失
-        return {"messages": state["messages"] + [resp]}
+        return {
+            "messages": state["messages"] + [resp],
+            "iteration_count": state.get("iteration_count", 0) + 1,
+        }
 
 
 #工具节点
@@ -129,7 +130,10 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
             })
 
         #list[dict]无reducer返回累积列表，保留之前的消息
-        return {"messages": state["messages"] + tool_results}
+        return {
+            "messages": state["messages"] + tool_results,
+            "tool_call_count": state.get("tool_call_count", 0) + len(tool_results),
+        }
 
 
 #路由判断
@@ -138,7 +142,7 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
         last_msg = state["messages"][-1]
 
         #检查是否超最大循环次数
-        if _iteration_count >= max_iterations:
+        if state.get("iteration_count", 0) >= max_iterations:
             return END
 
         tool_calls = last_msg.get("tool_calls", [])

@@ -681,7 +681,11 @@ function handleSSE(evt){
     for(var i=0;i<_stepNames.length;i++){var d=document.getElementById("pd"+i);if(d&&d.className.indexOf("done")<0&&d.className.indexOf("failed")<0)d.className="progress-dot done"}
     var fill=document.getElementById("pgFill");if(fill)fill.style.width="100%";
     var counter=document.querySelector(".progress-counter");if(counter)counter.textContent="全部完成";
-    stopProgressTimer();cid=evt.conversation_id;
+    stopProgressTimer();
+    if(_graphTimer){clearInterval(_graphTimer);_graphTimer=null;}
+    var meta=document.getElementById("graphMeta");if(meta)meta.textContent="全部完成";
+    var tm=document.getElementById("graphTimer");if(tm)tm.textContent="完成";
+    cid=evt.conversation_id;
     // P2-8: budget pie
     var reply=evt.reply;var budgetSection=reply.match(/## 💰.*?(?=##|$)/s);
     if(budgetSection){var pieData=parseBudgetTable(budgetSection[0]);if(pieData.length){var pieSvg=drawBudgetPie(pieData);reply=reply.replace(/## 💰.*?(?=##|$)/s,"## 💰 预算\n\n"+pieSvg)}}

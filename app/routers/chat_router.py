@@ -124,11 +124,13 @@ async def chat_stream(
         msg = req.message
 
         # 1. Guard
+        yield _gs("guard", "running")
         blocked, reason = check(msg)
         if blocked:
+            yield _gs("guard", "failed")
             yield f"data: {json.dumps({'event': 'guard', 'blocked': True, 'reason': reason}, ensure_ascii=False)}\n\n"
             return
-        yield f"data: {json.dumps({'event': 'guard', 'ok': True}, ensure_ascii=False)}\n\n"
+        yield _gs("guard", "done")
 
         # 2. 解析用户身份
         uid = str(user.id) if user else "anonymous"
