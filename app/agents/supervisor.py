@@ -335,10 +335,20 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
 
         step["result"] = final_content or "Worker 无输出"
         step["status"] = "done" if final_content else "failed"
-        # 统计 Worker 的推理轮数和工具调用次数
+        # 统计 Worker 的推理轮数和工具调用次数（兼容 dict 和 LangChain 消息对象）
         raw_msgs = result.get("messages", [])
-        step["iterations"] = sum(1 for m in raw_msgs if m.get("role") == "assistant")
-        step["tool_calls"] = sum(1 for m in raw_msgs if m.get("role") == "tool")
+        def _is_ai(m):
+            if isinstance(m, dict):
+                return m.get("role") == "assistant"
+            t = getattr(m, "type", "")
+            return t == "ai" or t == "AIMessage"
+        def _is_tool(m):
+            if isinstance(m, dict):
+                return m.get("role") == "tool"
+            t = getattr(m, "type", "")
+            return t == "tool" or t == "ToolMessage"
+        step["iterations"] = sum(1 for m in raw_msgs if _is_ai(m))
+        step["tool_calls"] = sum(1 for m in raw_msgs if _is_tool(m))
 
         #结构化提取
         if final_content:
