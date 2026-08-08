@@ -290,7 +290,13 @@ async def intent_router_node(state: AgentState) -> AgentState:
     result = await classify_intent(context)
     state["intent"] = result.intent.value
     state["active_workers"] = result.workers
-    print(f"[Intent] {result.intent.value} -> workers: {result.workers}")
+    # 把路由提取的参数传入 trip_state，Worker 直接用，省 1-2 轮推理
+    params = {}
+    if result.origin: params["origin"] = result.origin
+    if result.destination: params["destination"] = result.destination
+    if params:
+        state["trip_state"] = {**state.get("trip_state", {}), "search_params": params}
+    print(f"[Intent] {result.intent.value} -> workers: {result.workers} params={params}")
     return state
 
 
@@ -305,8 +311,9 @@ async def planner_node(state: AgentState) -> AgentState:
 
 
 #执行节点（调用 Worker 子图）
-async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
-    """对单个步骤调用对应的Worker子图"""
+async def _run_step_with_subgraph(step: dict, ctx: list | None, on_event=None, search_params: dict = None) -> None:
+    """对单个步骤调用对应的Worker子图。on_event 可选回调，用于流式推送 worker 内部进度。
+    search_params: intent_router 提取的参数（origin/destination），直接注入 Worker 输入，省 LLM 推理。"""
     worker_name = step.get("worker", "")
     subgraph = WORKER_SUBGRAPHS.get(worker_name)
 
@@ -320,20 +327,48 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
 
     #构建子图输入消息
     task_msg = step.get("description", "")
+    # 注入路由提取的参数，Worker 的 LLM 不用重新想一遍
+    param_lines = []
+    if search_params:
+        if search_params.get("origin"): param_lines.append(f"- 出发地: {search_params['origin']}")
+        if search_params.get("destination"): param_lines.append(f"- 目的地: {search_params['destination']}")
+        if search_params.get("date"): param_lines.append(f"- 日期: {search_params['date']}")
     context_msg = ""
     if ctx:
         context_msg = "前序步骤结果:\n" + "\n".join([
             f"--- {c['step']} ---\n{c['result']}" for c in ctx
         ])
-    user_input = f"{task_msg}\n\n{context_msg}" if context_msg else task_msg
+    parts = [task_msg]
+    if param_lines:
+        parts.append("已知参数:\n" + "\n".join(param_lines))
+    if context_msg:
+        parts.append(context_msg)
+    user_input = "\n\n".join(parts)
 
     try:
-        result = await asyncio.wait_for(
-            subgraph.ainvoke({
-                "messages": [{"role": "user", "content": user_input}]
-            }),
-            timeout=WORKER_TIMEOUT
-        )
+        # 用 astream 替代 ainvoke，推送每步内部进度
+        async def _stream():
+            r = {}
+            li = lt = 0
+            async for chunk in subgraph.astream(
+                {"messages": [{"role": "user", "content": user_input}]}
+            ):
+                # chunk 格式: {"llm": {state}} 或 {"tools": {state}}，取内层 state
+                s = list(chunk.values())[0] if chunk else {}
+                r = s
+                its = s.get("iteration_count", 0)
+                tc = s.get("tool_call_count", 0)
+                if its > li and on_event:
+                    last_msg = s.get("messages", [{}])[-1] if s.get("messages") else {}
+                    next_tools = [t.get("function", {}).get("name", "?") for t in last_msg.get("tool_calls", [])]
+                    on_event({"type": "worker_think", "name": step["name"], "round": its, "next_tools": next_tools})
+                if tc > lt and on_event:
+                    tool_msgs = [m for m in s.get("messages", []) if m.get("role") == "tool"]
+                    names = [m.get("name", "?") for m in tool_msgs[-(tc - lt):]]
+                    on_event({"type": "worker_tools", "name": step["name"], "tools": names})
+                li, lt = its, tc
+            return r
+        result = await asyncio.wait_for(_stream(), timeout=WORKER_TIMEOUT)
 
         #子图的最终回复是 messages 的最后一条
         final_msgs = result.get("messages", [])
@@ -399,15 +434,16 @@ async def executor_node(state: AgentState) -> AgentState:
     print(f"[Executor] {len(all_steps)}步, {len(layers)}层: "
           f"{' → '.join(['|'.join(s['name'] for s in layer) for layer in layers])}")
 
+    sp = state.get("trip_state", {}).get("search_params")
     for layer in layers:
         layer_ctx = _build_context(steps)
 
         if len(layer) == 1:
-            await _run_step_with_subgraph(layer[0], layer_ctx if layer_ctx else None)
+            await _run_step_with_subgraph(layer[0], layer_ctx if layer_ctx else None, search_params=sp)
         else:
             print(f"  [Executor] 并行执行 {len(layer)} 步: {[s['name'] for s in layer]}")
             await asyncio.gather(*[
-                _run_step_with_subgraph(s, layer_ctx if layer_ctx else None)
+                _run_step_with_subgraph(s, layer_ctx if layer_ctx else None, search_params=sp)
                 for s in layer
             ])
 

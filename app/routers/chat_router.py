@@ -200,10 +200,24 @@ async def chat_stream(
                 yield f"data: {json.dumps({'event': 'step_start', 'name': s['name'], 'worker': s.get('worker', ''), 'layer': len(layers), 'parallel': len(layer) > 1}, ensure_ascii=False)}\n\n"
 
             if len(layer) == 1:
-                await _run_step_with_subgraph(layer[0], _build_context(steps))
+                # 单 worker：用队列中转，流式推送内部进度
+                q = asyncio.Queue()
+                def _push(evt):
+                    try: q.put_nowait(evt)
+                    except: pass
+                async def _run():
+                    await _run_step_with_subgraph(layer[0], _build_context(steps), on_event=_push, search_params=state.get("trip_state", {}).get("search_params"))
+                task = asyncio.ensure_future(_run())
+                while not task.done() or not q.empty():
+                    try:
+                        evt = q.get_nowait()
+                        yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+                    except asyncio.QueueEmpty:
+                        await asyncio.sleep(0.05)
+                await task  # 有异常在这里抛出
             else:
                 await asyncio.gather(*[
-                    _run_step_with_subgraph(s, _build_context(steps))
+                    _run_step_with_subgraph(s, _build_context(steps), search_params=state.get("trip_state", {}).get("search_params"))
                     for s in layer
                 ])
 

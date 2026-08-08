@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.mcp.servers.flight_server import FLIGHTS
 from app.mcp.servers.hotel_server import HOTELS
 
-router = APIRouter(prefix="/api/search", tags=["搜索"])
+router = APIRouter(prefix="/search", tags=["搜索"])
 
 
 # ══════════════════════════════════════════════════════════════
@@ -22,7 +22,7 @@ async def search_flights(
 ):
     results = [
         f for f in FLIGHTS
-        if origin in f.get("origin", "") and destination in f.get("destination", "")
+        if origin in f.get("origin", "") and destination in f.get("dest", "")
     ]
     if date:
         results = [f for f in results if f.get("date", "").startswith(date)]

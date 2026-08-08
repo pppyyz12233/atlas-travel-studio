@@ -211,6 +211,10 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
   display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-tertiary)}
 .map-legend-item{display:flex;align-items:center;gap:4px}
 .map-legend-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.day-tabs{display:flex;gap:4px;padding:4px 8px;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0}
+.day-tab{padding:4px 10px;border-radius:14px;font-size:11px;cursor:pointer;white-space:nowrap;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);transition:all .15s}
+.day-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.day-tab:hover:not(.active){border-color:var(--blue);color:var(--blue)}
 
 /* ---- Info Window ---- */
 .amap-info-content{font-size:13px;line-height:1.5;max-width:220px;font-family:var(--font)}
@@ -272,6 +276,8 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 .dark .bubble-user{background:var(--blue)}
 .dark .chat-panel{background:var(--bg)}
 .dark .map-panel{background:var(--bg)}
+.dark .day-tab{background:var(--card);border-color:var(--border);color:var(--text-secondary)}
+.dark .day-tab.active{background:var(--blue);color:#fff}
 .dark .field{background:var(--card);color:var(--text);border-color:var(--border)}
 .dark .step-card{background:var(--card);border-color:var(--border)}
 .dark .trip-card{background:var(--card);border-color:var(--border)}
@@ -435,6 +441,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
     <span>地图标注</span>
     <span id="markerCount" style="font-weight:400;color:var(--text-tertiary)">0 个标记</span>
   </div>
+  <div id="dayTabs" class="day-tabs" style="display:none"></div>
   <div class="map-container">
     <div id="mapDiv"></div>
     <div class="map-placeholder" id="mapPlaceholder">加载地图中...</div>
@@ -453,7 +460,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 <script>
 window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
 </script>
-<script src="https://webapi.amap.com/maps?v=2.0&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
 
 <script>
 /* ================================================================
@@ -486,6 +493,7 @@ document.addEventListener("DOMContentLoaded",setupScrollFab);
 var A="/api",tk=localStorage.getItem("t"),cid=null,isReg=false,lt="email";
 var map=null,amapReady=false,_markers=[],_infoWindow=null,_stepResults={};
 var _stepNames=[],_stepDoneCount=0,_progStartTime=0,_progTimer=null,_graphTimer=null,_graphStart=0;
+var _dayRoutes=[],_activeDay=-1,_dayPolylines=[],_dayMarkers=[],_itineraryLocs=[];
 
 var STEP_COLORS={flight:"#ff3b30",hotel:"#0071e3",attraction:"#34c759",itinerary:"#af52de",budget:"#ff9500"};
 var STEP_ICONS={flight:"✈️",hotel:"🏨",attraction:"🎯",itinerary:"📋",budget:"💰"};
@@ -514,7 +522,13 @@ window.onload=function(){
   },200);
 };
 
-function clearMarkers(){if(map)map.clearMap();_markers=[];updateMarkerCount()}
+function clearMarkers(){if(map)map.clearMap();_markers=[];updateMarkerCount();clearDayRoutes();}
+function clearDayRoutes(){
+  _dayPolylines.forEach(function(p){if(p)map.remove(p);});
+  _dayMarkers.forEach(function(m){if(m)map.remove(m);});
+  _dayPolylines=[];_dayMarkers=[];_dayRoutes=[];_activeDay=-1;_itineraryLocs=[];
+  var tabs=document.getElementById("dayTabs");if(tabs){tabs.style.display="none";tabs.innerHTML="";}
+}
 function updateMarkerCount(){var el=document.getElementById("markerCount");if(el)el.textContent=_markers.length+" 个标记"}
 
 function addMapMarker(lng,lat,title,subtitle,color,stepName){
@@ -549,6 +563,85 @@ function addLocationsAsMarkers(locations,stepName,color){
   locations.forEach(function(loc){
     if(loc.lng&&loc.lat&&loc.name){addMapMarker(loc.lng,loc.lat,loc.name,loc.address||"",color,stepName);}
   });
+}
+
+function parseDayRoutes(reply){
+  if(!_itineraryLocs.length)return;
+  // 按 ### Day 或 #### Day 分割
+  var days=[],parts=reply.split(/###?\s*Day\s*(\d+)/i);
+  for(var i=1;i<parts.length;i+=2){
+    var num=parts[i],content=parts[i+1]||"";
+    var locs=[];
+    // 从表格行提取地点名（第2列）
+    var rows=content.match(/^\|.*\|$/gm);
+    if(rows){
+      rows.forEach(function(row){
+        var cols=row.split("|").map(function(c){return c.trim();});
+        var name=cols[2];  // 时段 | 地点 | 交通 | 备注
+        if(name&&name.length<30&&name!=="地点"&&name!=="---"&&!name.match(/^[:：\s-]+$/)){
+          // 匹配 itinerary 坐标（双向 substring）
+          var match=null;
+          for(var j=0;j<_itineraryLocs.length;j++){
+            var loc=_itineraryLocs[j];
+            if(loc.name&&(loc.name.includes(name)||name.includes(loc.name))){
+              match=loc;break;
+            }
+          }
+          if(match)locs.push({lng:match.lng,lat:match.lat,name:match.name,address:match.address||""});
+        }
+      });
+    }
+    if(locs.length>=2)days.push({label:"Day "+num,locations:locs});
+  }
+  if(!days.length)return;
+  _dayRoutes=days;
+  // 清除旧标记（路线模式只用编号圆点，不用旧 pins）
+  _markers.forEach(function(m){if(m)map.remove(m);});
+  _markers=[];
+  // 渲染 day tabs
+  var tabs=document.getElementById("dayTabs");
+  tabs.innerHTML=days.map(function(d,i){
+    return '<span class="day-tab'+(i===0?' active':'')+'" onclick="showDay('+i+')">'+d.label+'</span>';
+  }).join("");
+  tabs.style.display="flex";
+  showDay(0);
+}
+
+function showDay(index){
+  if(!amapReady||index>=_dayRoutes.length)return;
+  _activeDay=index;
+  // 清除旧路线和标记
+  _dayPolylines.forEach(function(p){if(p)map.remove(p);});
+  _dayMarkers.forEach(function(m){if(m)map.remove(m);});
+  _dayPolylines=[];_dayMarkers=[];
+  // 更新 tab 样式
+  var tabs=document.querySelectorAll(".day-tab");
+  tabs.forEach(function(t,i){t.className="day-tab"+(i===index?" active":"");});
+  // 画新路线
+  var route=_dayRoutes[index];
+  var path=route.locations.map(function(l){return [l.lng,l.lat];});
+  // 画连线（紫色虚线）
+  var poly=new AMap.Polyline({
+    path:path,strokeColor:"#af52de",strokeWeight:3,strokeOpacity:0.7,
+    strokeStyle:"dashed",showDir:true,strokeColor:"#af52de",
+    lineJoin:"round",zIndex:50
+  });
+  map.add(poly);_dayPolylines.push(poly);
+  // 画标记点
+  route.locations.forEach(function(l,i){
+    var color=i===0?"#34c759":(i===route.locations.length-1?"#ff3b30":"#af52de");
+    var m=new AMap.Marker({
+      position:[l.lng,l.lat],title:l.name,
+      label:{content:"<span style='font-size:10px;font-weight:600'>"+(i+1)+"</span>",offset:new AMap.Pixel(0,-12)},
+      icon:new AMap.Icon({size:new AMap.Size(22,22),
+        image:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="9" fill="'+color+'" stroke="white" stroke-width="2"/></svg>'),
+        imageSize:new AMap.Size(22,22)}),
+      zIndex:100
+    });
+    m.on("click",function(){_infoWindow.setContent('<div class="amap-info-content"><span class="iw-tag" style="background:'+color+'">'+(i+1)+'</span><h4>'+l.name+'</h4><p>'+l.address+'</p></div>');_infoWindow.open(map,m.getPosition());});
+    map.add(m);_dayMarkers.push(m);
+  });
+  map.setFitView(null,false,[60,60,120,300]);
 }
 
 /* ================================================================
@@ -709,11 +802,16 @@ function handleSSE(evt){
     updProgress(evt.name,ok?"done":"failed",(evt.iterations||0)+"轮 · "+(evt.tool_calls||0)+"工具");
     addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker,evt.result_snippet||"");
     _stepResults[evt.name]={status:evt.status,iterations:evt.iterations,tool_calls:evt.tool_calls};
+    // 日程 Worker：保存坐标供路线绘制
+    if(worker==="itinerary"&&evt.locations&&evt.locations.length){
+      _itineraryLocs=evt.locations.filter(function(l){return l.lng&&l.lat;});
+    }
     if(ok&&amapReady){
+      // 有日程路线时只用路线（清晰），否则用单独标记
       var color=STEP_COLORS[worker]||"#0071e3";
-      // 优先用服务端提取的精确坐标
-      if(evt.locations&&evt.locations.length){addLocationsAsMarkers(evt.locations,evt.name,color);}
-      // 否则用高德搜索
+      if(worker!=="itinerary"&&evt.locations&&evt.locations.length){
+        addLocationsAsMarkers(evt.locations,evt.name,color);
+      }
       var kw=stepSearchKeyword(evt.name,worker,dest);if(kw)searchAndMark(kw,dest,evt.name,color);
     }
     // P1-6: map hover — bind to step card
@@ -736,7 +834,23 @@ function handleSSE(evt){
     if(budgetSection){var pieData=parseBudgetTable(budgetSection[0]);if(pieData&&pieData.length){var pieSvg=drawBudgetPie(pieData);reply=reply.replace(/## 💰.*?(?=##|$)/s,"## 💰 预算\n\n"+pieSvg)}}}catch(e){}
     addBubble("assistant",reply);
     showSuggestChips(reply);
-    if(amapReady)searchAndMark(dest,dest,"总览","#6366f1");
+    // 解析 day-by-day 路线（用 itinerary 坐标匹配 markdown 表格中的地点）
+    parseDayRoutes(reply);
+    if(amapReady&&!_dayRoutes.length)searchAndMark(dest,dest,"总览","#6366f1");
+  }else if(evt.event==="worker_think"){
+    // Worker 实时进度：LLM 思考中 / 准备调工具
+    var pname=evt.name,round=evt.round||0,tools=evt.next_tools||[];
+    var si=findStepIdx(pname);if(si>=0){
+      var m=document.getElementById("pm"+si);
+      if(m)m.textContent="第"+round+"轮思考"+(tools.length?" → "+tools.join(","):"");
+    }
+  }else if(evt.event==="worker_tools"){
+    // Worker 实时进度：工具执行完成
+    var pname=evt.name,tnames=evt.tools||[];
+    var si=findStepIdx(pname);if(si>=0){
+      var m=document.getElementById("pm"+si);
+      if(m)m.textContent="执行: "+tnames.join(", ");
+    }
   }else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="汇总方案中..."}
 }
 </script>
