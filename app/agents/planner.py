@@ -78,12 +78,37 @@ async def generate_plan(
     intent = state.get("intent", "full_trip")
     active_workers = state.get("active_workers", list(WORKERS.keys()))
 
+    # 从全部历史消息提取城市（后续追问如"Day1去迪士尼"不含城市名，需回溯）
+    all_user_text = " ".join([
+        m.get("content", "") for m in state["messages"] if m.get("role") == "user"
+    ])
+    from_city, to_city = _extract_cities(msg)
+    if from_city == "出发地" or to_city == "目的地":
+        fc2, tc2 = _extract_cities(all_user_text)
+        if from_city == "出发地": from_city = fc2
+        if to_city == "目的地": to_city = tc2
+
     # Narrow intents use default_plan directly (no LLM needed)
     if intent != "full_trip":
-        return _default_plan(msg, active_workers)
+        plan = _default_plan(msg, active_workers)
+        # 追问/修改场景：把用户完整请求 + 已有方案作为 step description
+        # 只在修改意图时引用旧方案，避免跨话题污染
+        prev_reply = ""
+        if intent in ("itinerary_modify",):
+            for m in reversed(state["messages"]):
+                if m.get("role") == "assistant" and m.get("content"):
+                    c = m["content"]
+                    if "日程" in c or "航班" in c or "酒店" in c:
+                        prev_reply = c
+                        break
+        for step in plan:
+            extra = f"用户当前请求: {msg}"
+            if prev_reply:
+                extra += f"\n\n【已有方案参考】\n{prev_reply[:2000]}"
+            step["description"] = extra
+        return plan
 
     # Full trip: 确定性预过滤 + LLM 细粒度裁剪
-    from_city, to_city = _extract_cities(msg)
     active_workers, excluded = _pre_filter_workers(msg, from_city, to_city, active_workers)
     if excluded:
         print(f"[Planner] 预过滤去掉: {', '.join(excluded)}")

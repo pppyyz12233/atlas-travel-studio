@@ -1,5 +1,5 @@
 
-import json
+import asyncio, json
 from typing import TypedDict, Literal
 from langgraph.graph import StateGraph, END, START
 
@@ -92,10 +92,10 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
 
         #构建工具名函数映射
         tool_map = {t.name: t for t in tools}
-        tool_results = []
 
+        # 解析所有 tool_calls 的参数（不上网络，纯 CPU）
+        tasks = []
         for tc in tool_calls:
-            #兼容 OpenAI SDK对象和dict两种格式
             tc_id = str(tc.id) if hasattr(tc, 'id') else str(tc.get('id', ''))
             tc_name = tc.function.name if hasattr(tc, 'function') else tc.get('function', {}).get('name', '')
             tc_args = tc.function.arguments if hasattr(tc, 'function') else tc.get('function', {}).get('arguments', '{}')
@@ -107,31 +107,30 @@ def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_pr
 
             tool = tool_map.get(tc_name)
             if tool is None:
-                tool_results.append({
-                    "role": "tool",
-                    "tool_call_id": tc_id,
-                    "name": tc_name,
-                    "content": f"工具 {tc_name} 不存在",
-                })
-                continue
+                tasks.append((tc_id, tc_name, None, {}))
+            else:
+                tasks.append((tc_id, tc_name, tool, tc_args))
 
+        # 并行执行所有工具（gather 替代串行 await）
+        async def _run_one(tc_id, tc_name, tool, tc_args):
+            if tool is None:
+                return {"role": "tool", "tool_call_id": tc_id, "name": tc_name, "content": f"工具 {tc_name} 不存在"}
             print(f"  [{worker_name}] 执行工具: {tc_name}({tc_args})")
             try:
                 observation = await tool.ainvoke(tc_args)
-                observation_str = str(observation)
+                content = str(observation)
+                # 截断过长输出，保护 LLM context
+                if len(content) > 3000:
+                    content = content[:2800] + f"\n... (截断 {len(content) - 3000} 字符)"
             except Exception as e:
-                observation_str = f"工具执行错误: {e}"
+                content = f"工具执行错误: {e}"
+            return {"role": "tool", "tool_call_id": tc_id, "name": tc_name, "content": content}
 
-            tool_results.append({
-                "role": "tool",
-                "tool_call_id": tc_id,
-                "name": tc_name,
-                "content": observation_str,
-            })
+        tool_results = await asyncio.gather(*[_run_one(*t) for t in tasks])
 
         #list[dict]无reducer返回累积列表，保留之前的消息
         return {
-            "messages": state["messages"] + tool_results,
+            "messages": state["messages"] + list(tool_results),
             "tool_call_count": state.get("tool_call_count", 0) + len(tool_results),
         }
 

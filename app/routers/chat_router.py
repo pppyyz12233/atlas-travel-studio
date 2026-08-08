@@ -151,8 +151,19 @@ async def chat_stream(
         }
 
         # 4. 手动走图节点（为了流式推送中间进度）
+        # 恢复历史对话上下文（从 checkpointer）
+        prev_msgs = []
+        try:
+            prev_state = await agent.aget_state(config)
+            if prev_state and prev_state.values:
+                prev_msgs = prev_state.values.get("messages", [])
+                if prev_msgs:
+                    print(f"[SSE] 恢复 {len(prev_msgs)} 条历史消息")
+        except Exception:
+            pass
+
         state: AgentState = {
-            "messages": [{"role": "user", "content": msg}],
+            "messages": prev_msgs + [{"role": "user", "content": msg}],
             "plan_steps": [], "current_step_index": 0,
             "final_answer": "", "guard_blocked": False, "guard_reason": "",
             "intent": "full_trip", "active_workers": [], "trip_state": {},
@@ -208,6 +219,9 @@ async def chat_stream(
         yield _gs("aggregator", "running")
         yield f"data: {json.dumps({'event': 'aggregating'}, ensure_ascii=False)}\n\n"
         state = await aggregator_node(state)
+        # 把汇总回复写入 messages，下次请求可恢复上下文
+        if state.get("final_answer"):
+            state["messages"].append({"role": "assistant", "content": state["final_answer"]})
         yield _gs("aggregator", "done")
 
         # 7. 保存长期记忆（提取偏好）
@@ -218,15 +232,31 @@ async def chat_stream(
 
         # 8. 保存消息（独立短会话，避免长期锁）
         if user is not None:
-            async with AsyncSessionLocal() as _s:
-                if not conv_id:
-                    conv = await conversation.create_conversation(_s, user.id, msg[:30])
-                    conv_id = conv.id
-                await message.add_message(_s, conv_id, "user", msg)
-                await message.add_message(_s, conv_id, "assistant", state["final_answer"])
-                await _s.commit()
+            try:
+                async with AsyncSessionLocal() as _s:
+                    if not conv_id:
+                        conv = await conversation.create_conversation(_s, user.id, msg[:30])
+                        conv_id = conv.id
+                    await message.add_message(_s, conv_id, "user", msg)
+                    await message.add_message(_s, conv_id, "assistant", state["final_answer"])
+                    await _s.commit()
+            except Exception as e:
+                print(f"[SSE] 保存消息失败: {e}")
 
-        yield f"data: {json.dumps({'event': 'done', 'reply': state['final_answer'], 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
+        try:
+            reply = state.get("final_answer", "")
+            payload = json.dumps({"event": "done", "reply": reply, "conversation_id": conv_id}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+        except Exception as e:
+            print(f"[SSE] done 事件构造失败: {e}")
+            yield f"data: {json.dumps({'event': 'done', 'reply': f'方案生成出错: {str(e)[:200]}', 'conversation_id': conv_id})}\n\n"
+
+        # 9. 保存 state 到 checkpointer（在 done 事件后，避免阻塞流式输出）
+        try:
+            await agent.aupdate_state(config, state, as_node="memory_writer")
+            print(f"[SSE] state 已保存 ({len(state.get('messages',[]))} 条消息)")
+        except Exception as e:
+            print(f"[SSE] state 保存失败: {e}")
 
     return StreamingResponse(
         event_stream(), media_type="text/event-stream",

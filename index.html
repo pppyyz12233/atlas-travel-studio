@@ -187,6 +187,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 .step-card .sc-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;flex-shrink:0}
 .sc-badge.ok{background:#e8f8ed;color:var(--green)}
 .sc-badge.fail{background:#fef0ef;color:var(--red)}
+.step-card .sc-preview{font-size:10px;color:var(--text-tertiary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
 
 /* ---- Typing indicator — Apple-style bounce ---- */
 .typing-indicator{display:flex;gap:5px;padding:8px 0}
@@ -241,10 +242,10 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 .graph-header{font-size:10px;font-weight:700;color:var(--text-tertiary);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .graph-track{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
 .graph-node{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px;padding:7px 5px;border-radius:10px;transition:all .3s ease;opacity:.45;flex-shrink:0}
-.graph-node.running{opacity:1;background:rgba(255,149,0,.10);animation:pulse 1.2s ease-in-out infinite}
+.graph-node.running{opacity:1;background:linear-gradient(110deg,rgba(255,149,0,0.05) 30%,rgba(255,149,0,0.25) 50%,rgba(255,149,0,0.05) 70%);background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite}
 .graph-node.done{opacity:1;background:rgba(52,199,89,.10)}
 .graph-node.failed{opacity:1;background:rgba(255,59,48,.10)}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .gn-icon{font-size:15px;line-height:1}
 .gn-name{font-size:8px;font-weight:600;color:var(--text-secondary);letter-spacing:.02em}
 .gn-state{font-size:9px}
@@ -368,7 +369,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
   <div class="sidebar-form">
     <div class="field-group"><label class="field-label">目的地</label><input id="dest" class="field" placeholder="东京" value="东京"></div>
     <div class="field-group"><label class="field-label">出发地</label><input id="from" class="field" placeholder="上海" value="上海"></div>
-    <div class="field-group"><label class="field-label">出发日期</label><input id="startDate" class="field" type="date" value="2026-08-01"></div>
+    <div class="field-group"><label class="field-label">出发日期</label><input id="startDate" class="field" type="date"></div>
     <div class="field-row">
       <div class="field-group"><label class="field-label">天数</label><input id="days" class="field" type="number" value="5" style="text-align:center"></div>
       <div class="field-group"><label class="field-label">人数</label><input id="ppl" class="field" type="number" value="2" style="text-align:center"></div>
@@ -421,9 +422,10 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
       </div>
     </div>
   </div>
+  <div id="suggestBox" class="suggest-chips" style="display:none"></div>
   <div class="chat-input-bar">
     <input id="chatInput" class="chat-input" placeholder="描述旅行计划，或输入修改请求…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}">
-    <button class="btn" onclick="send()" style="padding:11px 22px">发送</button>
+    <button class="btn" id="sendBtn" onclick="send()" style="padding:11px 22px">发送</button>
   </div>
 </main>
 
@@ -451,7 +453,7 @@ body{font-family:var(--font);background:var(--content-bg);color:var(--text);-web
 <script>
 window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
 </script>
-<script src="https://webapi.amap.com/maps?v=1.4.15&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=67b0518fb9e4f2039c9feafd773db12d&plugin=AMap.PlaceSearch"></script>
 
 <script>
 /* ================================================================
@@ -461,7 +463,8 @@ window._AMapSecurityConfig={securityJsCode:'654b5821c6b564d63ce1bea94d3ab16d'};
   var btn=document.getElementById("themeBtn");if(d==="dark")btn.textContent="☀️"})();
 function toggleTheme(){var h=document.documentElement;h.classList.toggle("dark");
   var is=h.classList.contains("dark");var btn=document.getElementById("themeBtn");
-  btn.textContent=is?"☀️":"🌙";localStorage.setItem("theme",is?"dark":"light")}
+  btn.textContent=is?"☀️":"🌙";localStorage.setItem("theme",is?"dark":"light");
+  if(map){map.setMapStyle(is?'amap://styles/dark':'amap://styles/light');}}
 
 /* ================================================================
    P0-3: SCROLL TO BOTTOM
@@ -494,15 +497,20 @@ function initMap(){
   try{
     var ph=document.getElementById("mapPlaceholder");if(ph)ph.style.display="none";
     map=new AMap.Map("mapDiv",{zoom:13,center:[113.2644,23.1291],resizeEnable:true});
+    // 暗色模式同步
+    if(document.documentElement.classList.contains("dark")){map.setMapStyle('amap://styles/dark');}
     _infoWindow=new AMap.InfoWindow({offset:new AMap.Pixel(0,-30)});
     amapReady=true;
-  }catch(e){console.error("[Map]",e)}
+  }catch(e){console.error("[Map]",e);var ph=document.getElementById("mapPlaceholder");if(ph){ph.innerHTML='地图加载失败<br><small style="font-size:11px">请检查网络或尝试刷新</small>';ph.style.cursor='pointer';ph.onclick=function(){location.reload();};}}
 }
 window.onload=function(){
+  // 出发日期默认今天
+  var sd=document.getElementById("startDate");
+  if(sd&&!sd.value){var td=new Date();sd.value=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');}
   if(window.AMap&&typeof AMap.Map==="function"){initMap();return}
   var t=0,iv=setInterval(function(){t++;
     if(window.AMap&&typeof AMap.Map==="function"){clearInterval(iv);initMap()}
-    else if(t>50){clearInterval(iv);var ph=document.getElementById("mapPlaceholder");if(ph)ph.textContent="地图加载失败"}
+    else if(t>25){clearInterval(iv);var ph=document.getElementById("mapPlaceholder");if(ph){ph.innerHTML='地图加载超时<br><small style="font-size:11px">请检查网络或刷新重试</small>';ph.style.cursor='pointer';ph.onclick=function(){location.reload();};}}
   },200);
 };
 
@@ -517,7 +525,12 @@ function addMapMarker(lng,lat,title,subtitle,color,stepName){
     zIndex:100,extData:{step:stepName,color:color,title:title,subtitle:subtitle}});
   m.on("click",function(){var d=m.getExtData();
     _infoWindow.setContent('<div class="amap-info-content"><span class="iw-tag" style="background:'+(d.color||"#0071e3")+'">'+d.step+'</span><h4>'+d.title+'</h4><p>'+d.subtitle+'</p></div>');
-    _infoWindow.open(map,m.getPosition())});
+    _infoWindow.open(map,m.getPosition());
+    // 反向联动：高亮对应步骤卡片
+    var cards=document.querySelectorAll(".step-card");
+    cards.forEach(function(c){c.style.boxShadow="";c.style.borderColor="";});
+    cards.forEach(function(c){var n=c.querySelector(".sc-name");if(n&&n.textContent===d.step){c.style.boxShadow="0 0 0 2px "+(d.color||"#0071e3");c.style.borderColor=d.color||"#0071e3";c.scrollIntoView({behavior:"smooth",block:"center"});}});
+  });
   map.add(m);_markers.push(m);updateMarkerCount()
 }
 
@@ -530,7 +543,13 @@ function searchAndMark(keyword,city,stepName,color){
   })
 }
 
-function stepSearchKeyword(name,dest){var n=name.toLowerCase();if(n.includes("航班")||n.includes("flight"))return dest+" 机场";if(n.includes("酒店")||n.includes("hotel"))return dest+" 酒店";if(n.includes("景点")||n.includes("attraction"))return dest+" 景点";return null}
+function stepSearchKeyword(name,worker,dest){if(worker==="flight")return dest+" 机场";if(worker==="hotel")return dest+" 酒店";if(worker==="attraction")return dest+" 景点";return null}
+function addLocationsAsMarkers(locations,stepName,color){
+  if(!amapReady||!locations||!locations.length)return;
+  locations.forEach(function(loc){
+    if(loc.lng&&loc.lat&&loc.name){addMapMarker(loc.lng,loc.lat,loc.name,loc.address||"",color,stepName);}
+  });
+}
 
 /* ================================================================
    GRAPH STATE VISUALIZER
@@ -602,6 +621,18 @@ function logout(){tk=null;localStorage.removeItem("t");location.reload()}
    P2-9: QUICK SEND
    ================================================================ */
 function quickSend(msg){document.getElementById("chatInput").value=msg;send()}
+function showSuggestChips(reply){
+  var el=document.getElementById("suggestBox");if(!el)return;
+  var chips=[],r=reply||"";
+  if(r.includes("日程")||r.includes("Day"))chips.push({t:"调整日程",q:"调整一下日程安排"});
+  if(r.includes("航班")||r.includes("✈"))chips.push({t:"查其他航班",q:"有没有其他航班选择"});
+  if(r.includes("酒店")||r.includes("🏨"))chips.push({t:"换酒店",q:"换一家酒店看看"});
+  if(r.includes("预算")||r.includes("💰"))chips.push({t:"优化预算",q:"帮我优化一下预算"});
+  if(r.includes("景点")||r.includes("🎯"))chips.push({t:"更多景点",q:"再推荐一些景点"});
+  chips.push({t:"导出方案",q:"导出旅行方案为PDF"});
+  el.innerHTML=chips.map(function(c){return '<span class="suggest-chip" onclick="quickSend(\''+c.q.replace(/'/g,"\\'")+'\')">'+c.t+'</span>'}).join('');
+  el.style.display='flex';
+}
 
 /* ================================================================
    CHAT
@@ -620,10 +651,11 @@ function addBubble(role,text){var el=document.getElementById("chatBox"),w=docume
     tick();return d}
   el.appendChild(d);el.scrollTop=el.scrollHeight;return d}
 
-function addStepCard(name,status,iter,tools,workerType){
+function addStepCard(name,status,iter,tools,workerType,snippet){
   var el=document.getElementById("chatBox"),w=document.getElementById("welcome");if(w)w.style.display="none";
   var ok=status==="done",icon=STEP_ICONS[workerType]||"",color=STEP_COLORS[workerType]||"#0071e3";
   var detail=(ok?"完成":"失败")+" · "+iter+" 轮推理"+(tools?" · "+tools+" 次工具调用":"");
+  if(snippet&&ok){detail+='<div class="sc-preview" title="'+snippet.replace(/"/g,'&quot;')+'">'+snippet.substring(0,80)+(snippet.length>80?'...':'')+'</div>';}
   var d=document.createElement("div");d.className="step-card";
   d.innerHTML='<div class="sc-icon">'+icon+'</div><div class="sc-body"><div class="sc-name">'+name+'</div><div class="sc-detail">'+detail+'</div></div><span class="sc-badge '+(ok?"ok":"fail")+'">'+(ok?"完成":"失败")+'</span>';
   el.appendChild(d);el.scrollTop=el.scrollHeight;
@@ -644,20 +676,26 @@ function doGo(){
   send()
 }
 
+function setBtnsDisabled(d){
+  var gb=document.getElementById("goBtn");var sb=document.getElementById("sendBtn");
+  if(d){gb.disabled=true;gb.innerHTML='<span class="btn-spinner"></span>';if(sb)sb.disabled=true;}
+  else{gb.disabled=false;gb.textContent='开始规划';if(sb)sb.disabled=false;}
+}
 async function send(){
   var msg=document.getElementById("chatInput").value.trim();if(!msg)return;
   if(!tk){/* 匿名模式——跳过登录，允许试用 */}
   document.getElementById("chatInput").value="";addBubble("user",msg);showTyping();
-  var btn=document.getElementById("goBtn");btn.disabled=true;btn.innerHTML='<span class="btn-spinner"></span>';
+  setBtnsDisabled(true);
   _stepNames=[];_stepDoneCount=0;clearMarkers();_stepResults={};resetGraph();
+  var chips=document.getElementById("suggestBox");if(chips){chips.style.display="none";chips.innerHTML="";}
   try{
     var r=await fetch(A+"/chat/stream",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({message:msg,conversation_id:cid})});
-    if(r.status===401){tk=null;localStorage.removeItem("t");showLogin();addBubble("assistant","请先登录");btn.disabled=false;btn.textContent="开始规划";hideTyping();return}
-    if(!r.ok){addBubble("assistant","服务器错误: "+r.status);btn.disabled=false;btn.textContent="开始规划";hideTyping();return}
+    if(r.status===401){tk=null;localStorage.removeItem("t");showLogin();addBubble("assistant","请先登录");setBtnsDisabled(false);hideTyping();return}
+    if(!r.ok){addBubble("assistant","服务器错误: "+r.status);setBtnsDisabled(false);hideTyping();return}
     var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
     while(true){var v=await reader.read();if(v.done)break;buf+=decoder.decode(v.value,{stream:true});var lines=buf.split("\n");buf=lines.pop()||"";for(var i=0;i<lines.length;i++){var line=lines[i].trim();if(!line.startsWith("data: "))continue;try{handleSSE(JSON.parse(line.slice(6)))}catch(e){} }}
   }catch(e){addBubble("assistant","无法连接服务器");hideTyping()}
-  btn.disabled=false;btn.innerHTML='开始规划';stopProgressTimer()
+  setBtnsDisabled(false);stopProgressTimer()
 }
 
 function handleSSE(evt){
@@ -669,9 +707,15 @@ function handleSSE(evt){
   }else if(evt.event==="step_done"){
     var ok=evt.status==="done",worker=evt.worker||"";
     updProgress(evt.name,ok?"done":"failed",(evt.iterations||0)+"轮 · "+(evt.tool_calls||0)+"工具");
-    addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker);
+    addStepCard(evt.name,evt.status,evt.iterations||0,evt.tool_calls||0,worker,evt.result_snippet||"");
     _stepResults[evt.name]={status:evt.status,iterations:evt.iterations,tool_calls:evt.tool_calls};
-    if(ok&&amapReady){var kw=stepSearchKeyword(evt.name,dest);if(kw)searchAndMark(kw,dest,evt.name,STEP_COLORS[worker]||"#0071e3")}
+    if(ok&&amapReady){
+      var color=STEP_COLORS[worker]||"#0071e3";
+      // 优先用服务端提取的精确坐标
+      if(evt.locations&&evt.locations.length){addLocationsAsMarkers(evt.locations,evt.name,color);}
+      // 否则用高德搜索
+      var kw=stepSearchKeyword(evt.name,worker,dest);if(kw)searchAndMark(kw,dest,evt.name,color);
+    }
     // P1-6: map hover — bind to step card
     var cards=document.querySelectorAll(".step-card");if(cards.length>0){
       var last=cards[cards.length-1];last.addEventListener("mouseenter",function(){
@@ -686,10 +730,12 @@ function handleSSE(evt){
     var meta=document.getElementById("graphMeta");if(meta)meta.textContent="全部完成";
     var tm=document.getElementById("graphTimer");if(tm)tm.textContent="完成";
     cid=evt.conversation_id;
-    // P2-8: budget pie
-    var reply=evt.reply;var budgetSection=reply.match(/## 💰.*?(?=##|$)/s);
-    if(budgetSection){var pieData=parseBudgetTable(budgetSection[0]);if(pieData.length){var pieSvg=drawBudgetPie(pieData);reply=reply.replace(/## 💰.*?(?=##|$)/s,"## 💰 预算\n\n"+pieSvg)}}
+    // P2-8: budget pie (safe: guard against undefined/empty reply)
+    var reply=evt.reply||"";
+    try{var budgetSection=reply.match(/## 💰.*?(?=##|$)/s);
+    if(budgetSection){var pieData=parseBudgetTable(budgetSection[0]);if(pieData&&pieData.length){var pieSvg=drawBudgetPie(pieData);reply=reply.replace(/## 💰.*?(?=##|$)/s,"## 💰 预算\n\n"+pieSvg)}}}catch(e){}
     addBubble("assistant",reply);
+    showSuggestChips(reply);
     if(amapReady)searchAndMark(dest,dest,"总览","#6366f1");
   }else if(evt.event==="aggregating"){var c2=document.querySelector(".progress-counter");if(c2)c2.textContent="汇总方案中..."}
 }

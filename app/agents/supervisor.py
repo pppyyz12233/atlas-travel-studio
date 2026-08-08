@@ -277,7 +277,17 @@ async def memory_reader_node(state: AgentState, config, *, store) -> AgentState:
 async def intent_router_node(state: AgentState) -> AgentState:
     """分类用户意图，决定跑哪些Worker"""
     msg = state["messages"][-1]["content"]
-    result = await classify_intent(msg)
+    # 拼接最近的用户消息作为上下文，帮助区分"修改"和"新行程"
+    prev_user_msgs = [
+        m["content"] for m in state["messages"][:-1]
+        if m.get("role") == "user"
+    ]
+    if prev_user_msgs:
+        # 只取最近2条，避免跨话题污染
+        context = "【历史对话】" + " | ".join(prev_user_msgs[-2:]) + f"\n【当前输入】{msg}"
+    else:
+        context = msg
+    result = await classify_intent(context)
     state["intent"] = result.intent.value
     state["active_workers"] = result.workers
     print(f"[Intent] {result.intent.value} -> workers: {result.workers}")
@@ -483,6 +493,19 @@ async def aggregator_node(state: AgentState) -> AgentState:
     steps = state.get("plan_steps", [])
     msg = state["messages"][-1]["content"]
 
+    # 从历史消息中提取上一轮方案（用于增量修改时保留已有行程）
+    # 只在修改意图时使用，全新行程不引用旧方案
+    intent = state.get("intent", "full_trip")
+    is_modify = intent in ("itinerary_modify",)
+    prev_plan_text = ""
+    if is_modify:
+        for m in reversed(state["messages"]):
+            if m.get("role") == "assistant" and m.get("content"):
+                content = m["content"]
+                if "日程" in content or "航班" in content or "酒店" in content:
+                    prev_plan_text = content
+                    break  # 取最近的一个 assistant 回复
+
     trip_state = _build_trip_state(steps)
 
     text = "\n\n".join([
@@ -496,7 +519,26 @@ async def aggregator_node(state: AgentState) -> AgentState:
 
     planner_skill = load_skill("planner")
 
-    p = f"""用户需求：{msg}
+    if is_modify:
+        p = f"""## 任务：将以下新增内容合并到已有旅行方案中，输出完整方案
+
+### 已有方案（必须保留所有内容，逐字复制到输出）
+{prev_plan_text[:3000]}
+
+### 用户新需求
+{msg}
+
+### 本次新增步骤结果
+{text}
+
+## 输出规则（严格遵守）
+1. 输出完整的合并后方案，包括已有方案的全部内容 + 新增内容
+2. 已有方案中的每一天日程必须完整列出，禁止用"沿用""原方案""此前行程"等省略
+3. 航班和酒店如果本次无变化，完整复制已有方案中的航班和酒店信息
+4. 日程：保留已有天数，在最后追加新增的天数
+5. 预算：合并已有和新增的预算项目"""
+    else:
+        p = f"""用户需求：{msg}
 各步骤结果：{text}{trip_json}
 输出方案："""
     messages = []
