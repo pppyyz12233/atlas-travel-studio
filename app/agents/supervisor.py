@@ -337,6 +337,13 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
         step["status"] = "done" if final_content else "failed"
         # 统计 Worker 的推理轮数和工具调用次数
         raw_msgs = result.get("messages", [])
+        print(f"  [Executor] {step['name']} result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+        print(f"  [Executor] {step['name']} raw_msgs count: {len(raw_msgs)}")
+        for i, m in enumerate(raw_msgs):
+            if isinstance(m, dict):
+                print(f"  [Executor]   msg[{i}]: type=dict, keys={list(m.keys())}, role={m.get('role','?')}")
+            else:
+                print(f"  [Executor]   msg[{i}]: type={type(m).__name__}, has role={hasattr(m,'role')}, has type={hasattr(m,'type')}")
         its = tc = 0
         for m in raw_msgs:
             if isinstance(m, dict):
@@ -349,6 +356,7 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None) -> None:
                 elif "tool" in r.lower(): tc += 1
         step["iterations"] = its
         step["tool_calls"] = tc
+        print(f"  [Executor] {step['name']} 统计结果: its={its}, tc={tc}")
 
         #结构化提取
         if final_content:

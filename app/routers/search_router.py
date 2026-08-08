@@ -1,8 +1,8 @@
 """搜索路由 —— 分页列表，供前端选航班/酒店/景点"""
 
 from fastapi import APIRouter, HTTPException, Query
-from app.mcp.servers.flight_server import FLIGHT_DATA
-from app.mcp.servers.hotel_server import HOTEL_DATA
+from app.mcp.servers.flight_server import FLIGHTS
+from app.mcp.servers.hotel_server import HOTELS
 
 router = APIRouter(prefix="/api/search", tags=["搜索"])
 
@@ -21,7 +21,7 @@ async def search_flights(
     sort_by: str = Query("price", description="price / departure_time"),
 ):
     results = [
-        f for f in FLIGHT_DATA
+        f for f in FLIGHTS
         if origin in f.get("origin", "") and destination in f.get("destination", "")
     ]
     if date:
@@ -51,7 +51,7 @@ async def search_hotels(
     size: int = Query(10, ge=1, le=50),
     sort_by: str = Query("price", description="price / rating"),
 ):
-    results = [h for h in HOTEL_DATA if destination in h.get("city", "")]
+    results = [h for h in HOTELS if destination in h.get("city", "")]
     if min_price is not None:
         results = [h for h in results if h.get("price", 0) >= min_price]
     if max_price is not None and max_price > 0:
