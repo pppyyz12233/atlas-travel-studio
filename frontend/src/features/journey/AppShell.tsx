@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Map as MapIcon, X } from 'lucide-react'
 
 interface AppShellProps {
   rail: ReactNode
@@ -10,6 +10,8 @@ interface AppShellProps {
   contextOpen: boolean
   onCloseRail: () => void
   onCloseContext: () => void
+  /** R3：右栏收起时的边缘展开按钮（桌面） */
+  onOpenContext?: () => void
 }
 
 const focusableSelector = [
@@ -21,6 +23,9 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+// R3 主流程收敛：
+// - 会话栏在所有断点都是左侧抽屉，默认收起（入口在顶栏「会话」按钮）
+// - 右栏（地图+执行）桌面端随 contextOpen 展开为栏位、收起为边缘竖条；移动端保持右抽屉
 export default function AppShell({
   rail,
   workspace,
@@ -29,6 +34,7 @@ export default function AppShell({
   contextOpen,
   onCloseRail,
   onCloseContext,
+  onOpenContext,
 }: AppShellProps) {
   const [isCompact, setIsCompact] = useState(
     () => window.matchMedia('(max-width: 1279px)').matches,
@@ -37,7 +43,6 @@ export default function AppShell({
   const contextRef = useRef<HTMLElement>(null)
   const workspaceRef = useRef<HTMLElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
-  const drawerOpen = isCompact && (railOpen || contextOpen)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1279px)')
@@ -47,9 +52,14 @@ export default function AppShell({
     return () => media.removeEventListener('change', update)
   }, [])
 
+  // 任意抽屉打开（会话栏 / 移动端右栏）都做焦点圈闭
+  const drawerOpen = railOpen || (isCompact && contextOpen)
+  const railHidden = !railOpen
+  const contextCollapsed = !contextOpen
+
   useEffect(() => {
     if (!drawerOpen) return
-    const panel = contextOpen ? contextRef.current : railRef.current
+    const panel = (isCompact && contextOpen) ? contextRef.current : railRef.current
     if (!panel) return
 
     const focusedBeforeOpen = document.activeElement
@@ -61,7 +71,7 @@ export default function AppShell({
       panel.querySelectorAll<HTMLElement>(focusableSelector),
     ).filter(element => !element.hasAttribute('disabled'))
     const focusTimer = window.setTimeout(() => focusables()[0]?.focus(), 0)
-    const closeDrawer = contextOpen ? onCloseContext : onCloseRail
+    const closeDrawer = (isCompact && contextOpen) ? onCloseContext : onCloseRail
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -95,16 +105,14 @@ export default function AppShell({
       restoreFocusRef.current = null
       if (target?.isConnected) target.focus()
     }
-  }, [drawerOpen])
-
-  const railHidden = isCompact && !railOpen
-  const contextHidden = isCompact && !contextOpen
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 抽屉开合才需要重建圈闭
+  }, [drawerOpen, isCompact && contextOpen])
 
   useEffect(() => {
     railRef.current?.toggleAttribute('inert', railHidden)
-    contextRef.current?.toggleAttribute('inert', contextHidden)
+    contextRef.current?.toggleAttribute('inert', contextCollapsed)
     workspaceRef.current?.toggleAttribute('inert', drawerOpen)
-  }, [contextHidden, drawerOpen, railHidden])
+  }, [contextCollapsed, drawerOpen, railHidden])
 
   return (
     <div className="atlas-shell">
@@ -120,8 +128,8 @@ export default function AppShell({
         className={`atlas-rail ${railOpen ? 'is-open' : ''}`}
         aria-label="旅程列表"
         aria-hidden={railHidden ? 'true' : undefined}
-        aria-modal={isCompact && railOpen ? 'true' : undefined}
-        role={isCompact ? 'dialog' : undefined}
+        aria-modal={railOpen ? 'true' : undefined}
+        role={railOpen ? 'dialog' : undefined}
         tabIndex={-1}
       >
         <button type="button" className="atlas-drawer-close atlas-rail-close" onClick={onCloseRail} aria-label="关闭旅程列表">
@@ -134,20 +142,33 @@ export default function AppShell({
         {workspace}
       </main>
 
+      {!isCompact && contextCollapsed && (
+        <button
+          type="button"
+          className="atlas-context-tab"
+          onClick={onOpenContext}
+          aria-label="展开地图与执行详情"
+          disabled={!onOpenContext}
+        >
+          <MapIcon size={16} aria-hidden="true" />
+          <span>地图 · 执行</span>
+        </button>
+      )}
+
       <button
         type="button"
-        className={`atlas-scrim atlas-context-scrim ${contextOpen ? 'is-visible' : ''}`}
+        className={`atlas-scrim atlas-context-scrim ${isCompact && contextOpen ? 'is-visible' : ''}`}
         aria-hidden="true"
         tabIndex={-1}
         onClick={onCloseContext}
       />
       <aside
         ref={contextRef}
-        className={`atlas-context ${contextOpen ? 'is-open' : ''}`}
+        className={`atlas-context ${contextOpen ? 'is-open' : ''} ${!isCompact && contextCollapsed ? 'is-collapsed' : ''}`}
         aria-label="地图与执行详情"
-        aria-hidden={contextHidden ? 'true' : undefined}
+        aria-hidden={contextCollapsed ? 'true' : undefined}
         aria-modal={isCompact && contextOpen ? 'true' : undefined}
-        role={isCompact ? 'dialog' : undefined}
+        role={isCompact && contextOpen ? 'dialog' : undefined}
         tabIndex={-1}
       >
         <button type="button" className="atlas-drawer-close atlas-context-close" onClick={onCloseContext} aria-label="关闭地图与执行详情">

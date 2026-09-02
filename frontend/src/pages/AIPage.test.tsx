@@ -98,6 +98,9 @@ describe('Atlas page integration', () => {
 
     expect(screen.getByRole('heading', { name: /旅程工作区/ })).toBeInTheDocument()
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
+
+    // 会话栏默认收起：先从顶栏打开抽屉再操作
+    await user.click(screen.getByRole('button', { name: '打开旅程列表' }))
     expect(screen.getByRole('button', { name: /京都红叶季/ })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '新建旅程' }))
@@ -176,6 +179,10 @@ describe('Atlas page integration', () => {
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
     renderPage(<AIPage auth={auth} theme={theme} />)
+
+    // idle 不被三栏压迫：右栏收起
+    expect(screen.getByLabelText('地图与执行详情')).toHaveClass('is-collapsed')
+
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
 
     expect(within(screen.getByLabelText('对话记录')).getByText(/从上海去东京/)).toBeInTheDocument()
@@ -188,6 +195,10 @@ describe('Atlas page integration', () => {
       expect.any(Object),
     )
 
+    // 进入规划后自动展开右栏（地图 + 执行链）
+    await waitFor(() => {
+      expect(screen.getByLabelText('地图与执行详情')).not.toHaveClass('is-collapsed')
+    })
     act(() => {
       streamHarness.options?.onEvent({ event: 'plan', steps: ['推荐航班'] })
     })
@@ -258,6 +269,7 @@ describe('Atlas page integration', () => {
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
     renderPage(<AIPage auth={auth} theme={theme} />)
+    await user.click(screen.getByRole('button', { name: '打开旅程列表' }))
     await user.click(await screen.findByRole('button', { name: /东京旧行程/ }))
 
     const feed = await screen.findByLabelText('对话记录')

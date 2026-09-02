@@ -111,6 +111,11 @@ export default function AIPage({ auth, theme }: Props) {
     setResultNotice(null)
   }, [activeSession.id])
 
+  // R3：进入规划即自动展开右栏（地图 + 执行链）；idle 收起、结果态保留用户选择
+  useEffect(() => {
+    if (activeSession.phase === 'planning') setContextOpen(true)
+  }, [activeSession.phase])
+
   useEffect(() => {
     const scrollingElement = scrollRef.current
     if (!scrollingElement) return
@@ -482,6 +487,7 @@ export default function AIPage({ auth, theme }: Props) {
       contextOpen={contextOpen}
       onCloseRail={() => setRailOpen(false)}
       onCloseContext={() => setContextOpen(false)}
+      onOpenContext={() => setContextOpen(true)}
     />
   )
 }

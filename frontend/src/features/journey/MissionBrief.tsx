@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import {
-  ArrowUpRight, BedDouble, CalendarDays, Clock3, Compass, MapPin,
+  ArrowUpRight, BedDouble, CalendarDays, ChevronDown, Clock3, Compass, MapPin,
   Plane, Route, Sparkles, Users, Wallet,
 } from 'lucide-react'
 import type { TripForm } from './model'
@@ -48,6 +49,8 @@ function buildTravelBrief(form: TripForm): string {
   return `从${form.origin.trim()}去${form.destination.trim()}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
 }
 
+// R3 主流程收敛：一句话优先，结构化字段折叠为「详细条件（可选）」。
+// 有自由文本 → 直接以文本发起；否则回落到表单拼装（保持旧行为）。
 export default function MissionBrief({
   form,
   onChange,
@@ -55,7 +58,16 @@ export default function MissionBrief({
   onUseSuggestion,
   disabled,
 }: MissionBriefProps) {
-  const canSubmit = Boolean(form.origin.trim() && form.destination.trim() && form.date) && !disabled
+  const [freeText, setFreeText] = useState('')
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const trimmedText = freeText.trim()
+  const formReady = Boolean(form.origin.trim() && form.destination.trim() && form.date)
+  const canSubmit = (trimmedText.length > 0 || formReady) && !disabled
+
+  const submit = () => {
+    if (!canSubmit) return
+    onSubmit(trimmedText || buildTravelBrief(form))
+  }
 
   return (
     <section className="atlas-mission" aria-labelledby="atlas-mission-title">
@@ -69,44 +81,79 @@ export default function MissionBrief({
         className="atlas-brief-card"
         onSubmit={event => {
           event.preventDefault()
-          if (canSubmit) onSubmit(buildTravelBrief(form))
+          submit()
         }}
       >
-        <div className="atlas-route-editor">
-          <label>
-            <span>出发地</span>
-            <div><Route size={16} aria-hidden="true" /><input value={form.origin} onChange={event => onChange({ origin: event.target.value })} autoComplete="address-level2" /></div>
-          </label>
-          <span className="atlas-route-vector" aria-hidden="true"><i /><Plane size={18} /><i /></span>
-          <label>
-            <span>目的地</span>
-            <div><MapPin size={16} aria-hidden="true" /><input value={form.destination} onChange={event => onChange({ destination: event.target.value })} autoComplete="address-level2" /></div>
-          </label>
+        <div className="atlas-brief-freetext">
+          <textarea
+            aria-label="一句话旅行想法"
+            placeholder="说说这次旅行：目的地、同行人、节奏和预算……"
+            value={freeText}
+            rows={3}
+            onChange={event => setFreeText(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <small>一句话就够 —— Atlas 会自动理解目的地与预算；也可在下方补充详细条件。</small>
         </div>
 
-        <div className="atlas-brief-grid">
-          <label>
-            <span><CalendarDays size={15} aria-hidden="true" /> 出发日期</span>
-            <input type="date" value={form.date} onChange={event => onChange({ date: event.target.value })} />
-          </label>
-          <label>
-            <span><Clock3 size={15} aria-hidden="true" /> 旅行天数</span>
-            <input type="number" min="1" max="30" value={form.days} onChange={event => onChange({ days: Math.min(30, Math.max(1, Number(event.target.value) || 1)) })} />
-          </label>
-          <label>
-            <span><Users size={15} aria-hidden="true" /> 出行人数</span>
-            <input type="number" min="1" max="20" value={form.people} onChange={event => onChange({ people: Math.min(20, Math.max(1, Number(event.target.value) || 1)) })} />
-          </label>
-          <label>
-            <span><Wallet size={15} aria-hidden="true" /> 人均预算</span>
-            <div className="atlas-money-field"><b>¥</b><input type="number" min="0" step="500" value={form.budget} onChange={event => onChange({ budget: Math.max(0, Math.round(Number(event.target.value) || 0)) })} /></div>
-          </label>
+        <div className="atlas-brief-details">
+          <button
+            type="button"
+            className="atlas-brief-details-toggle"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen(value => !value)}
+          >
+            <ChevronDown size={15} aria-hidden="true" />
+            详细条件（可选）
+          </button>
+
+          {detailsOpen && (
+            <>
+              <div className="atlas-route-editor">
+                <label>
+                  <span>出发地</span>
+                  <div><Route size={16} aria-hidden="true" /><input value={form.origin} onChange={event => onChange({ origin: event.target.value })} autoComplete="address-level2" /></div>
+                </label>
+                <span className="atlas-route-vector" aria-hidden="true"><i /><Plane size={18} /><i /></span>
+                <label>
+                  <span>目的地</span>
+                  <div><MapPin size={16} aria-hidden="true" /><input value={form.destination} onChange={event => onChange({ destination: event.target.value })} autoComplete="address-level2" /></div>
+                </label>
+              </div>
+
+              <div className="atlas-brief-grid">
+                <label>
+                  <span><CalendarDays size={15} aria-hidden="true" /> 出发日期</span>
+                  <input type="date" value={form.date} onChange={event => onChange({ date: event.target.value })} />
+                </label>
+                <label>
+                  <span><Clock3 size={15} aria-hidden="true" /> 旅行天数</span>
+                  <input type="number" min="1" max="30" value={form.days} onChange={event => onChange({ days: Math.min(30, Math.max(1, Number(event.target.value) || 1)) })} />
+                </label>
+                <label>
+                  <span><Users size={15} aria-hidden="true" /> 出行人数</span>
+                  <input type="number" min="1" max="20" value={form.people} onChange={event => onChange({ people: Math.min(20, Math.max(1, Number(event.target.value) || 1)) })} />
+                </label>
+                <label>
+                  <span><Wallet size={15} aria-hidden="true" /> 人均预算</span>
+                  <div className="atlas-money-field"><b>¥</b><input type="number" min="0" step="500" value={form.budget} onChange={event => onChange({ budget: Math.max(0, Math.round(Number(event.target.value) || 0)) })} /></div>
+                </label>
+              </div>
+            </>
+          )}
         </div>
 
-        <button type="submit" className="atlas-primary-action" disabled={!canSubmit}>
-          开始规划旅程 <ArrowUpRight size={17} aria-hidden="true" />
-        </button>
-        <p className="atlas-form-note">无需登录即可体验；保存历史记录和导出时再登录。</p>
+        <div className="atlas-brief-submit-row">
+          <button type="submit" className="atlas-primary-action" disabled={!canSubmit}>
+            开始规划旅程 <ArrowUpRight size={17} aria-hidden="true" />
+          </button>
+          <p className="atlas-form-note">无需登录即可体验；保存历史记录和导出时再登录。</p>
+        </div>
       </form>
 
       <div className="atlas-examples" aria-label="示例旅行要求">

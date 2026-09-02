@@ -45,6 +45,31 @@ describe('Atlas journey interface', () => {
     expect(closeContext).toHaveBeenCalledOnce()
   })
 
+  it('keeps the rail as a drawer and collapses the context panel until opened (desktop)', async () => {
+    const user = userEvent.setup()
+    const openContext = vi.fn()
+
+    render(
+      <AppShell
+        rail={<div>会话</div>}
+        workspace={<main>工作区</main>}
+        context={<div>地图</div>}
+        railOpen={false}
+        contextOpen={false}
+        onCloseRail={() => undefined}
+        onCloseContext={() => undefined}
+        onOpenContext={openContext}
+      />,
+    )
+
+    // 桌面端会话栏也默认收起为抽屉
+    expect(screen.getByLabelText('旅程列表')).toHaveAttribute('aria-hidden', 'true')
+    // 右栏 idle 收起，提供边缘展开按钮
+    expect(screen.getByLabelText('地图与执行详情')).toHaveClass('is-collapsed')
+    await user.click(screen.getByRole('button', { name: '展开地图与执行详情' }))
+    expect(openContext).toHaveBeenCalledOnce()
+  })
+
   it('submits a normalized travel brief from the mission form', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
@@ -61,6 +86,43 @@ describe('Atlas journey interface', () => {
 
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
     expect(onSubmit).toHaveBeenCalledWith('从上海去东京，2026-09-08出发，5天，2人，人均预算8000元。请给出兼顾体验、节奏和预算的完整方案。')
+  })
+
+  it('prefers the free-text brief over the form fields when provided', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    render(
+      <MissionBrief
+        form={tripForm}
+        onChange={() => undefined}
+        onSubmit={onSubmit}
+        onUseSuggestion={() => undefined}
+        disabled={false}
+      />,
+    )
+
+    await user.type(screen.getByRole('textbox', { name: '一句话旅行想法' }), '十一月去京都看红叶，两个人')
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+
+    expect(onSubmit).toHaveBeenCalledWith('十一月去京都看红叶，两个人')
+  })
+
+  it('keeps detailed form fields collapsed until asked for', async () => {
+    const user = userEvent.setup()
+    render(
+      <MissionBrief
+        form={tripForm}
+        onChange={() => undefined}
+        onSubmit={() => undefined}
+        onUseSuggestion={() => undefined}
+        disabled={false}
+      />,
+    )
+
+    expect(screen.queryByLabelText('出发地')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /详细条件/ }))
+    expect(screen.getByLabelText('出发地')).toBeVisible()
   })
 
   it('does not repeat the journey summary before the mission is submitted', () => {
