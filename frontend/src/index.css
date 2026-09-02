@@ -1,49 +1,58 @@
 /* ==========================================================
    Atlas — 基础层：设计令牌 / 重置 / 共享组件（登录框、地图、Markdown）
-   v3 "上线感"升级：Linear 式分层纪律（细边框+微明度差、极轻阴影、
-   紧凑密度、克制的品牌色）+ 保留夜航蓝/日出橙的旅行主题
+   v4 "旅行手账工作台"：暖白画布 + 沙色内容 + 薄荷辅助 + 珊瑚强调 +
+   琥珀 CTA + 轻微硬阴影；保留分层纪律与紧凑密度
    ========================================================== */
 
 :root {
   color-scheme: light;
 
-  /* 表面：近中性冷白，分层靠 1px 边框 + 微明度差，不靠阴影 */
-  --atlas-canvas: #f7f8fa;
-  --atlas-canvas-glow: #eef2f8;
+  /* 表面：暖白画布，沙色分层 */
+  --atlas-canvas: #faf7f2;
+  --atlas-canvas-glow: #f4eee3;
   --atlas-paper: #ffffff;
-  --atlas-paper-soft: #f4f6f9;
-  --atlas-paper-deep: #ebedf2;
+  --atlas-paper-soft: #f6f1e7;
+  --atlas-paper-deep: #efe7d8;
 
-  /* 墨色：正文更黑，层级拉开（Linear 原则） */
-  --atlas-ink: #171923;
-  --atlas-ink-soft: #4c5162;
-  --atlas-ink-muted: #7e8494;
-  --atlas-line: #e7e9ef;
-  --atlas-line-strong: #d3d7e1;
+  /* 墨色：深暖墨，三级拉开（muted 需在沙底上 ≥4.5:1） */
+  --atlas-ink: #221f1a;
+  --atlas-ink-soft: #575046;
+  --atlas-ink-muted: #776e60;
+  --atlas-line: #e6dfd1;
+  --atlas-line-strong: #cfc4af;
 
-  /* 品牌色：蓝只用于操作/链接/激活；橙只用于 CTA 与运行态 */
-  --atlas-sky: #2563eb;
-  --atlas-sky-deep: #1d4fd8;
-  --atlas-sky-soft: #eaf0fe;
+  /* 语义色（沿用旧令牌名，语义已迁移）：
+     sky 系 = 珊瑚强调（链接/焦点/激活）
+     sun 系 = 珊瑚运行态（脉冲/进行中）
+     route 系 = 薄荷完成态
+     amber 系 = 琥珀主 CTA */
+  --atlas-sky: #c04435;
+  --atlas-sky-deep: #a53a2c;
+  --atlas-sky-soft: #fbeae6;
   --atlas-sky-ink: #ffffff;
-  --atlas-sun: #ff8a3d;
-  --atlas-sun-deep: #e05e12;
-  --atlas-sun-soft: #fff1e7;
-  --atlas-route: #0d9668;
-  --atlas-route-soft: #e3f6ef;
+  --atlas-sun: #e85d4a;
+  --atlas-sun-deep: #c04435;
+  --atlas-sun-soft: #fceae6;
+  --atlas-route: #2f9e77;
+  --atlas-route-soft: #e3f4ec;
   --atlas-alert: #d92d20;
   --atlas-alert-soft: #fdeceb;
 
-  /* 夜航侧栏 */
-  --atlas-deck: #161c2e;
-  --atlas-deck-ink: #e8ecf6;
-  --atlas-deck-soft: rgba(255, 255, 255, .055);
-  --atlas-deck-line: rgba(255, 255, 255, .07);
+  --atlas-amber: #f2b01e;
+  --atlas-amber-deep: #d99a0d;
+  --atlas-amber-soft: #fdf3d7;
+  --atlas-amber-ink: #241c05;
 
-  /* 阴影：几乎不可见，只保留环境层次 */
-  --atlas-shadow-sm: 0 1px 2px rgba(16, 24, 40, .04);
-  --atlas-shadow-md: 0 2px 4px rgba(16, 24, 40, .04), 0 8px 20px rgba(16, 24, 40, .05);
-  --atlas-shadow-lg: 0 8px 24px rgba(16, 24, 40, .08), 0 24px 64px rgba(16, 24, 40, .14);
+  /* 沙色纸面侧栏 */
+  --atlas-deck: #f2ecdf;
+  --atlas-deck-ink: #221f1a;
+  --atlas-deck-soft: rgba(34, 31, 26, .05);
+  --atlas-deck-line: #ddd2bd;
+
+  /* 阴影：轻微硬阴影（纸片叠放感） */
+  --atlas-shadow-sm: 2px 2px 0 0 var(--atlas-line-strong);
+  --atlas-shadow-md: 3px 3px 0 0 var(--atlas-line-strong);
+  --atlas-shadow-lg: 5px 5px 0 0 rgba(34, 31, 26, .12), 0 14px 36px rgba(34, 31, 26, .16);
   --atlas-fast: 130ms;
   --atlas-normal: 200ms;
   --atlas-ease: cubic-bezier(.25, 1, .35, 1);
@@ -61,50 +70,55 @@
     "Microsoft YaHei UI", system-ui, sans-serif;
   --atlas-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
 
-  /* 预算分类色 */
-  --atlas-budget-flight: #e2604c;
-  --atlas-budget-hotel: #3568c4;
-  --atlas-budget-attraction: #0d9668;
-  --atlas-budget-food: #e08a2e;
-  --atlas-budget-transit: #8a6fd1;
-  --atlas-budget-other: #7f8ea8;
+  /* 预算分类色（对齐 worker 色） */
+  --atlas-budget-flight: #d95b47;
+  --atlas-budget-hotel: #33586e;
+  --atlas-budget-attraction: #2f9e77;
+  --atlas-budget-food: #d99a0d;
+  --atlas-budget-transit: #8a6a3e;
+  --atlas-budget-other: #8d8477;
 }
 
 .dark {
   color-scheme: dark;
 
-  --atlas-canvas: #0f1116;
-  --atlas-canvas-glow: #13161d;
-  --atlas-paper: #16181f;
-  --atlas-paper-soft: #1c1f28;
-  --atlas-paper-deep: #232734;
+  --atlas-canvas: #16130f;
+  --atlas-canvas-glow: #1b1712;
+  --atlas-paper: #1e1a15;
+  --atlas-paper-soft: #272219;
+  --atlas-paper-deep: #332b20;
 
-  --atlas-ink: #f1f3f7;
-  --atlas-ink-soft: #b3b9c8;
-  --atlas-ink-muted: #7d8496;
-  --atlas-line: #262a36;
-  --atlas-line-strong: #343949;
+  --atlas-ink: #f2ede3;
+  --atlas-ink-soft: #c3b9aa;
+  --atlas-ink-muted: #9a917f;
+  --atlas-line: #352d22;
+  --atlas-line-strong: #4d4231;
 
-  --atlas-sky: #6b9aff;
-  --atlas-sky-deep: #88aeff;
-  --atlas-sky-soft: #1a2438;
-  --atlas-sky-ink: #0a0f1e;
-  --atlas-sun: #ff9a5c;
-  --atlas-sun-deep: #ffb088;
-  --atlas-sun-soft: #33241a;
-  --atlas-route: #3ecf9d;
-  --atlas-route-soft: #11291f;
-  --atlas-alert: #ff7a70;
-  --atlas-alert-soft: #361c1a;
+  --atlas-sky: #ff8a76;
+  --atlas-sky-deep: #ffa08e;
+  --atlas-sky-soft: #3a211c;
+  --atlas-sky-ink: #2a0f0a;
+  --atlas-sun: #f07a63;
+  --atlas-sun-deep: #ff9482;
+  --atlas-sun-soft: #3a201a;
+  --atlas-route: #46c395;
+  --atlas-route-soft: #163028;
+  --atlas-alert: #ff8578;
+  --atlas-alert-soft: #3a1d19;
 
-  --atlas-deck: #0c0f18;
-  --atlas-deck-ink: #e6e9f2;
+  --atlas-amber: #f7bd3a;
+  --atlas-amber-deep: #ffca57;
+  --atlas-amber-soft: #3a3018;
+  --atlas-amber-ink: #241c05;
+
+  --atlas-deck: #121009;
+  --atlas-deck-ink: #e9e3d6;
   --atlas-deck-soft: rgba(255, 255, 255, .05);
-  --atlas-deck-line: rgba(255, 255, 255, .06);
+  --atlas-deck-line: rgba(255, 255, 255, .07);
 
-  --atlas-shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
-  --atlas-shadow-md: 0 2px 6px rgba(0, 0, 0, .3), 0 10px 24px rgba(0, 0, 0, .26);
-  --atlas-shadow-lg: 0 10px 32px rgba(0, 0, 0, .4), 0 28px 72px rgba(0, 0, 0, .5);
+  --atlas-shadow-sm: 2px 2px 0 0 rgba(0, 0, 0, .3);
+  --atlas-shadow-md: 3px 3px 0 0 rgba(0, 0, 0, .34);
+  --atlas-shadow-lg: 5px 5px 0 0 rgba(0, 0, 0, .3), 0 14px 36px rgba(0, 0, 0, .5);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -175,18 +189,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--atlas-sky-ink);
-  background: var(--atlas-sky);
-  border: 0;
+  color: var(--atlas-amber-ink);
+  background: var(--atlas-amber);
+  border: 1.5px solid rgba(36, 28, 5, .28);
   border-radius: var(--atlas-r-btn);
-  font-weight: 650;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, .1), inset 0 1px 0 rgba(255, 255, 255, .12);
+  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .3);
   transition: background var(--atlas-fast), box-shadow var(--atlas-fast), transform var(--atlas-fast);
 }
 
-.primary-button:hover:not(:disabled) { background: var(--atlas-sky-deep); }
-.primary-button:active:not(:disabled) { transform: scale(.985); }
+.primary-button:hover:not(:disabled) { background: var(--atlas-amber-deep); }
+.primary-button:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 rgba(36, 28, 5, .3); }
 .primary-button:disabled { cursor: not-allowed; opacity: .45; }
 
 .brand-mark {
@@ -195,10 +209,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: #fff;
-  background: linear-gradient(135deg, #2b74ec 0%, #1c3d8f 100%);
+  color: var(--atlas-amber-ink);
+  background: linear-gradient(135deg, #ffd166 0%, var(--atlas-amber) 100%);
+  border: 1.5px solid rgba(36, 28, 5, .3);
   border-radius: 10px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .22);
 }
 
 /* ---------- 地图 ---------- */
@@ -287,7 +302,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   color: var(--atlas-ink-soft);
   background: var(--atlas-sun-soft);
 }
-.markdown-body pre { overflow-x: auto; margin: 12px 0; padding: 13px; border-radius: 10px; color: #e8eefb; background: #1b1f2c; font-family: var(--atlas-mono); font-size: 12.5px; }
+.markdown-body pre { overflow-x: auto; margin: 12px 0; padding: 13px; border-radius: 10px; color: #ede5d5; background: #26201a; font-family: var(--atlas-mono); font-size: 12.5px; }
 .markdown-body code { padding: 2px 6px; border-radius: 5px; color: var(--atlas-sky); background: var(--atlas-sky-soft); font-family: var(--atlas-mono); font-size: .92em; }
 .markdown-body pre code { padding: 0; color: inherit; background: transparent; }
 .markdown-body table { width: 100%; margin: 12px 0; border-collapse: collapse; }
@@ -315,7 +330,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .auth-dialog:focus { outline: none; }
 
-/* 左侧品牌面板：夜空 */
+/* 左侧品牌面板：暖暮（可可夜色 + 琥珀余晖） */
 .auth-story {
   position: relative;
   display: flex;
@@ -323,18 +338,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   justify-content: space-between;
   overflow: hidden;
   padding: 34px;
-  color: #e9ecf6;
+  color: #f0e8da;
   background:
-    radial-gradient(1.5px 1.5px at 18% 22%, rgba(255, 255, 255, .45) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 72% 12%, rgba(255, 255, 255, .3) 50%, transparent 51%),
-    radial-gradient(2px 2px at 55% 42%, rgba(255, 255, 255, .24) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 84% 58%, rgba(255, 255, 255, .34) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 30% 70%, rgba(255, 255, 255, .26) 50%, transparent 51%),
-    radial-gradient(circle at 86% 88%, rgba(255, 138, 61, .14) 0 40%, transparent 58%),
-    linear-gradient(160deg, #1a2240 0%, #131a33 62%, #101629 100%);
+    radial-gradient(1.5px 1.5px at 18% 22%, rgba(255, 240, 214, .4) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 72% 12%, rgba(255, 240, 214, .26) 50%, transparent 51%),
+    radial-gradient(2px 2px at 55% 42%, rgba(255, 240, 214, .2) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 84% 58%, rgba(255, 240, 214, .3) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 30% 70%, rgba(255, 240, 214, .22) 50%, transparent 51%),
+    radial-gradient(circle at 86% 88%, rgba(242, 176, 30, .16) 0 40%, transparent 58%),
+    linear-gradient(160deg, #33271c 0%, #261d14 62%, #1d1610 100%);
 }
 
-.auth-story-orbit { position: absolute; border: 1px dashed rgba(255, 255, 255, .14); border-radius: 50%; }
+.auth-story-orbit { position: absolute; border: 1px dashed rgba(255, 240, 214, .16); border-radius: 50%; }
 .auth-story-orbit-one { width: 340px; height: 340px; right: -200px; top: 40px; }
 .auth-story-orbit-two { width: 210px; height: 210px; right: -62px; top: 110px; }
 .auth-story-orbit-one::after, .auth-story-orbit-two::after {
@@ -343,18 +358,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--atlas-sun);
-  box-shadow: 0 0 0 5px rgba(255, 138, 61, .12);
+  background: var(--atlas-amber);
+  box-shadow: 0 0 0 5px rgba(242, 176, 30, .14);
 }
 .auth-story-orbit-one::after { left: 46px; top: 52px; }
 .auth-story-orbit-two::after { right: 30px; bottom: 40px; }
 
-.brand-mark-light { color: #161c2e; background: linear-gradient(135deg, #ffb37a 0%, var(--atlas-sun) 100%); }
+.brand-mark-light { color: var(--atlas-amber-ink); background: linear-gradient(135deg, #ffd166 0%, var(--atlas-amber) 100%); }
 .auth-story-copy { position: relative; z-index: 1; }
-.eyebrow-light { color: #ffb37a; }
+.eyebrow-light { color: #ffd166; }
 .auth-story h2 { margin: 15px 0; font-family: var(--atlas-display); font-size: 30px; font-weight: 700; line-height: 1.3; }
-.auth-story p { max-width: 290px; margin: 0; color: rgba(233, 236, 246, .7); font-size: 13px; line-height: 1.8; }
-.auth-trust-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; color: rgba(233, 236, 246, .62); font-size: 12px; }
+.auth-story p { max-width: 290px; margin: 0; color: rgba(240, 232, 218, .7); font-size: 13px; line-height: 1.8; }
+.auth-trust-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; color: rgba(240, 232, 218, .62); font-size: 12px; }
 
 .auth-form-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 46px 56px; }
 .auth-close { position: absolute; right: 18px; top: 18px; }

@@ -14,31 +14,31 @@ export interface WorkerMeta {
 export const workerMeta: Record<string, WorkerMeta> = {
   flight: {
     label: '航班智能体', shortLabel: '航班',
-    color: '#d9604c', markerColor: '#d9604c', icon: Plane,
+    color: '#d95b47', markerColor: '#d95b47', icon: Plane,
   },
   hotel: {
     label: '住宿智能体', shortLabel: '住宿',
-    color: '#335f74', markerColor: '#335f74', icon: Hotel,
+    color: '#33586e', markerColor: '#33586e', icon: Hotel,
   },
   attraction: {
     label: '地点智能体', shortLabel: '地点',
-    color: '#397764', markerColor: '#397764', icon: MapPin,
+    color: '#2f9e77', markerColor: '#2f9e77', icon: MapPin,
   },
   itinerary: {
     label: '日程智能体', shortLabel: '日程',
-    color: '#6b5b83', markerColor: '#6b5b83', icon: Route,
+    color: '#c08a1f', markerColor: '#c08a1f', icon: Route,
   },
   budget: {
     label: '预算智能体', shortLabel: '预算',
-    color: '#a87836', markerColor: '#a87836', icon: Wallet,
+    color: '#8a6a3e', markerColor: '#8a6a3e', icon: Wallet,
   },
 }
 
 export const fallbackWorkerMeta: WorkerMeta = {
   label: '规划智能体',
   shortLabel: '规划',
-  color: '#335f74',
-  markerColor: '#6d746f',
+  color: '#33586e',
+  markerColor: '#8d8477',
   icon: Sparkles,
 }
 
