@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import {
-  CalendarRange, Check, ChevronDown, Copy, FileDown, FileText, MapPin,
+  ArrowUpRight, CalendarRange, Check, ChevronDown, Copy, FileDown, FileText, MapPin,
   Route, Sparkles, WalletCards,
 } from 'lucide-react'
 import SafeMarkdown from '../../components/SafeMarkdown'
@@ -20,6 +20,12 @@ interface ItineraryWorkspaceProps {
   onSearchMap: (keyword: string, city: string) => void
   onExport?: (format: 'md' | 'pdf') => void
   notice?: { tone: 'success' | 'error'; message: string } | null
+  /** R2 主流程收敛：完成后去行程详情阅读视图 */
+  onOpenTrip?: () => void
+  /** 保存状态徽标：cloud = 已落库；local = 游客本地草稿 */
+  saveState?: 'cloud' | 'local'
+  /** local 徽标可点击唤起登录 */
+  onLogin?: () => void
 }
 
 const categoryClass: Record<string, string> = {
@@ -37,6 +43,9 @@ export default function ItineraryWorkspace({
   onSearchMap,
   onExport,
   notice = null,
+  onOpenTrip,
+  saveState,
+  onLogin,
 }: ItineraryWorkspaceProps) {
   const [tab, setTab] = useState<ResultTab>(viewModel.hasStructuredOverview ? 'overview' : 'document')
   const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>({ 0: true })
@@ -115,9 +124,20 @@ export default function ItineraryWorkspace({
         <div>
           <span className="atlas-kicker"><Sparkles size={13} aria-hidden="true" /> Curated itinerary</span>
           <h2 id="atlas-itinerary-title">{city || '目的地'}旅程工作区</h2>
-          <p>方案来自真实执行结果；你可以查看日程、预算、地点和智能体记录。</p>
+          <p>
+            方案来自真实执行结果；你可以查看日程、预算、地点和智能体记录。
+            {saveState === 'cloud' && <span className="atlas-save-badge is-cloud"><Check size={13} aria-hidden="true" /> 已保存到云端</span>}
+            {saveState === 'local' && (onLogin
+              ? <button type="button" className="atlas-save-badge is-local" onClick={onLogin}>已存为本地草稿 · 登录后可同步</button>
+              : <span className="atlas-save-badge is-local">已存为本地草稿</span>)}
+          </p>
         </div>
         <div className="atlas-result-actions">
+          {onOpenTrip && (
+            <button type="button" className="atlas-open-trip-action" onClick={onOpenTrip}>
+              查看完整行程 <ArrowUpRight size={15} aria-hidden="true" />
+            </button>
+          )}
           <button type="button" onClick={() => void copyPlan()} aria-label={copyStatus === 'success' ? '已复制方案' : copyStatus === 'error' ? '复制失败，重试复制方案' : '复制方案'}>
             {copyStatus === 'success' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
             {copyStatus === 'success' ? '已复制' : copyStatus === 'error' ? '重试复制' : '复制'}

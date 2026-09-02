@@ -8,6 +8,8 @@ import type { StreamError } from '../hooks/useSSE'
 import type { useTheme } from '../hooks/useTheme'
 import AIPage from './AIPage'
 import { JourneyProvider } from '../app/JourneyProvider'
+import { RouterProvider } from '../app/router'
+import { ToastProvider } from '../app/Toast'
 
 interface StreamOptions {
   onEvent: (event: NormalizedSSEEvent) => void
@@ -58,8 +60,15 @@ describe('Atlas page integration', () => {
     location.hash = ''
   })
 
-  // 会话状态已提升到 JourneyProvider，测试中包一层
-  const renderPage = (ui: React.ReactElement) => render(ui, { wrapper: JourneyProvider })
+  // 会话状态已提升到 JourneyProvider；R2 起页面还用到路由与 Toast，统一包全
+  const AllProviders = ({ children }: { children: React.ReactNode }) => (
+    <RouterProvider>
+      <JourneyProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </JourneyProvider>
+    </RouterProvider>
+  )
+  const renderPage = (ui: React.ReactElement) => render(ui, { wrapper: AllProviders })
 
   const guestAuth = () => ({
     user: null, token: null, isLoggedIn: false, isValidating: false,
@@ -135,10 +144,10 @@ describe('Atlas page integration', () => {
     const Probe = ({ show }: { show: boolean }) => (
       show ? <AIPage auth={guestAuth()} theme={lightTheme()} /> : null
     )
-    const { rerender } = render(<JourneyProvider><Probe show /></JourneyProvider>)
+    const { rerender } = render(<AllProviders><Probe show /></AllProviders>)
 
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
-    rerender(<JourneyProvider><Probe show={false} /></JourneyProvider>)
+    rerender(<AllProviders><Probe show={false} /></AllProviders>)
 
     await waitFor(() => {
       const persisted = JSON.parse(sessionStorage.getItem('atlas_journey_state') ?? '{}')
@@ -337,6 +346,30 @@ describe('Atlas page integration', () => {
 
     expect(screen.getByRole('heading', { name: '东京旅程工作区' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('导出失败')
+  })
+
+  it('routes a completed trip to the detail view and shows cloud save state', async () => {
+    const user = userEvent.setup()
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+    act(() => {
+      streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: 55 })
+    })
+
+    expect(screen.getByText('已保存到云端')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /查看完整行程/ }))
+    expect(window.location.hash).toMatch(/^#\/trip\//)
+  })
+
+  it('tells guests their trip is kept as a local draft', async () => {
+    const user = userEvent.setup()
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+    act(() => {
+      streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: null })
+    })
+
+    expect(screen.getByRole('button', { name: /已存为本地草稿/ })).toBeInTheDocument()
   })
 
   it('opens login and keeps the current draft when an SSE token expires', async () => {

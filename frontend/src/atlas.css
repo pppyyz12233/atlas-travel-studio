@@ -1063,6 +1063,45 @@
 .atlas-result-header p { max-width: 600px; margin: 7px 0 0; color: var(--atlas-ink-soft); font-size: 13px; line-height: 1.65; }
 .atlas-result-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 
+/* R2 主流程收敛：完成态保存徽标 + 「查看完整行程」主行动 */
+.atlas-save-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 9px;
+  padding: 2px 9px;
+  vertical-align: 1px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.atlas-save-badge.is-cloud { color: var(--atlas-route); background: var(--atlas-route-soft); }
+.atlas-save-badge.is-local {
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-paper-soft);
+  border: 1px solid var(--atlas-line);
+}
+button.atlas-save-badge.is-local { cursor: pointer; }
+button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: color-mix(in srgb, var(--atlas-sky) 34%, var(--atlas-line)); }
+
+.atlas-open-trip-action {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .2);
+  border-radius: var(--atlas-r-btn);
+  font-size: 12.5px;
+  font-weight: 700;
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
+  transition: background var(--atlas-fast), transform var(--atlas-fast), box-shadow var(--atlas-fast);
+}
+.atlas-open-trip-action:hover { background: var(--atlas-cta-deep); }
+.atlas-open-trip-action:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
+
 .atlas-result-notice {
   margin: 0 0 12px;
   padding: 10px 13px;

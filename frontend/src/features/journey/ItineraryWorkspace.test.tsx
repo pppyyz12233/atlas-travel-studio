@@ -77,4 +77,37 @@ describe('ItineraryWorkspace state and accessibility', () => {
     expect(screen.getByRole('tab', { name: '完整方案' })).toHaveAttribute('aria-selected', 'true')
     expect(onExport).toHaveBeenCalledWith('pdf')
   })
+
+  it('surfaces a single primary action to open the full trip with cloud save state', async () => {
+    const user = userEvent.setup()
+    const onOpenTrip = vi.fn()
+    render(
+      <ItineraryWorkspace
+        {...baseProps}
+        onOpenTrip={onOpenTrip}
+        saveState="cloud"
+        viewModel={buildItineraryViewModel('# 东京方案\n内容')}
+      />,
+    )
+
+    expect(screen.getByText('已保存到云端')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /查看完整行程/ }))
+    expect(onOpenTrip).toHaveBeenCalledOnce()
+  })
+
+  it('shows draft save state and a login prompt for guests', async () => {
+    const user = userEvent.setup()
+    const onLogin = vi.fn()
+    render(
+      <ItineraryWorkspace
+        {...baseProps}
+        saveState="local"
+        onLogin={onLogin}
+        viewModel={buildItineraryViewModel('# 东京方案\n内容')}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /已存为本地草稿/ }))
+    expect(onLogin).toHaveBeenCalledOnce()
+  })
 })

@@ -21,6 +21,8 @@ import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 import { useJourney } from '../app/JourneyProvider'
 import { consumePendingBrief } from '../app/pendingBrief'
+import { useRouter } from '../app/router'
+import { useToast } from '../app/Toast'
 import { api } from '../hooks/useApi'
 import type { useAuth } from '../hooks/useAuth'
 import { useSSE } from '../hooks/useSSE'
@@ -51,6 +53,8 @@ function fallbackBrief(form: TripForm): string {
 export default function AIPage({ auth, theme }: Props) {
   // 会话状态来自 App 级 JourneyProvider：首页/详情页/我的行程与规划页共享同一份
   const { state: journeyState, dispatch, activeSession } = useJourney()
+  const { navigate } = useRouter()
+  const { notify } = useToast()
   const { isStreaming, startStream, stopStream } = useSSE()
   const [input, setInput] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -283,6 +287,10 @@ export default function AIPage({ auth, theme }: Props) {
         if (event.event === 'done' && event.conversationId) {
           void refreshConversations()
         }
+
+        if (event.event === 'done') {
+          notify('success', event.conversationId ? '方案已生成，已保存到云端' : '方案已生成，已存为本地草稿')
+        }
       },
       onError(error) {
         streamingSessionIdRef.current = null
@@ -415,6 +423,9 @@ export default function AIPage({ auth, theme }: Props) {
             }}
             onExport={format => void exportPlan(format)}
             notice={resultNotice}
+            onOpenTrip={() => navigate(`/trip/${activeSession.id}`)}
+            saveState={activeSession.conversationId ? 'cloud' : 'local'}
+            onLogin={auth.isLoggedIn ? undefined : () => auth.setShowAuthModal(true)}
           />
         )}
       </div>
