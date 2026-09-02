@@ -111,9 +111,11 @@ export default function AIPage({ auth, theme }: Props) {
     setResultNotice(null)
   }, [activeSession.id])
 
-  // R3：进入规划即自动展开右栏（地图 + 执行链）；idle 收起、结果态保留用户选择
+  // R3/R4：规划中自动展开右栏（地图 + 执行链）；完成进入阅读态自动收起，
+  // 与「恢复已完成会话」路径保持一致；用户此后可从边缘竖条主动展开（phase 不再变化，不会被覆盖）
   useEffect(() => {
     if (activeSession.phase === 'planning') setContextOpen(true)
+    if (activeSession.phase === 'ready') setContextOpen(false)
   }, [activeSession.phase])
 
   useEffect(() => {

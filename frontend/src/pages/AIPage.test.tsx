@@ -208,6 +208,11 @@ describe('Atlas page integration', () => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n旅行建议已生成。', conversationId: null })
     })
     expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
+
+    // R4：完成后右栏自动收起（阅读态唯一中心）；与恢复会话路径状态一致
+    await waitFor(() => {
+      expect(screen.getByLabelText('地图与执行详情')).toHaveClass('is-collapsed')
+    })
   })
 
   it('applies a structured example to the command strip before planning', async () => {
