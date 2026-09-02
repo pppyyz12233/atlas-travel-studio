@@ -293,7 +293,8 @@ describe('Atlas journey interface', () => {
     expect(onExport).toHaveBeenCalledWith('pdf')
   })
 
-  it('falls back to a narrative note when no structured data exists', () => {
+  it('falls back to a narrative note when no structured data exists', async () => {
+    const user = userEvent.setup()
     render(
       <ItineraryWorkspace
         viewModel={buildItineraryViewModel('只有一段普通旅行建议')}
@@ -305,6 +306,8 @@ describe('Atlas journey interface', () => {
     )
 
     expect(screen.getByText(/自由叙述/)).toBeInTheDocument()
+    // 全文收在折叠里，展开后可见（R2）
+    await user.click(screen.getByRole('button', { name: /完整方案/ }))
     expect(screen.getByText('只有一段普通旅行建议')).toBeInTheDocument()
   })
 

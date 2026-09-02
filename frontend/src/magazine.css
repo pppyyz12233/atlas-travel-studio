@@ -964,6 +964,28 @@
   border-left: 1px solid var(--atlas-line);
 }
 .mag-timeline-day:last-child .mag-timeline-body { padding-bottom: 4px; }
+/* R2 手风琴日标题（阅读态） */
+.mag-timeline-trigger {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0 10px;
+  color: var(--atlas-ink);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--atlas-line);
+  text-align: left;
+  cursor: pointer;
+}
+.mag-timeline-trigger:hover .mag-timeline-trigger-title { text-decoration: underline; text-underline-offset: 4px; }
+.mag-timeline-trigger-title { font-family: var(--atlas-display); font-size: 18px; font-weight: 700; }
+.mag-timeline-trigger-sub { overflow: hidden; color: var(--atlas-ink-muted); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.mag-timeline-trigger svg { color: var(--atlas-ink-muted); transition: transform var(--atlas-fast); align-self: center; }
+.mag-timeline-trigger.is-open svg { transform: rotate(180deg); }
+.mag-timeline-panel { margin-top: 10px; }
+
 .mag-timeline-body header { display: grid; gap: 3px; margin-bottom: 10px; }
 .mag-timeline-body h3 { margin: 0; font-family: var(--atlas-display); font-size: 18px; font-weight: 700; }
 .mag-timeline-body header p { margin: 0; color: var(--atlas-ink-muted); font-size: 12.5px; }

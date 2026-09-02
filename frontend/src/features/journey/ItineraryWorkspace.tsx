@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Check, CheckCircle2, Copy, FileDown, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ArrowUpRight, Check, CheckCircle2, ChevronDown, Copy, FileDown, FileText } from 'lucide-react'
 import SafeMarkdown from '../../components/SafeMarkdown'
 import TripTimeline from '../../components/TripTimeline'
+import OrchestrationTimeline from './OrchestrationTimeline'
 import type { JourneyStep } from './model'
 import type { ItineraryViewModel } from './viewModel'
 
@@ -33,11 +35,36 @@ interface LocationLike {
   type?: string
 }
 
+// R2 次级折叠：默认收起，点击展开完整内容；数据不删只改层级
+function Fold({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="atlas-fold">
+      <button
+        type="button"
+        className={`atlas-fold-toggle ${open ? 'is-open' : ''}`}
+        aria-expanded={open}
+        aria-controls={`${id}-panel`}
+        onClick={() => setOpen(value => !value)}
+      >
+        <ChevronDown size={15} aria-hidden="true" />
+        {label}
+      </button>
+      {open && (
+        <div id={`${id}-panel`} className="atlas-fold-panel" role="region" aria-label={label}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // R1 阅读态：done 后的规划页不再是 Tab 工作区，而是一条线性阅读主线
 // 摘要（路线/日期/预算 + 保存状态 + 唯一主按钮）→ 每日安排 → 方案全文
 export default function ItineraryWorkspace({
   viewModel,
   city,
+  steps,
   onSearchMap,
   onExport,
   notice = null,
@@ -50,6 +77,7 @@ export default function ItineraryWorkspace({
 }: ItineraryWorkspaceProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const copyTimerRef = useRef<number | null>(null)
+  const maxBudget = Math.max(...viewModel.budgetItems.map(item => item.amount), 1)
 
   useEffect(() => () => {
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current)
@@ -121,16 +149,56 @@ export default function ItineraryWorkspace({
       <section className="atlas-reading-days" aria-label="每日安排">
         <h3>每日安排</h3>
         {viewModel.days.length > 0 ? (
-          <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} />
+          <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} collapsible />
         ) : (
           <p className="atlas-reading-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
         )}
       </section>
 
-      <section className="atlas-reading-document" aria-label="完整方案">
-        <h3>完整方案</h3>
-        <article className="atlas-document"><SafeMarkdown content={viewModel.markdown} /></article>
-      </section>
+      <div className="atlas-reading-folds">
+        {viewModel.budgetItems.length > 0 && (
+          <Fold id="atlas-fold-budget" label="预算明细">
+            <div className="atlas-budget-board">
+              <header>
+                <span>费用结构</span>
+                <strong>¥{Math.round(viewModel.budgetTotal).toLocaleString()}</strong>
+              </header>
+              <div>
+                {viewModel.budgetItems.map(item => (
+                  <div className="atlas-budget-row" key={`${item.category}-${item.amount}`}>
+                    <span>{item.category}</span>
+                    <div><i style={{ width: `${Math.max(item.amount / maxBudget * 100, 8)}%` }} /></div>
+                    <strong>¥{Math.round(item.amount).toLocaleString()}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Fold>
+        )}
+
+        <Fold id="atlas-fold-execution" label="执行明细">
+          {steps.length > 0 ? (
+            <OrchestrationTimeline
+              steps={steps}
+              graphNode=""
+              phase="ready"
+              statusMessage=""
+              onRetry={() => undefined}
+              onEditBrief={() => undefined}
+            />
+          ) : (
+            <p className="atlas-reading-note">本次执行没有记录执行明细（如从历史会话恢复的方案）。</p>
+          )}
+        </Fold>
+
+        <Fold id="atlas-fold-document" label="完整方案">
+          {viewModel.markdown.trim() ? (
+            <article className="atlas-document"><SafeMarkdown content={viewModel.markdown} /></article>
+          ) : (
+            <p className="atlas-reading-note">暂无方案全文。</p>
+          )}
+        </Fold>
+      </div>
     </section>
   )
 }

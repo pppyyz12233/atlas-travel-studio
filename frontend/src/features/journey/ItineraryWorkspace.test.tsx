@@ -27,12 +27,89 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('shows every day as a linear timeline section', () => {
+  it('keeps day 1 open and collapses later days until toggled', async () => {
+    const user = userEvent.setup()
     render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(structured)} />)
 
     const timeline = screen.getByRole('list', { name: '逐日行程时间轴' })
     expect(timeline.textContent).toContain('浅草寺')
-    expect(timeline.textContent).toContain('镰仓')
+    expect(timeline.textContent).not.toContain('镰仓')
+
+    const day2 = screen.getByRole('button', { name: /第 2 天/ })
+    await user.click(day2)
+    expect(screen.getByText('镰仓')).toBeInTheDocument()
+
+    await user.click(day2)
+    expect(day2).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('镰仓')).not.toBeInTheDocument()
+  })
+
+  it('supports keyboard toggling of day folds with aria wiring', async () => {
+    const user = userEvent.setup()
+    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(structured)} />)
+
+    const day2 = screen.getByRole('button', { name: /第 2 天/ })
+    expect(day2).toHaveAttribute('aria-expanded', 'false')
+    const panelId = day2.getAttribute('aria-controls')
+    expect(panelId).toBeTruthy()
+
+    day2.focus()
+    await user.keyboard('{Enter}')
+    expect(day2).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(panelId ?? '')).not.toBeNull()
+
+    await user.keyboard(' ')
+    expect(day2).toHaveAttribute('aria-expanded', 'false')
+    expect(document.getElementById(panelId ?? '')).toBeNull()
+  })
+
+  it('keeps budget, execution and full document behind closed folds by default', async () => {
+    const user = userEvent.setup()
+    const steps = [{
+      name: '推荐航班', worker: 'flight', status: 'done' as const, summary: 'MU539 往返',
+      locations: [], iterations: 1, toolCalls: 2,
+    }]
+    render(
+      <ItineraryWorkspace
+        {...baseProps}
+        steps={steps}
+        viewModel={buildItineraryViewModel(structured)}
+      />,
+    )
+
+    const budget = screen.getByRole('button', { name: /预算明细/ })
+    const execution = screen.getByRole('button', { name: /执行明细/ })
+    const documentFold = screen.getByRole('button', { name: /完整方案/ })
+    for (const fold of [budget, execution, documentFold]) {
+      expect(fold).toHaveAttribute('aria-expanded', 'false')
+    }
+
+    await user.click(budget)
+    expect(screen.getByText('交通')).toBeVisible()
+    expect(screen.getByText('¥500')).toBeVisible()
+
+    await user.click(execution)
+    expect(screen.getByText('推荐航班')).toBeInTheDocument()
+    // 工具/轮次等指标保持为次级小字信息
+    expect(screen.getByText(/1 轮分析/)).toBeInTheDocument()
+
+    await user.click(documentFold)
+    const panelId = documentFold.getAttribute('aria-controls')
+    expect(window.document.getElementById(panelId ?? '')?.textContent).toContain('交通')
+  })
+
+  it('shows honest empty states for folds without data', async () => {
+    const user = userEvent.setup()
+    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel('# 纯文档方案')} />)
+
+    // 无预算数据：不出现预算折叠入口
+    expect(screen.queryByRole('button', { name: /预算明细/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /执行明细/ }))
+    expect(screen.getByText(/没有记录执行明细/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /完整方案/ }))
+    expect(screen.getByText('纯文档方案')).toBeInTheDocument()
   })
 
   it('shows a recoverable message when clipboard copy fails', async () => {
@@ -65,11 +142,12 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
     expect(onExport).toHaveBeenCalledWith('pdf')
   })
 
-  it('renders the full document as a plain section for narrative plans', () => {
+  it('renders a narrative fallback when no structured days exist', () => {
     render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel('# 纯文档方案')} />)
 
     expect(screen.getByText(/自由叙述/)).toBeInTheDocument()
-    expect(screen.getByText('纯文档方案')).toBeInTheDocument()
+    // 全文收在折叠里（R2），此处不再直接可见
+    expect(screen.queryByText('纯文档方案')).not.toBeInTheDocument()
   })
 
   it('surfaces a single primary action to open the full trip with cloud save state', async () => {
