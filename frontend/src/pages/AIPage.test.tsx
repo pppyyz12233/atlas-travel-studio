@@ -97,6 +97,9 @@ describe('Atlas page integration', () => {
     renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
 
     expect(screen.getByRole('heading', { name: /行程方案/ })).toBeInTheDocument()
+
+    // R5：完成态对话轨迹默认折叠，展开后可见历史消息
+    await user.click(screen.getByRole('button', { name: /对话过程 \(2\)/ }))
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
 
     // 会话栏默认收起：先从顶栏打开抽屉再操作
@@ -118,6 +121,32 @@ describe('Atlas page integration', () => {
 
     expect(screen.getAllByText('已停止').length).toBeGreaterThan(0)
     expect(screen.getByText(/页面刷新，生成已中断/)).toBeInTheDocument()
+  })
+
+  it('collapses the conversation trail in reading mode and expands on demand', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'feed-trip',
+      title: '京都红叶季',
+      phase: 'ready',
+      finalReply: '# 京都方案',
+      messages: [
+        { role: 'user', content: '十一月去京都看红叶' },
+        { role: 'assistant', content: '# 京都方案' },
+      ],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ sessions: [session], activeId: session.id }))
+
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    // R5：完成态对话轨迹默认折叠为单行入口，带消息计数
+    expect(screen.queryByLabelText('对话记录')).not.toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: /对话过程 \(2\)/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(toggle)
+    expect(screen.getByLabelText('对话记录')).toBeInTheDocument()
+    expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
   })
 
   it('auto-starts planning from a home page brief exactly once', async () => {
@@ -277,6 +306,9 @@ describe('Atlas page integration', () => {
     await user.click(screen.getByRole('button', { name: '打开旅程列表' }))
     await user.click(await screen.findByRole('button', { name: /东京旧行程/ }))
 
+    // R5：历史会话进入阅读态，对话轨迹默认折叠，展开后可见
+    const toggle = await screen.findByRole('button', { name: /对话过程 \(4\)/ })
+    await user.click(toggle)
     const feed = await screen.findByLabelText('对话记录')
     expect(within(feed).getByText('第一版想住在银座')).toBeInTheDocument()
     expect(within(feed).getByText('第一版建议住银座东侧。')).toBeInTheDocument()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { LogIn, Map as MapIcon, Menu, Moon, Sparkles, Sun } from 'lucide-react'
+import { ChevronDown, LogIn, Map as MapIcon, Menu, MessageSquareText, Moon, Sparkles, Sun } from 'lucide-react'
 import type { MapApi } from '../components/MapView'
 import {
   AppShell,
@@ -61,6 +61,7 @@ export default function AIPage({ auth, theme }: Props) {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [railOpen, setRailOpen] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
+  const [feedOpen, setFeedOpen] = useState(false)
   const [resultNotice, setResultNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const mapRef = useRef<MapApi | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -111,11 +112,14 @@ export default function AIPage({ auth, theme }: Props) {
     setResultNotice(null)
   }, [activeSession.id])
 
-  // R3/R4：规划中自动展开右栏（地图 + 执行链）；完成进入阅读态自动收起，
-  // 与「恢复已完成会话」路径保持一致；用户此后可从边缘竖条主动展开（phase 不再变化，不会被覆盖）
+  // R3/R4/R5：规划中自动展开右栏；完成进入阅读态自动收起右栏并折叠对话轨迹，
+  // 与「恢复已完成会话」路径保持一致；用户此后可主动展开（phase 不再变化，不会被覆盖）
   useEffect(() => {
     if (activeSession.phase === 'planning') setContextOpen(true)
-    if (activeSession.phase === 'ready') setContextOpen(false)
+    if (activeSession.phase === 'ready') {
+      setContextOpen(false)
+      setFeedOpen(false)
+    }
   }, [activeSession.phase])
 
   useEffect(() => {
@@ -392,7 +396,21 @@ export default function AIPage({ auth, theme }: Props) {
         />
 
         {activeSession.phase !== 'idle' && activeSession.messages.length > 0 && (
-          <ConversationFeed messages={activeSession.messages} finalReply={activeSession.finalReply} />
+          activeSession.phase === 'ready' && !feedOpen ? (
+            <button
+              type="button"
+              className="atlas-feed-toggle"
+              aria-expanded={false}
+              aria-controls="atlas-conversation-feed"
+              onClick={() => setFeedOpen(true)}
+            >
+              <MessageSquareText size={14} aria-hidden="true" />
+              对话过程 ({activeSession.messages.length})
+              <ChevronDown size={14} aria-hidden="true" />
+            </button>
+          ) : (
+            <ConversationFeed messages={activeSession.messages} finalReply={activeSession.finalReply} />
+          )
         )}
 
         {activeSession.phase === 'idle' && (

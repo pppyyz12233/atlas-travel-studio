@@ -2210,3 +2210,24 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   background: var(--atlas-paper-soft);
   outline: none;
 }
+
+/* ---------- R5 对话轨迹折叠入口 ---------- */
+.atlas-feed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 0 auto 18px;
+  padding: 0 14px;
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--atlas-shadow-sm);
+  transition: color var(--atlas-fast), border-color var(--atlas-fast);
+}
+.atlas-feed-toggle:hover { color: var(--atlas-ink); border-color: var(--atlas-line-strong); }
+.atlas-feed-toggle svg { color: var(--atlas-ink-muted); }
