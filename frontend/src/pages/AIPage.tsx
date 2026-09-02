@@ -431,6 +431,9 @@ export default function AIPage({ auth, theme }: Props) {
             onOpenTrip={() => navigate(`/trip/${activeSession.id}`)}
             saveState={activeSession.conversationId ? 'cloud' : 'local'}
             onLogin={auth.isLoggedIn ? undefined : () => auth.setShowAuthModal(true)}
+            route={`${activeSession.form.origin} → ${activeSession.form.destination}`}
+            date={activeSession.form.date}
+            people={activeSession.form.people}
           />
         )}
       </div>

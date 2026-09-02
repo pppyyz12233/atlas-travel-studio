@@ -2064,3 +2064,64 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
     transition-duration: .01ms !important;
   }
 }
+
+/* ==========================================================
+   R1 阅读态：done 后的规划页 = 线性阅读主线
+   摘要(路线/日期/预算+保存状态+唯一主按钮) → 每日安排 → 方案全文
+   ========================================================== */
+
+.atlas-reading { width: min(100%, 1000px); margin-inline: auto; animation: atlas-rise .4s var(--atlas-ease) both; }
+
+.atlas-reading-head { padding: 4px 0 16px; border-bottom: 1px solid var(--atlas-line); }
+
+.atlas-reading-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: var(--atlas-route);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.atlas-reading-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.atlas-reading-title-row h2 {
+  margin: 0;
+  font-family: var(--atlas-display);
+  font-size: clamp(22px, 2.6vw, 28px);
+  font-weight: 750;
+}
+
+.atlas-reading-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin: 12px 0 0;
+  color: var(--atlas-ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.atlas-reading-route { color: var(--atlas-ink); font-weight: 700; }
+.atlas-reading-budget strong { color: var(--atlas-ink); font-weight: 750; }
+.atlas-reading-stats small { color: var(--atlas-ink-muted); font-size: 11px; }
+
+.atlas-reading-days,
+.atlas-reading-document { margin-top: 24px; }
+.atlas-reading-days > h3,
+.atlas-reading-document > h3 {
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--atlas-line);
+  font-family: var(--atlas-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+.atlas-reading-note { margin: 0; color: var(--atlas-ink-muted); font-size: 13px; }

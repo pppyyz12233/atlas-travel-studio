@@ -1,76 +1,55 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
-import {
-  ArrowUpRight, CalendarRange, Check, ChevronDown, Copy, FileDown, FileText, MapPin,
-  Route, Sparkles, WalletCards,
-} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowUpRight, Check, CheckCircle2, Copy, FileDown, FileText } from 'lucide-react'
 import SafeMarkdown from '../../components/SafeMarkdown'
-import type { Location } from '../../types'
+import TripTimeline from '../../components/TripTimeline'
 import type { JourneyStep } from './model'
-import OrchestrationTimeline from './OrchestrationTimeline'
 import type { ItineraryViewModel } from './viewModel'
-
-type ResultTab = 'overview' | 'daily' | 'budget' | 'document' | 'trace'
 
 interface ItineraryWorkspaceProps {
   viewModel: ItineraryViewModel
   city: string
   steps: JourneyStep[]
-  locations: Location[]
+  locations: LocationLike[]
   onSearchMap: (keyword: string, city: string) => void
   onExport?: (format: 'md' | 'pdf') => void
   notice?: { tone: 'success' | 'error'; message: string } | null
-  /** R2 主流程收敛：完成后去行程详情阅读视图 */
+  /** 主流程：完成后去行程详情阅读视图 */
   onOpenTrip?: () => void
   /** 保存状态徽标：cloud = 已落库；local = 游客本地草稿 */
   saveState?: 'cloud' | 'local'
   /** local 徽标可点击唤起登录 */
   onLogin?: () => void
+  /** 阅读态摘要行：路线 / 日期 / 人数 */
+  route?: string
+  date?: string
+  people?: number
 }
 
-const categoryClass: Record<string, string> = {
-  '机票': 'is-flight', '航班': 'is-flight',
-  '酒店': 'is-hotel', '住宿': 'is-hotel',
-  '门票': 'is-attraction', '景点': 'is-attraction',
-  '餐饮': 'is-food', '交通': 'is-transit',
+interface LocationLike {
+  lng: number
+  lat: number
+  name: string
+  address: string
+  type?: string
 }
 
+// R1 阅读态：done 后的规划页不再是 Tab 工作区，而是一条线性阅读主线
+// 摘要（路线/日期/预算 + 保存状态 + 唯一主按钮）→ 每日安排 → 方案全文
 export default function ItineraryWorkspace({
   viewModel,
   city,
-  steps,
-  locations,
   onSearchMap,
   onExport,
   notice = null,
   onOpenTrip,
   saveState,
   onLogin,
+  route,
+  date,
+  people,
 }: ItineraryWorkspaceProps) {
-  const [tab, setTab] = useState<ResultTab>(viewModel.hasStructuredOverview ? 'overview' : 'document')
-  const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>({ 0: true })
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const copyTimerRef = useRef<number | null>(null)
-  const tabRefs = useRef<Partial<Record<ResultTab, HTMLButtonElement | null>>>({})
-  const maxBudget = useMemo(
-    () => Math.max(...viewModel.budgetItems.map(item => item.amount), 1),
-    [viewModel.budgetItems],
-  )
-
-  const tabs: Array<{ id: ResultTab; label: string; disabled: boolean }> = [
-    { id: 'overview', label: '概览', disabled: !viewModel.hasStructuredOverview },
-    { id: 'daily', label: '逐日行程', disabled: viewModel.days.length === 0 },
-    { id: 'budget', label: '预算', disabled: viewModel.budgetItems.length === 0 },
-    { id: 'document', label: '完整方案', disabled: !viewModel.markdown.trim() },
-    { id: 'trace', label: '执行记录', disabled: steps.length === 0 },
-  ]
-  const availableTabs = tabs.filter(item => !item.disabled)
-
-  useEffect(() => {
-    if (tabs.find(item => item.id === tab)?.disabled) {
-      setTab(availableTabs[0]?.id ?? 'document')
-    }
-  }, [tab, viewModel.hasStructuredOverview, viewModel.days.length, viewModel.budgetItems.length, viewModel.markdown, steps.length])
 
   useEffect(() => () => {
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current)
@@ -90,65 +69,46 @@ export default function ItineraryWorkspace({
     }
   }
 
-  const moveTab = (current: ResultTab, key: string) => {
-    const currentIndex = availableTabs.findIndex(item => item.id === current)
-    if (currentIndex === -1) return
-    let nextIndex = currentIndex
-    if (key === 'ArrowRight') nextIndex = (currentIndex + 1) % availableTabs.length
-    if (key === 'ArrowLeft') nextIndex = (currentIndex - 1 + availableTabs.length) % availableTabs.length
-    if (key === 'Home') nextIndex = 0
-    if (key === 'End') nextIndex = availableTabs.length - 1
-    if (nextIndex === currentIndex && key !== 'Home' && key !== 'End') return
-    const next = availableTabs[nextIndex]
-    if (!next) return
-    setTab(next.id)
-    tabRefs.current[next.id]?.focus()
-  }
-
-  const dossierFacts = [
-    viewModel.days.length > 0 ? `${viewModel.days.length} 天` : '',
-    locations.length > 0 ? `${locations.length} 个地图地点` : '',
-  ].filter(Boolean).join(' · ')
-
-  const exportResult = (format: 'md' | 'pdf') => {
-    if (!onExport) return
-    if (format === 'pdf' && viewModel.markdown.trim() && tab !== 'document') {
-      flushSync(() => setTab('document'))
-    }
-    onExport(format)
-  }
-
   return (
-    <section className="atlas-itinerary" aria-labelledby="atlas-itinerary-title">
-      <header className="atlas-result-header">
-        <div>
-          <span className="atlas-kicker"><Sparkles size={13} aria-hidden="true" /> Curated itinerary</span>
-          <h2 id="atlas-itinerary-title">{city || '目的地'}旅程工作区</h2>
-          <p>
-            方案来自真实执行结果；你可以查看日程、预算、地点和智能体记录。
-            {saveState === 'cloud' && <span className="atlas-save-badge is-cloud"><Check size={13} aria-hidden="true" /> 已保存到云端</span>}
-            {saveState === 'local' && (onLogin
-              ? <button type="button" className="atlas-save-badge is-local" onClick={onLogin}>已存为本地草稿 · 登录后可同步</button>
-              : <span className="atlas-save-badge is-local">已存为本地草稿</span>)}
-          </p>
-        </div>
-        <div className="atlas-result-actions">
-          {onOpenTrip && (
-            <button type="button" className="atlas-open-trip-action" onClick={onOpenTrip}>
-              查看完整行程 <ArrowUpRight size={15} aria-hidden="true" />
+    <section className="atlas-reading" aria-labelledby="atlas-reading-title">
+      <header className="atlas-reading-head">
+        <p className="atlas-reading-status">
+          <CheckCircle2 size={15} aria-hidden="true" /> 方案已生成
+          {saveState === 'cloud' && <span className="atlas-save-badge is-cloud">已保存到云端</span>}
+          {saveState === 'local' && (onLogin
+            ? <button type="button" className="atlas-save-badge is-local" onClick={onLogin}>已存为本地草稿 · 登录后可同步</button>
+            : <span className="atlas-save-badge is-local">已存为本地草稿</span>)}
+        </p>
+        <div className="atlas-reading-title-row">
+          <h2 id="atlas-reading-title">{city || '目的地'} · 行程方案</h2>
+          <div className="atlas-result-actions">
+            {onOpenTrip && (
+              <button type="button" className="atlas-open-trip-action" onClick={onOpenTrip}>
+                查看完整行程 <ArrowUpRight size={15} aria-hidden="true" />
+              </button>
+            )}
+            <button type="button" onClick={() => void copyPlan()} aria-label={copyStatus === 'success' ? '已复制方案' : copyStatus === 'error' ? '复制失败，重试复制方案' : '复制方案'}>
+              {copyStatus === 'success' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+              {copyStatus === 'success' ? '已复制' : copyStatus === 'error' ? '重试复制' : '复制'}
             </button>
-          )}
-          <button type="button" onClick={() => void copyPlan()} aria-label={copyStatus === 'success' ? '已复制方案' : copyStatus === 'error' ? '复制失败，重试复制方案' : '复制方案'}>
-            {copyStatus === 'success' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
-            {copyStatus === 'success' ? '已复制' : copyStatus === 'error' ? '重试复制' : '复制'}
-          </button>
-          {onExport && (
-            <>
-              <button type="button" onClick={() => exportResult('md')} aria-label="导出 Markdown"><FileText size={15} aria-hidden="true" /> Markdown</button>
-              <button type="button" onClick={() => exportResult('pdf')} aria-label="导出 PDF"><FileDown size={15} aria-hidden="true" /> PDF</button>
-            </>
-          )}
+            {onExport && (
+              <>
+                <button type="button" onClick={() => onExport('md')} aria-label="导出 Markdown"><FileText size={15} aria-hidden="true" /> Markdown</button>
+                <button type="button" onClick={() => onExport('pdf')} aria-label="导出 PDF"><FileDown size={15} aria-hidden="true" /> PDF</button>
+              </>
+            )}
+          </div>
         </div>
+        <p className="atlas-reading-stats">
+          {route && <span className="atlas-reading-route">{route}</span>}
+          {date && <time dateTime={date}>{date}</time>}
+          {viewModel.days.length > 0 && <span>{viewModel.days.length} 天</span>}
+          {people !== undefined && <span>{people} 人</span>}
+          {viewModel.budgetItems.length > 0 && (
+            <span className="atlas-reading-budget">预算合计 <strong>¥{Math.round(viewModel.budgetTotal).toLocaleString()}</strong></span>
+          )}
+          <small>金额均来自后端真实返回</small>
+        </p>
       </header>
 
       {copyStatus === 'error' && <p className="atlas-result-notice is-error" role="alert">复制失败，请检查浏览器剪贴板权限后重试。</p>}
@@ -158,116 +118,19 @@ export default function ItineraryWorkspace({
         </p>
       )}
 
-      <div className="atlas-result-tabs" role="tablist" aria-label="旅行方案视图">
-        {tabs.map(item => (
-          <button
-            type="button"
-            role="tab"
-            id={`atlas-tab-${item.id}`}
-            aria-controls={`atlas-panel-${item.id}`}
-            aria-selected={tab === item.id}
-            tabIndex={tab === item.id ? 0 : -1}
-            className={tab === item.id ? 'is-active' : ''}
-            disabled={item.disabled}
-            key={item.id}
-            ref={element => { tabRefs.current[item.id] = element }}
-            onClick={() => setTab(item.id)}
-            onKeyDown={event => {
-              if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return
-              event.preventDefault()
-              moveTab(item.id, event.key)
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="atlas-result-panel" role="tabpanel" id={`atlas-panel-${tab}`} aria-labelledby={`atlas-tab-${tab}`}>
-        {tab === 'overview' && (
-          <div className="atlas-overview-grid">
-            <article className="atlas-overview-lead">
-              <span>Journey dossier</span>
-              <h3>{dossierFacts || '完整旅行提案'}</h3>
-              <p>{viewModel.days[0]?.title || '完整旅行提案已生成，可继续通过对话微调。'}</p>
-              {viewModel.days[0]?.items.slice(0, 3).map((item, index) => (
-                <div className="atlas-highlight-row" key={`${item.description}-${index}`}>
-                  <b>{item.time || String(index + 1).padStart(2, '0')}</b><span>{item.description}</span>
-                </div>
-              ))}
-            </article>
-            {viewModel.budgetItems.length > 0 && <article className="atlas-overview-stat">
-              <WalletCards size={20} aria-hidden="true" />
-              <span>预算合计</span>
-              <strong>¥{Math.round(viewModel.budgetTotal).toLocaleString()}</strong>
-              <small>{viewModel.budgetItems.length} 个费用项目</small>
-            </article>}
-            {viewModel.days.length > 0 && <article className="atlas-overview-stat">
-              <CalendarRange size={20} aria-hidden="true" />
-              <span>日程密度</span>
-              <strong>{viewModel.days.reduce((total, day) => total + day.items.length, 0)}</strong>
-              <small>项可执行安排</small>
-            </article>}
-          </div>
+      <section className="atlas-reading-days" aria-label="每日安排">
+        <h3>每日安排</h3>
+        {viewModel.days.length > 0 ? (
+          <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} />
+        ) : (
+          <p className="atlas-reading-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
         )}
+      </section>
 
-        {tab === 'daily' && (
-          <div className="atlas-days">
-            {viewModel.days.map((day, index) => {
-              const expanded = Boolean(expandedDays[index])
-              return (
-                <article className={`atlas-day-card ${expanded ? 'is-expanded' : ''}`} key={`${day.day}-${index}`}>
-                  <button type="button" className="atlas-day-trigger" onClick={() => setExpandedDays(value => ({ ...value, [index]: !value[index] }))} aria-expanded={expanded}>
-                    <span>{String(index + 1).padStart(2, '0')}</span>
-                    <span><strong>{day.day}</strong><small>{day.title.replace(/^Day\s*\d+\s*[-—：:]?\s*/i, '') || `${city}探索日`}</small></span>
-                    <em>{day.items.length} 项</em>
-                    <ChevronDown size={17} aria-hidden="true" />
-                  </button>
-                  {expanded && (
-                    <div className="atlas-day-timeline">
-                      {day.items.map((item, itemIndex) => (
-                        <div className="atlas-day-item" key={`${item.description}-${itemIndex}`}>
-                          <span className="atlas-day-dot" aria-hidden="true" />
-                          <time>{item.time || String(itemIndex + 1)}</time>
-                          <p>{item.description}</p>
-                          <button type="button" onClick={() => onSearchMap(item.description.slice(0, 28), city)} aria-label={`在地图查看 ${item.description}`}>
-                            <MapPin size={14} aria-hidden="true" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              )
-            })}
-          </div>
-        )}
-
-        {tab === 'budget' && (
-          <div className="atlas-budget-board">
-            <header><span><WalletCards size={19} aria-hidden="true" /> 费用结构</span><strong>¥{Math.round(viewModel.budgetTotal).toLocaleString()}</strong></header>
-            <div>
-              {viewModel.budgetItems.map(item => (
-                <div className="atlas-budget-row" key={`${item.category}-${item.amount}`}>
-                  <span>{item.category}</span>
-                  <div><i className={categoryClass[item.category] || 'is-other'} style={{ width: `${Math.max(item.amount / maxBudget * 100, 8)}%` }} /></div>
-                  <strong>¥{Math.round(item.amount).toLocaleString()}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'document' && <article className="atlas-document"><SafeMarkdown content={viewModel.markdown} /></article>}
-
-        {tab === 'trace' && (
-          <OrchestrationTimeline steps={steps} graphNode="" phase="ready" statusMessage="" onRetry={() => undefined} onEditBrief={() => undefined} compact />
-        )}
-
-        {tab === 'overview' && !viewModel.hasStructuredOverview && (
-          <div className="atlas-empty-result"><Route size={22} aria-hidden="true" /> 当前结果仅提供完整文档视图。</div>
-        )}
-      </div>
+      <section className="atlas-reading-document" aria-label="完整方案">
+        <h3>完整方案</h3>
+        <article className="atlas-document"><SafeMarkdown content={viewModel.markdown} /></article>
+      </section>
     </section>
   )
 }

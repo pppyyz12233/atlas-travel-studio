@@ -9,43 +9,30 @@ const baseProps = {
   steps: [],
   locations: [],
   onSearchMap: vi.fn(),
+  route: '上海 → 东京',
+  date: '2026-09-16',
+  people: 2,
 }
 
-describe('ItineraryWorkspace state and accessibility', () => {
-  it('moves to an available tab when refreshed data disables the current tab', async () => {
-    const user = userEvent.setup()
-    const structured = buildItineraryViewModel(`## 预算\n| 类别 | 金额 |\n| --- | --- |\n| 交通 | ¥500 |\n\n## 日程\n### 第 1 天 城市散步\n- 09:00: 浅草寺`)
-    const { rerender } = render(<ItineraryWorkspace {...baseProps} viewModel={structured} />)
-    await user.click(screen.getByRole('tab', { name: '预算' }))
-    expect(screen.getByRole('tab', { name: '预算' })).toHaveAttribute('aria-selected', 'true')
+const structured = `## 预算\n| 类别 | 金额 |\n| --- | --- |\n| 交通 | ¥500 |\n| 住宿 | ¥760 |\n\n## 日程\n### 第 1 天 城市散步\n- 09:00: 浅草寺\n\n### 第 2 天 近郊\n- 10:00: 镰仓`
 
-    rerender(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel('# 纯文档方案')} />)
+describe('ItineraryWorkspace reading mode (R1 结构)', () => {
+  it('renders a linear reading layout instead of tab groups', () => {
+    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(structured)} />)
 
-    expect(screen.getByRole('tab', { name: '完整方案' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('纯文档方案')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /行程方案/ })).toBeInTheDocument()
+    expect(screen.getByText(/上海 → 东京/)).toBeInTheDocument()
+    expect(screen.getByText(/预算合计/)).toBeInTheDocument()
+    // 5 个 Tab 已移除：不应再有 tablist
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('renders only statistics backed by available result data', () => {
-    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(`## 日程\n### 第 1 天 城市散步\n- 09:00: 浅草寺`)} />)
+  it('shows every day as a linear timeline section', () => {
+    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(structured)} />)
 
-    expect(screen.getByText('日程密度')).toBeInTheDocument()
-    expect(screen.queryByText('预算合计')).not.toBeInTheDocument()
-    expect(screen.queryByText(/0 个地图地点/)).not.toBeInTheDocument()
-  })
-
-  it('supports Arrow, Home and End navigation with roving tab focus', async () => {
-    const user = userEvent.setup()
-    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel(`## 预算\n| 类别 | 金额 |\n| --- | --- |\n| 交通 | ¥500 |\n\n## 日程\n### 第 1 天 城市散步\n- 09:00: 浅草寺`)} />)
-    const overview = screen.getByRole('tab', { name: '概览' })
-    overview.focus()
-
-    await user.keyboard('{ArrowRight}')
-    expect(screen.getByRole('tab', { name: '逐日行程' })).toHaveFocus()
-    await user.keyboard('{End}')
-    expect(screen.getByRole('tab', { name: '完整方案' })).toHaveFocus()
-    await user.keyboard('{Home}')
-    expect(overview).toHaveFocus()
-    expect(overview).toHaveAttribute('tabindex', '0')
+    const timeline = screen.getByRole('list', { name: '逐日行程时间轴' })
+    expect(timeline.textContent).toContain('浅草寺')
+    expect(timeline.textContent).toContain('镰仓')
   })
 
   it('shows a recoverable message when clipboard copy fails', async () => {
@@ -61,21 +48,28 @@ describe('ItineraryWorkspace state and accessibility', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('复制失败')
   })
 
-  it('opens the complete document view before starting PDF export', async () => {
+  it('forwards markdown and pdf exports', async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
     render(
       <ItineraryWorkspace
         {...baseProps}
         onExport={onExport}
-        viewModel={buildItineraryViewModel(`## 预算\n| 类别 | 金额 |\n| --- | --- |\n| 交通 | ¥500 |\n\n# 完整方案`)}
+        viewModel={buildItineraryViewModel(structured)}
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: '导出 Markdown' }))
     await user.click(screen.getByRole('button', { name: '导出 PDF' }))
-
-    expect(screen.getByRole('tab', { name: '完整方案' })).toHaveAttribute('aria-selected', 'true')
+    expect(onExport).toHaveBeenCalledWith('md')
     expect(onExport).toHaveBeenCalledWith('pdf')
+  })
+
+  it('renders the full document as a plain section for narrative plans', () => {
+    render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel('# 纯文档方案')} />)
+
+    expect(screen.getByText(/自由叙述/)).toBeInTheDocument()
+    expect(screen.getByText('纯文档方案')).toBeInTheDocument()
   })
 
   it('surfaces a single primary action to open the full trip with cloud save state', async () => {
@@ -86,7 +80,7 @@ describe('ItineraryWorkspace state and accessibility', () => {
         {...baseProps}
         onOpenTrip={onOpenTrip}
         saveState="cloud"
-        viewModel={buildItineraryViewModel('# 东京方案\n内容')}
+        viewModel={buildItineraryViewModel(structured)}
       />,
     )
 
@@ -103,7 +97,7 @@ describe('ItineraryWorkspace state and accessibility', () => {
         {...baseProps}
         saveState="local"
         onLogin={onLogin}
-        viewModel={buildItineraryViewModel('# 东京方案\n内容')}
+        viewModel={buildItineraryViewModel(structured)}
       />,
     )
 

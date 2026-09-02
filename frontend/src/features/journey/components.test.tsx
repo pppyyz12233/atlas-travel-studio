@@ -267,7 +267,7 @@ describe('Atlas journey interface', () => {
     expect(screen.getByRole('button', { name: '重新生成' })).toBeInTheDocument()
   })
 
-  it('switches itinerary tabs and forwards export actions', async () => {
+  it('renders daily content inline and forwards export actions', async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
     const viewModel = buildItineraryViewModel(`## 日程
@@ -285,13 +285,15 @@ describe('Atlas journey interface', () => {
       />,
     )
 
-    await user.click(screen.getByRole('tab', { name: '完整方案' }))
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('入住银座酒店')
+    // 阅读态：日程与全文都在同一条线性主线里，无需切换
+    expect(screen.getByRole('list', { name: '逐日行程时间轴' })).toHaveTextContent('入住银座酒店')
+    expect(screen.getByText('抵达东京')).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: '导出 PDF' }))
     expect(onExport).toHaveBeenCalledWith('pdf')
   })
 
-  it('disables result tabs that do not have real data', () => {
+  it('falls back to a narrative note when no structured data exists', () => {
     render(
       <ItineraryWorkspace
         viewModel={buildItineraryViewModel('只有一段普通旅行建议')}
@@ -302,9 +304,8 @@ describe('Atlas journey interface', () => {
       />,
     )
 
-    expect(screen.getByRole('tab', { name: '逐日行程' })).toBeDisabled()
-    expect(screen.getByRole('tab', { name: '预算' })).toBeDisabled()
-    expect(screen.getByRole('tab', { name: '执行记录' })).toBeDisabled()
+    expect(screen.getByText(/自由叙述/)).toBeInTheDocument()
+    expect(screen.getByText('只有一段普通旅行建议')).toBeInTheDocument()
   })
 
   it('keeps route and execution context together', () => {

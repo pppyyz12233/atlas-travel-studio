@@ -96,7 +96,7 @@ describe('Atlas page integration', () => {
 
     renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
 
-    expect(screen.getByRole('heading', { name: /旅程工作区/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /行程方案/ })).toBeInTheDocument()
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
 
     // 会话栏默认收起：先从顶栏打开抽屉再操作
@@ -207,7 +207,7 @@ describe('Atlas page integration', () => {
     act(() => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n旅行建议已生成。', conversationId: null })
     })
-    expect(screen.getByRole('heading', { name: '东京旅程工作区' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
   })
 
   it('applies a structured example to the command strip before planning', async () => {
@@ -275,7 +275,7 @@ describe('Atlas page integration', () => {
     const feed = await screen.findByLabelText('对话记录')
     expect(within(feed).getByText('第一版想住在银座')).toBeInTheDocument()
     expect(within(feed).getByText('第一版建议住银座东侧。')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '东京旅程工作区' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
   })
 
   it('ignores a stale conversation response after logout', async () => {
@@ -356,7 +356,7 @@ describe('Atlas page integration', () => {
     })
     await user.click(screen.getByRole('button', { name: '导出 PDF' }))
 
-    expect(screen.getByRole('heading', { name: '东京旅程工作区' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('导出失败')
   })
 
