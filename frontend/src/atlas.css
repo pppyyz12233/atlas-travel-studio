@@ -2231,3 +2231,32 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 }
 .atlas-feed-toggle:hover { color: var(--atlas-ink); border-color: var(--atlas-line-strong); }
 .atlas-feed-toggle svg { color: var(--atlas-ink-muted); }
+
+/* ---------- R6 输入框单行收起 ---------- */
+.atlas-composer-teaser {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1000px;
+  margin-inline: auto;
+  padding: 0 16px;
+  color: var(--atlas-ink-muted);
+  background: var(--atlas-paper);
+  border: 1px dashed var(--atlas-line-strong);
+  border-radius: 13px;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: text;
+  transition: color var(--atlas-fast), border-color var(--atlas-fast), box-shadow var(--atlas-fast);
+}
+.atlas-composer-teaser:hover {
+  color: var(--atlas-ink);
+  border-color: var(--atlas-sky);
+  border-style: solid;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--atlas-sky) 10%, transparent);
+}
+.atlas-composer-teaser svg { flex: 0 0 auto; color: var(--atlas-sky); }
+.atlas-composer-teaser small { margin-left: auto; color: var(--atlas-ink-muted); font-size: 11px; font-weight: 500; white-space: nowrap; }

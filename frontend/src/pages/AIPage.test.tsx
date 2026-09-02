@@ -149,6 +149,40 @@ describe('Atlas page integration', () => {
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
   })
 
+  it('collapses the composer to a one-line teaser in reading mode', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'teaser-trip',
+      title: '东京五日',
+      phase: 'ready',
+      finalReply: '# 东京方案',
+      messages: [
+        { role: 'user', content: '东京五天' },
+        { role: 'assistant', content: '# 东京方案' },
+      ],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ sessions: [session], activeId: session.id }))
+
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    // R6：完成态输入框收起为单行，textarea 不占屏
+    expect(screen.queryByLabelText('补充或修改旅行需求')).not.toBeInTheDocument()
+    const teaser = screen.getByRole('button', { name: /继续调整这份方案/ })
+    expect(teaser).toBeInTheDocument()
+
+    await user.click(teaser)
+    const textarea = screen.getByLabelText('补充或修改旅行需求')
+    await user.type(textarea, '第二天少一个景点')
+    await user.type(textarea, '{Enter}')
+
+    expect(streamHarness.startStream).toHaveBeenCalledWith(
+      '第二天少一个景点',
+      null,
+      null,
+      expect.any(Object),
+    )
+  })
+
   it('auto-starts planning from a home page brief exactly once', async () => {
     sessionStorage.setItem('atlas_pending_brief', '十一月去京都看红叶，两个人')
 

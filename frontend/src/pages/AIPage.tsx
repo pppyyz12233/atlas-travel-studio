@@ -62,6 +62,7 @@ export default function AIPage({ auth, theme }: Props) {
   const [railOpen, setRailOpen] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const [feedOpen, setFeedOpen] = useState(false)
+  const [composerOpen, setComposerOpen] = useState(false)
   const [resultNotice, setResultNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const mapRef = useRef<MapApi | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -119,6 +120,7 @@ export default function AIPage({ auth, theme }: Props) {
     if (activeSession.phase === 'ready') {
       setContextOpen(false)
       setFeedOpen(false)
+      setComposerOpen(false)
     }
   }, [activeSession.phase])
 
@@ -465,7 +467,10 @@ export default function AIPage({ auth, theme }: Props) {
           onSubmit={() => send(input)}
           onStop={stop}
           isStreaming={isStreaming}
-          suggestions={activeSession.phase === 'ready' ? followupSuggestions : []}
+          suggestions={activeSession.phase === 'ready' && composerOpen ? followupSuggestions : []}
+          collapsed={activeSession.phase === 'ready' && !composerOpen && !isStreaming}
+          onExpand={() => setComposerOpen(true)}
+          autoFocusOnMount={activeSession.phase === 'ready' && composerOpen}
         />
         <p>Atlas 只展示后端实际返回的价格、地点和运行指标；预订前请再次核验。</p>
       </footer>

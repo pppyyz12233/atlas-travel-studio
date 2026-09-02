@@ -1,4 +1,4 @@
-import { CornerDownLeft, Send, Square } from 'lucide-react'
+import { CornerDownLeft, PenLine, Send, Square } from 'lucide-react'
 import { useRef } from 'react'
 
 interface ComposerProps {
@@ -8,6 +8,11 @@ interface ComposerProps {
   onStop: () => void
   isStreaming: boolean
   suggestions: string[]
+  /** R6：完成态收起为单行提示，点击展开 */
+  collapsed?: boolean
+  onExpand?: () => void
+  /** 由收起态展开时自动聚焦输入框 */
+  autoFocusOnMount?: boolean
 }
 
 export default function Composer({
@@ -17,9 +22,25 @@ export default function Composer({
   onStop,
   isStreaming,
   suggestions,
+  collapsed = false,
+  onExpand,
+  autoFocusOnMount = false,
 }: ComposerProps) {
   const composingRef = useRef(false)
   const canSubmit = Boolean(value.trim()) && !isStreaming
+
+  // R6：阅读态单行收起——释放底部空间，保留「继续调整」的自然入口
+  if (collapsed) {
+    return (
+      <div className="atlas-composer-wrap">
+        <button type="button" className="atlas-composer-teaser" onClick={onExpand}>
+          <PenLine size={15} aria-hidden="true" />
+          继续调整这份方案…
+          <small>回车发送 · Shift+Enter 换行</small>
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="atlas-composer-wrap">
@@ -36,6 +57,7 @@ export default function Composer({
           placeholder="例如：第二天少安排一个景点，酒店靠近地铁站……"
           value={value}
           rows={1}
+          autoFocus={autoFocusOnMount}
           onChange={event => onChange(event.target.value)}
           onCompositionStart={() => { composingRef.current = true }}
           onCompositionEnd={() => { composingRef.current = false }}
