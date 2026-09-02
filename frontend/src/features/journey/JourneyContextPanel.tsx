@@ -34,7 +34,7 @@ export default function JourneyContextPanel({
     <div className="atlas-context-panel">
       <header className="atlas-context-header">
         <div>
-          <span><Radio size={13} aria-hidden="true" /> Live journey canvas</span>
+          <span><Radio size={13} aria-hidden="true" /> 实时执行地图</span>
           <h2>{form.destination || '目的地'}行动地图</h2>
         </div>
         <span className={`atlas-context-state is-${phase}`}><i aria-hidden="true" />{phaseLabels[phase]}</span>
@@ -47,7 +47,7 @@ export default function JourneyContextPanel({
 
       <div className="atlas-context-scroll">
         <section className="atlas-route-manifest" aria-label="路线清单">
-          <span className="atlas-kicker">Route manifest</span>
+          <span className="atlas-kicker">路线概览</span>
           <div className="atlas-manifest-route">
             <strong>{form.origin || '出发地'}</strong>
             <span aria-hidden="true"><i /><ArrowRight size={15} /><i /></span>
@@ -61,7 +61,7 @@ export default function JourneyContextPanel({
         </section>
 
         <div className="atlas-context-trace-heading">
-          <span>Agent 执行链</span>
+          <span>智能体执行</span>
           <small>{steps.length > 0 ? `${progress}%` : 'STANDBY'}</small>
         </div>
         <OrchestrationTimeline

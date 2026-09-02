@@ -56,10 +56,10 @@ export default function OrchestrationTimeline({
       {!compact && (
         <header className="atlas-orchestration-header">
           <div>
-            <span className="atlas-kicker"><Sparkles size={13} aria-hidden="true" /> Multi-agent orchestration</span>
+            <span className="atlas-kicker"><Sparkles size={13} aria-hidden="true" /> 多智能体执行</span>
             <h2 id="atlas-orchestration-title">实时执行链</h2>
           </div>
-          <span className={`atlas-run-badge is-${phase}`}><i aria-hidden="true" />{phase === 'planning' ? 'Live run' : phase === 'ready' ? 'Run complete' : 'Run state'}</span>
+          <span className={`atlas-run-badge is-${phase}`}><i aria-hidden="true" />{phase === 'planning' ? '执行中' : phase === 'ready' ? '已完成' : '执行状态'}</span>
         </header>
       )}
 

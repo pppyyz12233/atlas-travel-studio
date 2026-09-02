@@ -84,6 +84,9 @@ describe('Atlas journey interface', () => {
       />,
     )
 
+    // R7：表单区引导文案中文化
+    expect(screen.getByText('智能旅行规划')).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
     expect(onSubmit).toHaveBeenCalledWith('从上海去东京，2026-09-08出发，5天，2人，人均预算8000元。请给出兼顾体验、节奏和预算的完整方案。')
   })
@@ -312,7 +315,7 @@ describe('Atlas journey interface', () => {
     expect(screen.getByText('只有一段普通旅行建议')).toBeInTheDocument()
   })
 
-  it('keeps route and execution context together', () => {
+  it('keeps route and execution context together with Chinese labels', () => {
     render(
       <JourneyContextPanel
         form={tripForm}
@@ -327,5 +330,9 @@ describe('Atlas journey interface', () => {
     expect(screen.getByText('上海')).toBeInTheDocument()
     expect(screen.getByText('东京')).toBeInTheDocument()
     expect(screen.getByText('等待任务')).toBeInTheDocument()
+    // R7：面向用户的文案不再中英混排
+    expect(screen.getByText('实时执行地图')).toBeInTheDocument()
+    expect(screen.getByText('路线概览')).toBeInTheDocument()
+    expect(screen.getByText('智能体执行')).toBeInTheDocument()
   })
 })

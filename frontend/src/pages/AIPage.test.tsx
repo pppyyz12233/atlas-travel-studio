@@ -102,12 +102,11 @@ describe('Atlas page integration', () => {
     await user.click(screen.getByRole('button', { name: /对话过程 \(2\)/ }))
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
 
-    // 会话栏默认收起：先从顶栏打开抽屉再操作
-    await user.click(screen.getByRole('button', { name: '打开旅程列表' }))
-    expect(screen.getByRole('button', { name: /京都红叶季/ })).toBeInTheDocument()
+    // R7：阅读态隐藏工作区顶栏（会话切换交给「我的行程」页与全局顶栏）
+    expect(screen.queryByRole('button', { name: '打开旅程列表' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '新建旅程' }))
-    expect(screen.getByLabelText('补充或修改旅行需求')).toBeInTheDocument()
+    // R6：输入框收起为单行
+    expect(screen.getByRole('button', { name: /继续调整这份方案/ })).toBeInTheDocument()
   })
 
   it('marks a session interrupted by refresh as cancelled instead of stuck streaming', () => {

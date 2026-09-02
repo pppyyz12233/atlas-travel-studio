@@ -367,8 +367,13 @@ export default function AIPage({ auth, theme }: Props) {
     mapRef.current?.clearMarkers()
   }, [])
 
+  // R7：阅读态隐藏工作区顶栏——完成态只剩一个阅读中心，
+  // 会话切换交给「我的行程」页与全局顶栏
+  const showWorkspaceTopbar = activeSession.phase !== 'ready'
+
   const workspace = (
-    <div className="atlas-workspace-frame">
+    <div className={`atlas-workspace-frame ${showWorkspaceTopbar ? '' : 'is-reading'}`}>
+      {showWorkspaceTopbar && (
       <header className="atlas-mobile-topbar">
         <button type="button" onClick={() => setRailOpen(true)} aria-label="打开旅程列表">
           <Menu size={19} aria-hidden="true" />
@@ -388,6 +393,7 @@ export default function AIPage({ auth, theme }: Props) {
           )}
         </div>
       </header>
+      )}
 
       <div className="atlas-workspace-scroll" ref={scrollRef}>
         <JourneyCommandStrip

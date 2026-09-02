@@ -72,7 +72,7 @@ export default function MissionBrief({
   return (
     <section className="atlas-mission" aria-labelledby="atlas-mission-title">
       <div className="atlas-mission-intro">
-        <span className="atlas-kicker"><Sparkles size={14} aria-hidden="true" /> Journey intelligence workspace</span>
+        <span className="atlas-kicker"><Sparkles size={14} aria-hidden="true" /> 智能旅行规划</span>
         <h1 id="atlas-mission-title">把旅行要求，编排成一条可执行的航线。</h1>
         <p>提交一次任务，查看航班、住宿、地点、日程和预算智能体如何并行协作，并随时继续修改方案。</p>
       </div>

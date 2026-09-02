@@ -2260,3 +2260,6 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 }
 .atlas-composer-teaser svg { flex: 0 0 auto; color: var(--atlas-sky); }
 .atlas-composer-teaser small { margin-left: auto; color: var(--atlas-ink-muted); font-size: 11px; font-weight: 500; white-space: nowrap; }
+
+/* ---------- R7 阅读态隐藏工作区顶栏 ---------- */
+.atlas-workspace-frame.is-reading { grid-template-rows: minmax(0, 1fr) auto; }
