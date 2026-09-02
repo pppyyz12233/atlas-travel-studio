@@ -116,6 +116,99 @@ export function createJourneySession(overrides: Partial<JourneySession> = {}): J
   }
 }
 
+// ---------- 会话持久化：刷新恢复 + URL 锚点 ----------
+
+export const JOURNEY_STORAGE_KEY = 'atlas_journey_state'
+
+const phases: ReadonlySet<JourneyPhase> = new Set(['idle', 'planning', 'ready', 'error', 'cancelled'])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+// 恢复前逐会话校验结构：sessionStorage 里的脏数据宁可丢弃也不能让渲染崩溃
+function isValidSession(value: unknown): value is JourneySession {
+  if (!isRecord(value)) return false
+  if (typeof value.id !== 'string' || !value.id) return false
+  if (typeof value.title !== 'string') return false
+  if (typeof value.phase !== 'string' || !phases.has(value.phase as JourneyPhase)) return false
+  if (!Array.isArray(value.messages) || !Array.isArray(value.steps)) return false
+  if (typeof value.finalReply !== 'string') return false
+  if (!Array.isArray(value.locations)) return false
+  if (typeof value.graphNode !== 'string' || typeof value.statusMessage !== 'string') return false
+  const form = value.form
+  if (!isRecord(form)) return false
+  return typeof form.origin === 'string' && typeof form.destination === 'string'
+    && typeof form.date === 'string' && typeof form.days === 'number'
+    && typeof form.people === 'number' && typeof form.budget === 'number'
+}
+
+export function serializeJourneyState(state: JourneyState): string | null {
+  try {
+    return JSON.stringify({ sessions: state.sessions, activeId: state.activeId })
+  } catch {
+    return null
+  }
+}
+
+export function restoreJourneyState(raw: string | null): JourneyState | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { sessions?: unknown; activeId?: unknown }
+    if (!Array.isArray(parsed.sessions) || parsed.sessions.length === 0) return null
+    if (!parsed.sessions.every(isValidSession)) return null
+    // 刷新时仍在生成的会话标记为已取消，避免恢复后永远卡在"规划中"
+    const sessions = (parsed.sessions as JourneySession[]).map(session => (
+      session.phase === 'planning'
+        ? { ...session, phase: 'cancelled' as const, graphNode: '', statusMessage: '页面刷新，生成已中断；已完成的步骤仍然保留。' }
+        : session
+    ))
+    const activeId = typeof parsed.activeId === 'string' && sessions.some(session => session.id === parsed.activeId)
+      ? parsed.activeId
+      : sessions[0].id
+    return { sessions, activeId }
+  } catch {
+    return null
+  }
+}
+
+function readSessionIdFromHash(hash: string): string | null {
+  const match = /^#s=([A-Za-z0-9-]+)$/.exec(hash.trim())
+  return match ? match[1] : null
+}
+
+export function loadInitialJourneyState(): JourneyState {
+  const persisted = restoreJourneyState(
+    typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(JOURNEY_STORAGE_KEY),
+  )
+  if (persisted) {
+    const hashId = typeof location === 'undefined' ? null : readSessionIdFromHash(location.hash)
+    if (hashId && persisted.sessions.some(session => session.id === hashId)) {
+      return { ...persisted, activeId: hashId }
+    }
+    return persisted
+  }
+  const session = createJourneySession()
+  return { sessions: [session], activeId: session.id }
+}
+
+export function saveJourneyState(state: JourneyState): void {
+  try {
+    const serialized = serializeJourneyState(state)
+    if (serialized) sessionStorage.setItem(JOURNEY_STORAGE_KEY, serialized)
+  } catch {
+    // 隐私模式 / 存储配额满：放弃持久化，不影响当前会话
+  }
+}
+
+export function writeSessionIdToHash(sessionId: string): void {
+  try {
+    history.replaceState(null, '', `#s=${sessionId}`)
+  } catch {
+    // history 不可用（如沙箱 iframe）时忽略
+  }
+}
+
 function uniqueLocations(current: Location[], incoming: Location[]): Location[] {
   const locations = new Map<string, Location>()
   for (const location of [...current, ...incoming]) {
@@ -127,10 +220,25 @@ function uniqueLocations(current: Location[], incoming: Location[]): Location[] 
   return Array.from(locations.values())
 }
 
-export function journeyProgress(steps: JourneyStep[]): number {
-  if (steps.length === 0) return 0
+// 阶段加权进度：主图前段（guard→planner）固定小步进，executor 按 step 比例，
+// 尾段（aggregator/memory_writer）接近收口 —— 保证等待期任何时刻都有可读进度。
+const stageProgress: Record<string, number> = {
+  guard: 4,
+  memory_reader: 8,
+  intent_router: 12,
+  planner: 16,
+  executor: 16,
+}
+
+export function journeyProgress(steps: JourneyStep[], graphNode = ''): number {
+  if (graphNode === 'aggregator') return 95
+  if (graphNode === 'memory_writer') return 98
+  if (steps.length === 0) {
+    if (!graphNode) return 0
+    return stageProgress[graphNode] ?? 8
+  }
   const finished = steps.filter(step => step.status === 'done' || step.status === 'failed').length
-  return Math.round(finished / steps.length * 100)
+  return Math.min(94, Math.round(16 + finished / steps.length * 78))
 }
 
 export function activeJourneySession(state: JourneyState): JourneySession {

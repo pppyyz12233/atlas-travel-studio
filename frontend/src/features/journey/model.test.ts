@@ -1,10 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  JOURNEY_STORAGE_KEY,
   activeJourneySession,
   createJourneySession,
   journeyProgress,
   journeyReducer,
+  loadInitialJourneyState,
+  restoreJourneyState,
+  serializeJourneyState,
 } from './model'
+
+const step = (name: string, status: 'pending' | 'running' | 'done' | 'failed') => ({
+  name,
+  worker: 'flight',
+  status,
+  summary: '',
+  locations: [],
+  iterations: 0,
+  toolCalls: 0,
+})
 
 describe('journey session model', () => {
   afterEach(() => {
@@ -94,7 +108,25 @@ describe('journey session model', () => {
     expect(journeyProgress([
       { name: 'A', worker: 'flight', status: 'done', summary: '', locations: [], iterations: 0, toolCalls: 0 },
       { name: 'B', worker: 'hotel', status: 'running', summary: '', locations: [], iterations: 0, toolCalls: 0 },
-    ])).toBe(50)
+    ])).toBe(55)
+  })
+
+  it('weights progress across graph stages so early nodes never sit at 0%', () => {
+    expect(journeyProgress([], 'guard')).toBe(4)
+    expect(journeyProgress([], 'memory_reader')).toBe(8)
+    expect(journeyProgress([], 'intent_router')).toBe(12)
+    expect(journeyProgress([], 'planner')).toBe(16)
+    expect(journeyProgress([], 'unknown-node')).toBe(8)
+    expect(journeyProgress([], '')).toBe(0)
+
+    const planned = [step('推荐航班', 'pending'), step('推荐酒店', 'pending')]
+    expect(journeyProgress(planned, 'executor')).toBe(16)
+    expect(journeyProgress([step('推荐航班', 'done'), step('推荐酒店', 'running')], 'executor')).toBe(55)
+    expect(journeyProgress(
+      [step('推荐航班', 'done'), step('推荐酒店', 'done')],
+      'aggregator',
+    )).toBe(95)
+    expect(journeyProgress([step('推荐航班', 'done')], 'memory_writer')).toBe(98)
   })
 
   it('adds, activates and removes local journeys with a fallback session', () => {
@@ -137,5 +169,64 @@ describe('journey session model', () => {
     expect(activeJourneySession(state).form.destination).toBe('京都')
     expect(activeJourneySession(state).steps[0].summary).toBe('已调用酒店检索')
     expect(activeJourneySession(state).phase).toBe('ready')
+  })
+})
+
+describe('journey state persistence', () => {
+  afterEach(() => {
+    sessionStorage.clear()
+    location.hash = ''
+  })
+
+  it('sanitizes a session that was streaming when the page refreshed', () => {
+    const interrupted = createJourneySession({ id: 'interrupted', phase: 'planning', graphNode: 'executor' })
+    const settled = createJourneySession({ id: 'settled', phase: 'ready', finalReply: '# 方案' })
+
+    const restored = restoreJourneyState(serializeJourneyState({
+      sessions: [interrupted, settled],
+      activeId: 'interrupted',
+    }))
+
+    expect(restored?.sessions[0].phase).toBe('cancelled')
+    expect(restored?.sessions[0].graphNode).toBe('')
+    expect(restored?.sessions[0].statusMessage).toContain('页面刷新')
+    expect(restored?.sessions[1].phase).toBe('ready')
+  })
+
+  it('returns null for corrupted or empty payloads', () => {
+    expect(restoreJourneyState(null)).toBeNull()
+    expect(restoreJourneyState('not-json')).toBeNull()
+    expect(restoreJourneyState('{"sessions":[],"activeId":"x"}')).toBeNull()
+    expect(restoreJourneyState('{"sessions":[{"id":"a"}],"activeId":"missing"}')).toBeNull()
+  })
+
+  it('falls back to a fresh idle session when nothing was persisted', () => {
+    const state = loadInitialJourneyState()
+    expect(state.sessions).toHaveLength(1)
+    expect(state.sessions[0].phase).toBe('idle')
+    expect(state.activeId).toBe(state.sessions[0].id)
+  })
+
+  it('prefers the session id from the location hash when restoring', () => {
+    const first = createJourneySession({ id: 'hash-first' })
+    const second = createJourneySession({ id: 'hash-second' })
+    sessionStorage.setItem(
+      JOURNEY_STORAGE_KEY,
+      serializeJourneyState({ sessions: [first, second], activeId: 'hash-first' }) ?? '',
+    )
+    location.hash = '#s=hash-second'
+
+    expect(loadInitialJourneyState().activeId).toBe('hash-second')
+  })
+
+  it('ignores a hash that does not match any persisted session', () => {
+    const only = createJourneySession({ id: 'only-session' })
+    sessionStorage.setItem(
+      JOURNEY_STORAGE_KEY,
+      serializeJourneyState({ sessions: [only], activeId: 'only-session' }) ?? '',
+    )
+    location.hash = '#s=does-not-exist'
+
+    expect(loadInitialJourneyState().activeId).toBe('only-session')
   })
 })

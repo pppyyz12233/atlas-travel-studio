@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { parseSSEDataLine } from '../features/journey/sseContract'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 
@@ -16,6 +16,11 @@ interface UseSSEOptions {
 export function useSSE() {
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  // 组件卸载时中止在途流，防止卸载后仍消费 reader / 触发回调
+  useEffect(() => () => {
+    abortRef.current?.abort()
+  }, [])
 
   const startStream = useCallback(async (
     message: string,

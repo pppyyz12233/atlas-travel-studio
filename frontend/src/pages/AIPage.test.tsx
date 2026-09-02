@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { JOURNEY_STORAGE_KEY, createJourneySession } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 import type { useAuth } from '../hooks/useAuth'
 import type { StreamError } from '../hooks/useSSE'
@@ -52,6 +53,55 @@ describe('Atlas page integration', () => {
     })
     apiHarness.get.mockReset()
     apiHarness.get.mockResolvedValue([])
+    sessionStorage.clear()
+    location.hash = ''
+  })
+
+  const guestAuth = () => ({
+    user: null, token: null, isLoggedIn: false, isValidating: false,
+    login: vi.fn(), loginByPhone: vi.fn(), register: vi.fn(), logout: vi.fn(),
+    showAuthModal: false, setShowAuthModal: vi.fn(),
+  }) as ReturnType<typeof useAuth>
+  const lightTheme = () => ({ isDark: false, toggle: vi.fn() }) as ReturnType<typeof useTheme>
+
+  it('restores persisted journey sessions after a page refresh', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'restored-session',
+      title: '京都红叶季',
+      phase: 'ready',
+      finalReply: '# 京都方案\n完整内容',
+      messages: [
+        { role: 'user', content: '十一月去京都看红叶' },
+        { role: 'assistant', content: '# 京都方案\n完整内容' },
+      ],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({
+      sessions: [session],
+      activeId: session.id,
+    }))
+
+    render(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    expect(screen.getByRole('heading', { name: /旅程工作区/ })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /京都红叶季/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '新建旅程' }))
+    expect(screen.getByLabelText('补充或修改旅行需求')).toBeInTheDocument()
+  })
+
+  it('marks a session interrupted by refresh as cancelled instead of stuck streaming', () => {
+    const session = createJourneySession({ id: 'interrupted', title: '冲绳潜水', phase: 'planning' })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({
+      sessions: [session],
+      activeId: session.id,
+    }))
+
+    render(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    expect(screen.getAllByText('已停止').length).toBeGreaterThan(0)
+    expect(screen.getByText(/页面刷新，生成已中断/)).toBeInTheDocument()
   })
 
   it('lets a guest plan and renders a completed stream in the journey workspace', async () => {

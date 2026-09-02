@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { MapPinned } from 'lucide-react'
 import type { Location } from '../types'
 import { readAMapConfig } from '../features/journey/mapConfig'
+import { locationTypeColors } from '../features/journey/workerMeta'
 
 declare namespace AMap {
   class Map {
@@ -50,14 +51,6 @@ interface Props {
   locations: Location[]
   onMapReady?: (api: MapApi) => void
   className?: string
-}
-
-const typeColors: Record<string, string> = {
-  flight: '#d9604c', airport: '#d9604c',
-  hotel: '#335f74',
-  attraction: '#397764',
-  itinerary: '#6b5b83', station: '#6b5b83',
-  budget: '#a87836', other: '#6d746f',
 }
 
 let scriptPromise: Promise<void> | null = null
@@ -182,7 +175,7 @@ export default function MapView({ locations, onMapReady, className = '' }: Props
   useEffect(() => {
     if (!ready || !mapRef.current) return
     clearMarkers()
-    locations.forEach(location => addMarker(location, location.type, typeColors[location.type] || typeColors.other))
+    locations.forEach(location => addMarker(location, location.type, locationTypeColors[location.type] ?? locationTypeColors.other))
     if (locations.length > 1) mapRef.current.setFitView(null, false, [52, 52, 52, 52])
     if (locations.length === 1) mapRef.current.setCenter([locations[0].lng, locations[0].lat])
   }, [locations, ready, clearMarkers, addMarker])

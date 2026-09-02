@@ -164,7 +164,6 @@ describe('Atlas journey interface', () => {
         onSubmit={onSubmit}
         onStop={() => undefined}
         isStreaming={false}
-        disabled={false}
         suggestions={[]}
       />,
     )
@@ -179,7 +178,6 @@ describe('Atlas journey interface', () => {
         onSubmit={() => undefined}
         onStop={() => undefined}
         isStreaming
-        disabled={false}
         suggestions={[]}
       />,
     )
@@ -202,7 +200,8 @@ describe('Atlas journey interface', () => {
     )
 
     expect(screen.getByText('推荐酒店')).toBeInTheDocument()
-    expect(screen.getByText('连接提前结束，请重试')).toBeInTheDocument()
+    expect(screen.getByText(/连接提前结束，请重试/)).toBeInTheDocument()
+    expect(screen.getByText(/已保留 1 个完成的步骤/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '重新生成' })).toBeInTheDocument()
   })
 

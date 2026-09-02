@@ -7,7 +7,6 @@ interface ComposerProps {
   onSubmit: () => void
   onStop: () => void
   isStreaming: boolean
-  disabled: boolean
   suggestions: string[]
 }
 
@@ -17,11 +16,10 @@ export default function Composer({
   onSubmit,
   onStop,
   isStreaming,
-  disabled,
   suggestions,
 }: ComposerProps) {
   const composingRef = useRef(false)
-  const canSubmit = Boolean(value.trim()) && !disabled && !isStreaming
+  const canSubmit = Boolean(value.trim()) && !isStreaming
 
   return (
     <div className="atlas-composer-wrap">
@@ -37,7 +35,6 @@ export default function Composer({
           aria-label="补充或修改旅行需求"
           placeholder="例如：第二天少安排一个景点，酒店靠近地铁站……"
           value={value}
-          disabled={disabled}
           rows={1}
           onChange={event => onChange(event.target.value)}
           onCompositionStart={() => { composingRef.current = true }}

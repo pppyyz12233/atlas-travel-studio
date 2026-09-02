@@ -1,8 +1,9 @@
 import {
-  AlertTriangle, Check, Circle, Clock3, Coins, Hotel, LoaderCircle, MapPin,
-  Plane, RefreshCw, Route, Sparkles, Undo2, Wallet, Wrench,
+  AlertTriangle, Check, Circle, Clock3, Coins, LoaderCircle, RefreshCw,
+  Route, Sparkles, Undo2, Wrench,
 } from 'lucide-react'
 import type { JourneyPhase, JourneyStep } from './model'
+import { getWorkerMeta, workerMeta } from './workerMeta'
 
 interface OrchestrationTimelineProps {
   steps: JourneyStep[]
@@ -12,14 +13,6 @@ interface OrchestrationTimelineProps {
   onRetry: () => void
   onEditBrief: () => void
   compact?: boolean
-}
-
-const workerMeta: Record<string, { label: string; icon: typeof Plane }> = {
-  flight: { label: '航班智能体', icon: Plane },
-  hotel: { label: '住宿智能体', icon: Hotel },
-  attraction: { label: '地点智能体', icon: MapPin },
-  itinerary: { label: '日程智能体', icon: Route },
-  budget: { label: '预算智能体', icon: Wallet },
 }
 
 const nodeLabels: Record<string, string> = {
@@ -40,7 +33,7 @@ const statusLabels = {
 }
 
 function WorkerIcon({ worker }: { worker: string }) {
-  const Icon = workerMeta[worker]?.icon ?? Sparkles
+  const Icon = getWorkerMeta(worker).icon
   return <Icon size={17} aria-hidden="true" />
 }
 
@@ -53,6 +46,7 @@ export default function OrchestrationTimeline({
   onEditBrief,
   compact = false,
 }: OrchestrationTimelineProps) {
+  const doneCount = steps.filter(step => step.status === 'done').length
   const latestStep = [...steps].reverse().find(step => step.status === 'running')
     ?? [...steps].reverse().find(step => step.status === 'done' || step.status === 'failed')
   const liveText = graphNode ? nodeLabels[graphNode] ?? graphNode : latestStep?.name ?? ''
@@ -76,7 +70,10 @@ export default function OrchestrationTimeline({
           <span><AlertTriangle size={20} aria-hidden="true" /></span>
           <div>
             <strong>{phase === 'cancelled' ? '生成已停止' : '这次规划没有完成'}</strong>
-            <p>{statusMessage || (phase === 'cancelled' ? '已保留当前进度，你可以修改要求后继续。' : '已保留完成的步骤，请重新生成或修改要求。')}</p>
+            <p>
+              {statusMessage || (phase === 'cancelled' ? '已保留当前进度，你可以修改要求后继续。' : '已保留完成的步骤，请重新生成或修改要求。')}
+              {doneCount > 0 && ` 已保留 ${doneCount} 个完成的步骤。`}
+            </p>
           </div>
           <div className="atlas-recovery-actions">
             <button type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" /> 重新生成</button>
@@ -88,13 +85,15 @@ export default function OrchestrationTimeline({
       {steps.length === 0 ? (
         <div className="atlas-orchestration-empty">
           <Route size={24} aria-hidden="true" />
-          <strong>{phase === 'planning' ? nodeLabels[graphNode] ?? '正在建立执行计划' : '执行链尚未启动'}</strong>
-          <p>{compact ? '五位智能体整装待发，提交任务后实时展示各自的进展。' : '任务拆解后，每个智能体的真实状态会显示在这里。'}</p>
-          {compact && (
+          <strong>{phase === 'planning' ? nodeLabels[graphNode] ?? '正在建立执行计划' : phase === 'ready' ? '历史会话 · 无本次执行记录' : '执行链尚未启动'}</strong>
+          <p>{phase === 'ready'
+            ? '这是从历史记录恢复的方案，执行明细未随会话保存。'
+            : compact ? '五位智能体整装待发，提交任务后实时展示各自的进展。' : '任务拆解后，每个智能体的真实状态会显示在这里。'}</p>
+          {compact && phase !== 'ready' && (
             <div className="atlas-agent-roster" aria-hidden="true">
-              {Object.entries(workerMeta).map(([key, meta]) => {
+              {Object.values(workerMeta).map(meta => {
                 const Icon = meta.icon
-                return <span key={key}><Icon size={14} />{meta.label.replace('智能体', '')}</span>
+                return <span key={meta.shortLabel}><Icon size={14} />{meta.shortLabel}</span>
               })}
             </div>
           )}
@@ -111,7 +110,7 @@ export default function OrchestrationTimeline({
                 <div className="atlas-step-card">
                   <span className="atlas-step-icon"><WorkerIcon worker={step.worker} /></span>
                   <div className="atlas-step-copy">
-                    <span><strong>{step.name}</strong><em>{workerMeta[step.worker]?.label ?? '规划智能体'}</em></span>
+                    <span><strong>{step.name}</strong><em>{getWorkerMeta(step.worker).label}</em></span>
                     <p>{step.summary || (step.status === 'pending' ? '等待上游任务完成' : step.status === 'running' ? '正在分析和调用工具' : '步骤已完成')}</p>
                     <div className="atlas-step-metrics">
                       {step.iterations > 0 && <span><Clock3 size={12} aria-hidden="true" />{step.iterations} 轮分析</span>}

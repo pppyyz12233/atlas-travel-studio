@@ -4,6 +4,7 @@ import { api } from './useApi'
 describe('api error contract', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
     localStorage.clear()
   })
 
@@ -30,5 +31,33 @@ describe('api error contract', () => {
       name: 'ApiError',
       status: 502,
     })
+  })
+
+  it('rejects with a timeout error when the server never responds', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted', 'AbortError'))
+        }, { once: true })
+      }),
+    ))
+
+    const pending = api.get('/chat/conversations')
+    const assertion = expect(pending).rejects.toMatchObject({
+      name: 'ApiError',
+      message: '请求超时，请稍后重试',
+    })
+    await vi.advanceTimersByTimeAsync(8000)
+    await assertion
+  })
+
+  it('resolves normally when the response arrives before the timeout', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ code: 200, message: '', data: [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )))
+
+    await expect(api.get('/chat/conversations')).resolves.toEqual([])
   })
 })

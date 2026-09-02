@@ -104,4 +104,26 @@ describe('useSSE request authentication', () => {
 
     expect(onError).toHaveBeenCalledWith({ message: '登录已过期', status: 401 })
   })
+
+  it('aborts an in-flight stream when the component unmounts', async () => {
+    let capturedSignal: AbortSignal | null | undefined
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      capturedSignal = init?.signal
+      return new Promise<Response>((_resolve, reject) => {
+        capturedSignal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        }, { once: true })
+      })
+    }))
+
+    const { result, unmount } = renderHook(() => useSSE())
+    act(() => {
+      result.current.startStream('一段很长的规划', null, null, { onEvent: vi.fn() })
+    })
+    await waitFor(() => expect(result.current.isStreaming).toBe(true))
+
+    unmount()
+
+    expect(capturedSignal?.aborted).toBe(true)
+  })
 })

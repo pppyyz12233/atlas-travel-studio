@@ -1,6 +1,7 @@
 import type { ApiResponse } from '../types'
 
 const BASE = '/api'
+const DEFAULT_TIMEOUT_MS = 8000
 
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -9,17 +10,36 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+async function request<T>(
+  url: string,
+  options: RequestInit & { timeoutMs?: number } = {},
+): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options
   const token = localStorage.getItem('travel_token')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...((options?.headers as Record<string, string>) || {}),
+    ...((init.headers as Record<string, string>) || {}),
   }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${BASE}${url}`, { ...options, headers })
+  // 每个请求自带超时：服务器无响应时给用户可读错误，而不是无限 pending
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${url}`, { ...init, headers, signal: controller.signal })
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiError('请求超时，请稍后重试')
+    }
+    throw new ApiError('无法连接服务器，请检查网络后重试')
+  } finally {
+    clearTimeout(timer)
+  }
+
   let json: ApiResponse<T>
   try {
     json = await res.json() as ApiResponse<T>

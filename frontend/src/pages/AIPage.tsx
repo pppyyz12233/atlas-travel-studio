@@ -15,8 +15,12 @@ import {
   buildItineraryViewModel,
   createJourneySession,
   eventToJourneyActions,
+  getWorkerMeta,
   journeyProgress,
   journeyReducer,
+  loadInitialJourneyState,
+  saveJourneyState,
+  writeSessionIdToHash,
 } from '../features/journey'
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
@@ -29,14 +33,6 @@ import type { Conversation } from '../types'
 interface Props {
   auth: ReturnType<typeof useAuth>
   theme: ReturnType<typeof useTheme>
-}
-
-const workerColors: Record<string, string> = {
-  flight: '#d9604c',
-  hotel: '#335f74',
-  attraction: '#397764',
-  itinerary: '#6b5b83',
-  budget: '#a87836',
 }
 
 const followupSuggestions = [
@@ -56,11 +52,8 @@ function fallbackBrief(form: TripForm): string {
 }
 
 export default function AIPage({ auth, theme }: Props) {
-  const initialSession = useMemo(() => createJourneySession(), [])
-  const [journeyState, dispatch] = useReducer(journeyReducer, {
-    sessions: [initialSession],
-    activeId: initialSession.id,
-  })
+  // 惰性初始化：优先从 sessionStorage 恢复刷新前的会话，其次看 #s= 锚点，最后新会话
+  const [journeyState, dispatch] = useReducer(journeyReducer, undefined, loadInitialJourneyState)
   const activeSession = activeJourneySession(journeyState)
   const { isStreaming, startStream, stopStream } = useSSE()
   const [input, setInput] = useState('')
@@ -76,7 +69,7 @@ export default function AIPage({ auth, theme }: Props) {
   const conversationsRequestRef = useRef(0)
   activeIdRef.current = activeSession.id
 
-  const progress = journeyProgress(activeSession.steps)
+  const progress = journeyProgress(activeSession.steps, activeSession.graphNode)
   const viewModel = useMemo(
     () => buildItineraryViewModel(activeSession.finalReply, activeSession.tripState),
     [activeSession.finalReply, activeSession.tripState],
@@ -113,6 +106,15 @@ export default function AIPage({ auth, theme }: Props) {
   useEffect(() => {
     void refreshConversations()
   }, [refreshConversations])
+
+  // 刷新恢复 + URL 锚点
+  useEffect(() => {
+    saveJourneyState(journeyState)
+  }, [journeyState])
+
+  useEffect(() => {
+    writeSessionIdToHash(activeSession.id)
+  }, [activeSession.id])
 
   useEffect(() => {
     setResultNotice(null)
@@ -286,7 +288,7 @@ export default function AIPage({ auth, theme }: Props) {
               keyword,
               destination,
               event.name ?? keyword,
-              workerColors[worker] ?? '#335f74',
+              getWorkerMeta(worker).markerColor,
             )
           }
         }
@@ -402,7 +404,7 @@ export default function AIPage({ auth, theme }: Props) {
             steps={activeSession.steps}
             locations={activeSession.locations}
             onSearchMap={(keyword, city) => {
-              mapRef.current?.searchAndMark(keyword, city, keyword, workerColors.itinerary)
+              mapRef.current?.searchAndMark(keyword, city, keyword, getWorkerMeta('itinerary').markerColor)
               setContextOpen(true)
             }}
             onExport={format => void exportPlan(format)}
@@ -418,7 +420,6 @@ export default function AIPage({ auth, theme }: Props) {
           onSubmit={() => send(input)}
           onStop={stop}
           isStreaming={isStreaming}
-          disabled={false}
           suggestions={activeSession.phase === 'ready' ? followupSuggestions : []}
         />
         <p>Atlas 只展示后端实际返回的价格、地点和运行指标；预订前请再次核验。</p>

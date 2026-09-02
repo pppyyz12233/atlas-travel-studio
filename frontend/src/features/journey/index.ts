@@ -8,11 +8,22 @@ export { default as MissionBrief } from './MissionBrief'
 export { default as OrchestrationTimeline } from './OrchestrationTimeline'
 export { default as SessionRail } from './SessionRail'
 export {
+  JOURNEY_STORAGE_KEY,
   activeJourneySession,
   createJourneySession,
   journeyProgress,
   journeyReducer,
+  loadInitialJourneyState,
+  saveJourneyState,
+  writeSessionIdToHash,
 } from './model'
+export {
+  fallbackWorkerMeta,
+  getWorkerMeta,
+  locationTypeColors,
+  workerMeta,
+} from './workerMeta'
+export type { WorkerMeta } from './workerMeta'
 export { eventToJourneyActions } from './sseContract'
 export { buildItineraryViewModel } from './viewModel'
 export type {
