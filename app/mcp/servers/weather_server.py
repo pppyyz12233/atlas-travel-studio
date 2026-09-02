@@ -1,5 +1,15 @@
 import aiohttp
 
+# 复用全局 ClientSession（连接池），避免每次查询都重建 TCP/TLS 连接
+_session: aiohttp.ClientSession | None = None
+
+
+async def _get_session() -> aiohttp.ClientSession:
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+    return _session
+
 
 async def _fetch(city: str):
     """调用 wttr.in API，获取原始 JSON 天气数据。
@@ -11,10 +21,10 @@ async def _fetch(city: str):
         wttr.in 的完整 JSON 响应
     """
     url = f"https://wttr.in/{city}?format=j1"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            resp.raise_for_status()
-            return await resp.json()
+    session = await _get_session()
+    async with session.get(url) as resp:
+        resp.raise_for_status()
+        return await resp.json()
 
 
 async def get_weather(city: str):

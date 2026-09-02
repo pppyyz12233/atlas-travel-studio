@@ -1,4 +1,6 @@
 
+import asyncio
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +39,9 @@ async def export_trip(
     md = build_markdown(reply)
     html = markdown_to_html(md)
     try:
-        pdf_bytes = html_to_pdf(html)
+        # WeasyPrint 是同步 CPU 密集操作，丢进线程池执行，
+        # 避免导出期间阻塞事件循环（SSE 推流会被一起卡住）
+        pdf_bytes = await asyncio.to_thread(html_to_pdf, html)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

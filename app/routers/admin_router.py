@@ -1,5 +1,6 @@
 
 import os
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,13 +12,16 @@ router = APIRouter(prefix="/admin", tags=["管理"])
 
 UPLOAD_DIR = "uploads"
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+CHUNK_SIZE = 1024 * 1024
 
 
 def _safe_path(filename: str) -> str:
-    """防止路径穿越"""
+    """防路径穿越 + 防同名覆盖（加 uuid 前缀）"""
     safe_name = os.path.basename(filename)
+    unique_name = f"{uuid.uuid4().hex[:8]}_{safe_name}"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    return os.path.join(UPLOAD_DIR, safe_name)
+    return os.path.join(UPLOAD_DIR, unique_name)
 
 
 #用户列表
@@ -44,6 +48,8 @@ async def promote(user_id: int, db: AsyncSession = Depends(get_db), admin=Depend
 #删除用户
 @router.delete("/users/{user_id}")
 async def delete(user_id: int, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="不能删除自己的账号")
     await user.delete_user(db, user_id)
     return {"code": 200, "message": "删除成功", "data": None}
 
@@ -58,11 +64,19 @@ async def upload(file: UploadFile = File(...), db: AsyncSession = Depends(get_db
 
     # 安全路径
     file_path = _safe_path(file.filename)
-    content = await file.read()
-    if len(content) > 50 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件大小不能超过 50MB")
+    # 分块读取边读边计数：超限立即中止，避免先整文件读进内存才检查（内存 DoS）
+    written = 0
     with open(file_path, "wb") as f:
-        f.write(content)
+        while True:
+            chunk = await file.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > MAX_UPLOAD_BYTES:
+                f.close()
+                os.remove(file_path)
+                raise HTTPException(status_code=400, detail="文件大小不能超过 50MB")
+            f.write(chunk)
 
     # 记录入库（文档解析功能待后续接入 RAG 管线实现）
     file_type = ext.lstrip(".")

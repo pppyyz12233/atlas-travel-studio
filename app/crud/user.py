@@ -1,6 +1,7 @@
 ﻿
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -22,7 +23,12 @@ async def create_user(db: AsyncSession, email: str | None, phone: str | None, us
 
     user = User(email=email, phone=phone, username=username, password=hash_password(password))
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 并发注册同一邮箱/手机号：唯一索引兜底，转成友好的 400 而不是 500
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="该邮箱或手机号已被注册")
     await db.refresh(user)
     return user
 

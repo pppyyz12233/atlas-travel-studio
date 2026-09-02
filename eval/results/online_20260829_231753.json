@@ -1,0 +1,41 @@
+{
+  "mode": "online",
+  "ran_at": "2026-08-29T23:17:53",
+  "base_url": "http://127.0.0.1:8000",
+  "cases": 1,
+  "intent_accuracy": 1.0,
+  "tool_selection_recall": 0.0,
+  "tool_overcall_ratio": 0.0,
+  "plan_success_rate": 1.0,
+  "latency_avg_s": 12.1,
+  "latency_median_s": 12.1,
+  "latency_p95_s": 12.1,
+  "llm_calls_total_est": 5,
+  "tool_calls_total": 0,
+  "llm_calls_avg_est": 5.0,
+  "details": [
+    {
+      "id": 11,
+      "category": "flight_only",
+      "intent_match": true,
+      "expected_workers": [
+        "flight"
+      ],
+      "actual_workers": [
+        "flight"
+      ],
+      "expected_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [],
+      "plan_success": true,
+      "reply_len": 338,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 12.09,
+      "llm_calls_est": 5,
+      "tool_calls": 0
+    }
+  ]
+}

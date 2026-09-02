@@ -1,8 +1,7 @@
 
 
-import json, asyncio, time, os, re, logging, uuid
+import json, asyncio, time, re, logging
 from langgraph.graph import StateGraph, END, START
-from langgraph.types import Command
 
 from app.agents.state import AgentState
 from app.agents.intent_router import classify_intent
@@ -27,9 +26,11 @@ OVERSEAS_CITIES = ["东京", "巴黎", "曼谷", "新加坡", "伦敦", "纽约"
 #城市提取（纯确定性，不调 LLM）
 def _extract_cities(msg: str) -> tuple[str, str]:
     from_city, to_city = "出发地", "目的地"
+    # 只匹配中英文/数字，避免把 "东京，" 这类带标点的片段抓成城市名
+    city_char = r"[一-龥A-Za-z0-9]"
     patterns = [
-        r"从(\S{1,4})[去到往](\S{1,4})",
-        r"(\S{1,4})[去到往](\S{1,4})",
+        rf"从({city_char}{{1,4}})[去到往]({city_char}{{1,4}})",
+        rf"({city_char}{{1,4}})[去到往]({city_char}{{1,4}})",
     ]
     for p in patterns:
         m = re.search(p, msg)
@@ -262,10 +263,9 @@ async def memory_reader_node(state: AgentState, config, *, store) -> AgentState:
         if memories:
             pref_lines = [f"- {m.key}: {m.value.get('value', '')}" for m in memories]
             pref_text = "用户历史偏好:\n" + "\n".join(pref_lines)
-            # 插入到 messages 最前面，作为 system 级别的上下文
-            state["messages"] = [
-                {"role": "system", "content": pref_text}
-            ] + state["messages"]
+            # 先移除上一轮注入的 system 偏好再插入新的，避免多轮后 system 消息重复堆积
+            stripped = [m for m in state["messages"] if m.get("role") != "system"]
+            state["messages"] = [{"role": "system", "content": pref_text}] + stripped[-20:]
             print(f"[Memory] 加载了 {len(memories)} 条用户偏好")
     except Exception:
         logger.debug("memory_reader: store 不可用或为空", exc_info=True)
@@ -350,24 +350,32 @@ async def _run_step_with_subgraph(step: dict, ctx: list | None, on_event=None, s
         async def _stream():
             r = {}
             li = lt = 0
+            # 计数器跨 chunk 累计：iteration_count 只在 llm 节点更新、
+            # tool_call_count 只在 tools 节点更新，取"最后一个 chunk"会丢数据
+            final_it = final_tc = 0
             async for chunk in subgraph.astream(
                 {"messages": [{"role": "user", "content": user_input}]}
             ):
                 # chunk 格式: {"llm": {state}} 或 {"tools": {state}}，取内层 state
                 s = list(chunk.values())[0] if chunk else {}
                 r = s
-                its = s.get("iteration_count", 0)
-                tc = s.get("tool_call_count", 0)
+                # 每个 chunk 只携带自己节点更新的计数；缺失时沿用上一基线，
+                # 避免基线被重置为 0 导致事件切片/增量计算错位
+                its = s.get("iteration_count", li)
+                tc = s.get("tool_call_count", lt)
+                final_it = max(final_it, its)
+                final_tc = max(final_tc, tc)
                 if its > li and on_event:
                     last_msg = s.get("messages", [{}])[-1] if s.get("messages") else {}
                     next_tools = [t.get("function", {}).get("name", "?") for t in last_msg.get("tool_calls", [])]
-                    on_event({"type": "worker_think", "name": step["name"], "round": its, "next_tools": next_tools})
+                    on_event({"event": "worker_think", "name": step["name"], "round": its, "next_tools": next_tools})
                 if tc > lt and on_event:
                     tool_msgs = [m for m in s.get("messages", []) if m.get("role") == "tool"]
                     names = [m.get("name", "?") for m in tool_msgs[-(tc - lt):]]
-                    on_event({"type": "worker_tools", "name": step["name"], "tools": names})
+                    on_event({"event": "worker_tools", "name": step["name"], "tools": names})
                 li, lt = its, tc
-            return r
+            # 合并累计计数器进最终结果（messages 取最后 chunk 的完整列表）
+            return {**r, "iteration_count": final_it, "tool_call_count": final_tc}
         result = await asyncio.wait_for(_stream(), timeout=WORKER_TIMEOUT)
 
         #子图的最终回复是 messages 的最后一条
@@ -544,8 +552,9 @@ async def aggregator_node(state: AgentState) -> AgentState:
 
     trip_state = _build_trip_state(steps)
 
+    # 每步结果截断，防止超长输出把 aggregator 的 prompt 撑爆
     text = "\n\n".join([
-        f"Step{s['id']}[{s['name']}]:\n{s.get('result', '')}"
+        f"Step{s['id']}[{s['name']}]:\n{s.get('result', '')[:2000]}"
         for s in steps
     ])
 

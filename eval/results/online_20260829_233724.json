@@ -1,0 +1,872 @@
+{
+  "mode": "online",
+  "ran_at": "2026-08-29T23:37:24",
+  "base_url": "http://127.0.0.1:8000",
+  "cases": 30,
+  "intent_accuracy": 0.8666666666666667,
+  "tool_selection_recall": 0.8450704225352113,
+  "tool_overcall_ratio": 0.19718309859154928,
+  "plan_success_rate": 1.0,
+  "latency_avg_s": 26.3,
+  "latency_median_s": 21.1,
+  "latency_p95_s": 54.4,
+  "llm_calls_total_est": 268,
+  "tool_calls_total": 95,
+  "llm_calls_avg_est": 8.9,
+  "details": [
+    {
+      "id": 1,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1307,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 46.08,
+      "llm_calls_est": 19,
+      "tool_calls": 10
+    },
+    {
+      "id": 2,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1639,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 53.67,
+      "llm_calls_est": 18,
+      "tool_calls": 6
+    },
+    {
+      "id": 3,
+      "category": "full_trip",
+      "intent_match": false,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "hotel"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 818,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 9.59,
+      "llm_calls_est": 6,
+      "tool_calls": 2
+    },
+    {
+      "id": 4,
+      "category": "full_trip",
+      "intent_match": false,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 793,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 30.02,
+      "llm_calls_est": 7,
+      "tool_calls": 2
+    },
+    {
+      "id": 5,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1113,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 41.65,
+      "llm_calls_est": 15,
+      "tool_calls": 5
+    },
+    {
+      "id": 6,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1422,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 49.15,
+      "llm_calls_est": 19,
+      "tool_calls": 8
+    },
+    {
+      "id": 7,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1311,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 54.45,
+      "llm_calls_est": 19,
+      "tool_calls": 8
+    },
+    {
+      "id": 8,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1952,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 54.37,
+      "llm_calls_est": 17,
+      "tool_calls": 5
+    },
+    {
+      "id": 9,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1781,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 48.69,
+      "llm_calls_est": 19,
+      "tool_calls": 9
+    },
+    {
+      "id": 10,
+      "category": "full_trip",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "budget",
+        "flight",
+        "hotel",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_forecast_tool",
+        "get_weather_tool",
+        "search_flights_tool",
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1580,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 51.28,
+      "llm_calls_est": 19,
+      "tool_calls": 9
+    },
+    {
+      "id": 11,
+      "category": "flight_only",
+      "intent_match": true,
+      "expected_workers": [
+        "flight"
+      ],
+      "actual_workers": [
+        "flight"
+      ],
+      "expected_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 231,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 7.01,
+      "llm_calls_est": 5,
+      "tool_calls": 1
+    },
+    {
+      "id": 12,
+      "category": "flight_only",
+      "intent_match": true,
+      "expected_workers": [
+        "flight"
+      ],
+      "actual_workers": [
+        "flight"
+      ],
+      "expected_tools": [
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 179,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 8.21,
+      "llm_calls_est": 6,
+      "tool_calls": 2
+    },
+    {
+      "id": 13,
+      "category": "flight_only",
+      "intent_match": true,
+      "expected_workers": [
+        "flight"
+      ],
+      "actual_workers": [
+        "flight"
+      ],
+      "expected_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 165,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 8.53,
+      "llm_calls_est": 6,
+      "tool_calls": 2
+    },
+    {
+      "id": 14,
+      "category": "flight_only",
+      "intent_match": true,
+      "expected_workers": [
+        "flight"
+      ],
+      "actual_workers": [
+        "flight"
+      ],
+      "expected_tools": [
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 195,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 9.65,
+      "llm_calls_est": 6,
+      "tool_calls": 2
+    },
+    {
+      "id": 15,
+      "category": "hotel_only",
+      "intent_match": true,
+      "expected_workers": [
+        "hotel"
+      ],
+      "actual_workers": [
+        "hotel"
+      ],
+      "expected_tools": [
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 460,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 8.67,
+      "llm_calls_est": 5,
+      "tool_calls": 1
+    },
+    {
+      "id": 16,
+      "category": "hotel_only",
+      "intent_match": true,
+      "expected_workers": [
+        "hotel"
+      ],
+      "actual_workers": [
+        "hotel"
+      ],
+      "expected_tools": [
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 502,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 10.03,
+      "llm_calls_est": 5,
+      "tool_calls": 1
+    },
+    {
+      "id": 17,
+      "category": "hotel_only",
+      "intent_match": true,
+      "expected_workers": [
+        "hotel"
+      ],
+      "actual_workers": [
+        "hotel"
+      ],
+      "expected_tools": [
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 256,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 8.1,
+      "llm_calls_est": 5,
+      "tool_calls": 1
+    },
+    {
+      "id": 18,
+      "category": "hotel_only",
+      "intent_match": true,
+      "expected_workers": [
+        "hotel"
+      ],
+      "actual_workers": [
+        "hotel"
+      ],
+      "expected_tools": [
+        "search_hotels_tool"
+      ],
+      "actual_tools": [
+        "search_hotels_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 368,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 8.26,
+      "llm_calls_est": 5,
+      "tool_calls": 1
+    },
+    {
+      "id": 19,
+      "category": "attractions_only",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1036,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 39.78,
+      "llm_calls_est": 7,
+      "tool_calls": 2
+    },
+    {
+      "id": 20,
+      "category": "attractions_only",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_weather_tool"
+      ],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1068,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 40.95,
+      "llm_calls_est": 7,
+      "tool_calls": 2
+    },
+    {
+      "id": 21,
+      "category": "attractions_only",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_weather_tool"
+      ],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 808,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 42.5,
+      "llm_calls_est": 7,
+      "tool_calls": 2
+    },
+    {
+      "id": 22,
+      "category": "attractions_only",
+      "intent_match": true,
+      "expected_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "actual_workers": [
+        "attraction",
+        "itinerary"
+      ],
+      "expected_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 814,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 39.01,
+      "llm_calls_est": 7,
+      "tool_calls": 2
+    },
+    {
+      "id": 23,
+      "category": "budget_only",
+      "intent_match": true,
+      "expected_workers": [
+        "budget",
+        "flight"
+      ],
+      "actual_workers": [
+        "budget",
+        "flight"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1277,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 16.16,
+      "llm_calls_est": 8,
+      "tool_calls": 2
+    },
+    {
+      "id": 24,
+      "category": "budget_only",
+      "intent_match": true,
+      "expected_workers": [
+        "budget",
+        "flight"
+      ],
+      "actual_workers": [
+        "budget",
+        "flight"
+      ],
+      "expected_tools": [
+        "get_exchange_rate_tool",
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool",
+        "get_flight_price_tool",
+        "search_flights_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1494,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 19.09,
+      "llm_calls_est": 9,
+      "tool_calls": 3
+    },
+    {
+      "id": 25,
+      "category": "budget_only",
+      "intent_match": true,
+      "expected_workers": [
+        "budget",
+        "flight"
+      ],
+      "actual_workers": [
+        "budget",
+        "flight"
+      ],
+      "expected_tools": [
+        "search_flights_tool"
+      ],
+      "actual_tools": [
+        "get_exchange_rate_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 842,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 17.24,
+      "llm_calls_est": 7,
+      "tool_calls": 1
+    },
+    {
+      "id": 26,
+      "category": "itinerary_modify",
+      "intent_match": true,
+      "expected_workers": [
+        "itinerary"
+      ],
+      "actual_workers": [
+        "itinerary"
+      ],
+      "expected_tools": [],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1098,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 23.02,
+      "llm_calls_est": 5,
+      "tool_calls": 2
+    },
+    {
+      "id": 27,
+      "category": "itinerary_modify",
+      "intent_match": true,
+      "expected_workers": [
+        "itinerary"
+      ],
+      "actual_workers": [
+        "itinerary"
+      ],
+      "expected_tools": [],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 986,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 15.76,
+      "llm_calls_est": 5,
+      "tool_calls": 2
+    },
+    {
+      "id": 28,
+      "category": "itinerary_modify",
+      "intent_match": true,
+      "expected_workers": [
+        "itinerary"
+      ],
+      "actual_workers": [
+        "itinerary"
+      ],
+      "expected_tools": [],
+      "actual_tools": [
+        "get_forecast_tool",
+        "get_weather_tool"
+      ],
+      "plan_success": true,
+      "reply_len": 1581,
+      "failed_steps": 0,
+      "error": "",
+      "latency": 28.84,
+      "llm_calls_est": 5,
+      "tool_calls": 2
+    },
+    {
+      "id": 29,
+      "category": "guard_blocked",
+      "guard_ok": true,
+      "latency": 0.0
+    },
+    {
+      "id": 30,
+      "category": "guard_blocked",
+      "guard_ok": true,
+      "latency": 0.0
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useAuth } from './hooks/useAuth'
 import { useTheme } from './hooks/useTheme'
 import AuthModal from './components/AuthModal'
@@ -10,13 +11,14 @@ export default function App() {
   return (
     <>
       <AIPage auth={auth} theme={theme} />
-      {auth.showAuthModal && (
+      {auth.showAuthModal && createPortal(
         <AuthModal
           onClose={() => auth.setShowAuthModal(false)}
           onLogin={auth.login}
           onLoginByPhone={auth.loginByPhone}
           onRegister={auth.register}
-        />
+        />,
+        document.body,
       )}
     </>
   )

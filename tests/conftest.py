@@ -1,12 +1,7 @@
-﻿"""测试 Fixtures"""
+import sys
+from pathlib import Path
 
-import pytest
-import asyncio
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """创建事件循环"""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+ROOT = Path(__file__).resolve().parents[1]
+for p in (str(ROOT), str(ROOT / "eval")):
+    if p not in sys.path:
+        sys.path.insert(0, p)

@@ -4,11 +4,25 @@ import json
 from openai import AsyncOpenAI, APIError, APITimeoutError
 from app.utils.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
-client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+
+_client: AsyncOpenAI | None = None
+
+
+def _get_client() -> AsyncOpenAI:
+    """延迟创建客户端，让未配置模型的环境仍可启动 UI 与健康检查。"""
+    global _client
+    if not DEEPSEEK_API_KEY.strip():
+        raise RuntimeError(
+            "未配置 DEEPSEEK_API_KEY。请复制项目根目录的 .env.example 为 .env，"
+            "填写密钥后重试。"
+        )
+    if _client is None:
+        _client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+    return _client
 
 
 async def _create(params: dict):
-    return await client.chat.completions.create(**params)
+    return await _get_client().chat.completions.create(**params)
 
 
 async def chat(messages: list[dict], tools: list[dict] | None = None,
@@ -71,7 +85,7 @@ def parse_tool_call(resp: dict, index: int = 0) -> dict | None:
 
 async def chat_stream(messages: list[dict]) -> str:
     """流式输出"""
-    stream = await client.chat.completions.create(
+    stream = await _get_client().chat.completions.create(
         model=DEEPSEEK_MODEL, messages=messages, temperature=0.3, stream=True
     )
     result = ""

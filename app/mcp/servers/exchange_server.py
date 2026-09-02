@@ -1,5 +1,15 @@
 import aiohttp
 
+# 复用全局 ClientSession（连接池），避免每次查询都重建 TCP/TLS 连接
+_session: aiohttp.ClientSession | None = None
+
+
+async def _get_session() -> aiohttp.ClientSession:
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+    return _session
+
 
 async def get_exchange_rate(from_currency: str = "CNY", to_currency: str = "JPY") -> dict:
     """查询实时汇率，支持主流货币互转。
@@ -14,9 +24,9 @@ async def get_exchange_rate(from_currency: str = "CNY", to_currency: str = "JPY"
     """
     try:
         url = f"https://api.exchangerate-api.com/v4/latest/{from_currency}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                data = await resp.json()
+        session = await _get_session()
+        async with session.get(url) as resp:
+            data = await resp.json()
 
         rate = data["rates"].get(to_currency)
         if rate is None:

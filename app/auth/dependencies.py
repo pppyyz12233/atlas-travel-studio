@@ -27,14 +27,18 @@ async def get_current_user(authorization: str = Header(...)):
 
 async def get_optional_user(request: Request, db: AsyncSession = Depends(get_db)):
     """Optional auth — returns user or None for guest access"""
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
         return None
+
+    scheme, separator, token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not separator or not token.strip() or " " in token.strip():
+        raise HTTPException(status_code=401, detail="Authorization 格式无效")
+
     try:
-        token = auth_header.split(" ")[1]
-        return await get_current_user_from_token(token, db)
+        return await get_current_user_from_token(token.strip(), db)
     except Exception:
-        return None
+        raise HTTPException(status_code=401, detail="Token 无效或已过期") from None
 
 
 async def require_admin(user=Depends(get_current_user)):

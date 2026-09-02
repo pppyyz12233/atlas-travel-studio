@@ -2,6 +2,13 @@ import type { ApiResponse } from '../types'
 
 const BASE = '/api'
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('travel_token')
   const headers: Record<string, string> = {
@@ -13,9 +20,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   const res = await fetch(`${BASE}${url}`, { ...options, headers })
-  const json: ApiResponse<T> = await res.json()
-  if (json.code !== 200) {
-    throw new Error(json.message || '请求失败')
+  let json: ApiResponse<T>
+  try {
+    json = await res.json() as ApiResponse<T>
+  } catch {
+    throw new ApiError(res.ok ? '服务响应格式异常' : `请求失败 (${res.status})`, res.status)
+  }
+  if (!res.ok || json.code !== 200) {
+    const status = res.ok ? json.code : res.status
+    throw new ApiError(json.message || `请求失败 (${status})`, status)
   }
   return json.data
 }

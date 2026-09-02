@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.database import get_db, AsyncSessionLocal
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.auth.guest_session import (
+    GUEST_COOKIE_NAME,
+    resolve_guest_session,
+    set_guest_cookie,
+)
 from app.schemas.chat import ChatRequest
 from app.agents.workflow.guard import check
 from app.agents.supervisor import (
@@ -24,8 +29,9 @@ limiter = RateLimiter(max_per_minute=20)
 
 
 def _client_key(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    return forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+    # 不信任 X-Forwarded-For：该头可被客户端任意伪造，会导致限流被绕过。
+    # 只有部署在可信反向代理之后时，才应改为解析代理写入的真实 XFF。
+    return request.client.host if request.client else "unknown"
 
 
 def _thread_id(user_id: int | str, conv_id: int) -> str:
@@ -67,6 +73,8 @@ async def chat(
         }
 
     # 已登录 → 带 Checkpointer + Store 的图
+    # 先创建/校验会话拿到真实 conv_id，再生成 thread_id —— 保证每个会话的
+    # checkpoint 上下文一一对应（否则新对话会全部挤在 conv_0 线程里互相污染）
     conv_id = req.conversation_id
     if conv_id:
         await conversation.verify_owner(db, conv_id, user.id)
@@ -115,12 +123,15 @@ async def chat_stream(
 ):
     """SSE 流式对话：每个步骤完成时推送进度"""
     await limiter.check(_client_key(request))
+    guest_session = None
+    if user is None:
+        guest_session = resolve_guest_session(request.cookies.get(GUEST_COOKIE_NAME))
 
     def _gs(node, status):
         """graph_state 事件：Agent 工作流节点状态"""
         return f"data: {json.dumps({'event': 'graph_state', 'node': node, 'status': status}, ensure_ascii=False)}\n\n"
 
-    async def event_stream():
+    async def _run():
         msg = req.message
 
         # 1. Guard
@@ -132,20 +143,30 @@ async def chat_stream(
             return
         yield _gs("guard", "done")
 
-        # 2. 解析用户身份
-        uid = str(user.id) if user else "anonymous"
+        # 2. 解析用户身份（登录用户先创建/校验会话，让 thread_id 与会话一一对应，
+        #    避免所有新对话挤在 conv_0 线程里互相污染上下文）
         conv_id = req.conversation_id
-        if user and conv_id:
+        if user is not None:
             async with AsyncSessionLocal() as _s:
-                await conversation.verify_owner(_s, conv_id, user.id)
+                if conv_id:
+                    await conversation.verify_owner(_s, conv_id, user.id)
+                else:
+                    conv = await conversation.create_conversation(_s, user.id, msg[:30])
+                    conv_id = conv.id
                 await _s.commit()
+            uid = str(user.id)
+            thread_id = _thread_id(uid, conv_id)
+        else:
+            assert guest_session is not None
+            uid = guest_session.user_id
+            thread_id = guest_session.thread_id
 
         # 3. 获取 agent
         from main import get_agent
         agent = get_agent()
         config = {
             "configurable": {
-                "thread_id": _thread_id(uid, conv_id or 0),
+                "thread_id": thread_id,
                 "user_id": uid,
             }
         }
@@ -162,6 +183,10 @@ async def chat_stream(
         except Exception:
             pass
 
+        # 历史瘦身：去掉上一轮注入的 system 偏好（memory_reader 每轮会重新注入一份），
+        # 并只保留最近 20 条，控制逐轮增长的 token 成本
+        prev_msgs = [m for m in prev_msgs if m.get("role") != "system"][-20:]
+
         state: AgentState = {
             "messages": prev_msgs + [{"role": "user", "content": msg}],
             "plan_steps": [], "current_step_index": 0,
@@ -170,8 +195,10 @@ async def chat_stream(
         }
 
         # 加载长期记忆（如有）
-        from main import get_store
-        store = get_store()
+        store = None
+        if user is not None:
+            from main import get_store
+            store = get_store()
         yield _gs("memory_reader", "running")
         if store:
             state = await memory_reader_node(state, config, store=store)
@@ -216,13 +243,24 @@ async def chat_stream(
                         await asyncio.sleep(0.05)
                 await task  # 有异常在这里抛出
             else:
+                # 并行层同样推送 worker 内部进度（收集到队列，gather 完成后统一吐出）
+                q2 = asyncio.Queue()
+                def _push2(evt):
+                    try:
+                        q2.put_nowait(evt)
+                    except Exception:
+                        pass
                 await asyncio.gather(*[
-                    _run_step_with_subgraph(s, _build_context(steps), search_params=state.get("trip_state", {}).get("search_params"))
+                    _run_step_with_subgraph(
+                        s, _build_context(steps), on_event=_push2,
+                        search_params=state.get("trip_state", {}).get("search_params"),
+                    )
                     for s in layer
                 ])
+                while not q2.empty():
+                    yield f"data: {json.dumps(q2.get_nowait(), ensure_ascii=False)}\n\n"
 
             for s in layer:
-                print(f"[SSE] step_done {s.get('name','?')}: iterations={s.get('iterations','MISSING')} tool_calls={s.get('tool_calls','MISSING')} keys={sorted(s.keys())}", flush=True)
                 result_text = s.get("result", "") or ""
                 result_snippet = result_text[:150] if len(result_text) > 150 else result_text
                 yield f"data: {json.dumps({'event': 'step_done', 'name': s['name'], 'worker': s.get('worker', ''), 'status': s.get('status', 'failed'), 'result_snippet': result_snippet, 'summary': s.get('summary', ''), 'locations': s.get('locations', []), 'iterations': s.get('iterations', 0), 'tool_calls': s.get('tool_calls', 0)}, ensure_ascii=False)}\n\n"
@@ -244,13 +282,10 @@ async def chat_stream(
             state = await memory_writer_node(state, config, store=store)
         yield _gs("memory_writer", "done")
 
-        # 8. 保存消息（独立短会话，避免长期锁）
+        # 8. 保存消息（独立短会话，避免长期锁；conv_id 已在第 2 步创建/校验）
         if user is not None:
             try:
                 async with AsyncSessionLocal() as _s:
-                    if not conv_id:
-                        conv = await conversation.create_conversation(_s, user.id, msg[:30])
-                        conv_id = conv.id
                     await message.add_message(_s, conv_id, "user", msg)
                     await message.add_message(_s, conv_id, "assistant", state["final_answer"])
                     await _s.commit()
@@ -272,10 +307,28 @@ async def chat_stream(
         except Exception as e:
             print(f"[SSE] state 保存失败: {e}")
 
-    return StreamingResponse(
+    async def event_stream():
+        """SSE 兜底：任何阶段抛异常都以 error 事件收尾，而不是让连接裸断
+        （前端 sseContract 已处理 event=error → 进入可重试的恢复态）。"""
+        try:
+            async for chunk in _run():
+                yield chunk
+        except Exception as e:
+            print(f"[SSE] 生成中断: {type(e).__name__}: {e}")
+            reason = str(e)[:200] or "生成失败，请重试"
+            yield f"data: {json.dumps({'event': 'error', 'message': reason}, ensure_ascii=False)}\n\n"
+
+    response = StreamingResponse(
         event_stream(), media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )
+    if guest_session is not None and guest_session.is_new:
+        set_guest_cookie(
+            response,
+            guest_session,
+            secure=request.url.scheme == "https",
+        )
+    return response
 
 
 # ══════════════════════════════════════════════════════════════

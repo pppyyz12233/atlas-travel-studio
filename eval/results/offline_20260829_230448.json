@@ -1,0 +1,10 @@
+{
+  "mode": "offline",
+  "ran_at": "2026-08-29T23:04:48",
+  "cases": 30,
+  "guard_accuracy": 1.0,
+  "city_extraction_accuracy": 1.0,
+  "worker_mapping_accuracy": 1.0,
+  "prefilter_accuracy": 1.0,
+  "failures": []
+}

@@ -1,83 +1,447 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* ==========================================================
+   Atlas — 基础层：设计令牌 / 重置 / 共享组件（登录框、地图、Markdown）
+   v3 "上线感"升级：Linear 式分层纪律（细边框+微明度差、极轻阴影、
+   紧凑密度、克制的品牌色）+ 保留夜航蓝/日出橙的旅行主题
+   ========================================================== */
 
-/* ============================================================
-   Travel Planner — Design System
-   frontend-design: distinctive, not templated
-   ui-ux-pro-max: exaggerated minimalism + inter
-   ============================================================ */
 :root {
-  --bg: #ffffff;
-  --surface: #f8fafc;
-  --card: #ffffff;
-  --text: #1a1f36;
-  --text2: #5b6178;
-  --text3: #939aad;
-  --line: rgba(0, 0, 0, 0.06);
-  --shadow: 0 0 0 1px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02), 0 4px 16px rgba(0,0,0,0.04);
-  --shadow-lg: 0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.03), 0 16px 48px rgba(0,0,0,0.06);
-  --glass: rgba(255, 255, 255, 0.7);
-  --blue: #2563eb;
-  --blue2: #3b82f6;
-  --teal: #0891b2;
-  --coral: #e94560;
-  --amber: #d97706;
+  color-scheme: light;
+
+  /* 表面：近中性冷白，分层靠 1px 边框 + 微明度差，不靠阴影 */
+  --atlas-canvas: #f7f8fa;
+  --atlas-canvas-glow: #eef2f8;
+  --atlas-paper: #ffffff;
+  --atlas-paper-soft: #f4f6f9;
+  --atlas-paper-deep: #ebedf2;
+
+  /* 墨色：正文更黑，层级拉开（Linear 原则） */
+  --atlas-ink: #171923;
+  --atlas-ink-soft: #4c5162;
+  --atlas-ink-muted: #7e8494;
+  --atlas-line: #e7e9ef;
+  --atlas-line-strong: #d3d7e1;
+
+  /* 品牌色：蓝只用于操作/链接/激活；橙只用于 CTA 与运行态 */
+  --atlas-sky: #2563eb;
+  --atlas-sky-deep: #1d4fd8;
+  --atlas-sky-soft: #eaf0fe;
+  --atlas-sky-ink: #ffffff;
+  --atlas-sun: #ff8a3d;
+  --atlas-sun-deep: #e05e12;
+  --atlas-sun-soft: #fff1e7;
+  --atlas-route: #0d9668;
+  --atlas-route-soft: #e3f6ef;
+  --atlas-alert: #d92d20;
+  --atlas-alert-soft: #fdeceb;
+
+  /* 夜航侧栏 */
+  --atlas-deck: #161c2e;
+  --atlas-deck-ink: #e8ecf6;
+  --atlas-deck-soft: rgba(255, 255, 255, .055);
+  --atlas-deck-line: rgba(255, 255, 255, .07);
+
+  /* 阴影：几乎不可见，只保留环境层次 */
+  --atlas-shadow-sm: 0 1px 2px rgba(16, 24, 40, .04);
+  --atlas-shadow-md: 0 2px 4px rgba(16, 24, 40, .04), 0 8px 20px rgba(16, 24, 40, .05);
+  --atlas-shadow-lg: 0 8px 24px rgba(16, 24, 40, .08), 0 24px 64px rgba(16, 24, 40, .14);
+  --atlas-fast: 130ms;
+  --atlas-normal: 200ms;
+  --atlas-ease: cubic-bezier(.25, 1, .35, 1);
+
+  /* 圆角体系：统一收敛，工具感 */
+  --atlas-r-card: 12px;
+  --atlas-r-input: 10px;
+  --atlas-r-btn: 10px;
+  --atlas-r-chip: 8px;
+
+  /* 字体 */
+  --atlas-font: "Segoe UI Variable Text", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --atlas-display: "Segoe UI Variable Display", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
+    "Microsoft YaHei UI", system-ui, sans-serif;
+  --atlas-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+
+  /* 预算分类色 */
+  --atlas-budget-flight: #e2604c;
+  --atlas-budget-hotel: #3568c4;
+  --atlas-budget-attraction: #0d9668;
+  --atlas-budget-food: #e08a2e;
+  --atlas-budget-transit: #8a6fd1;
+  --atlas-budget-other: #7f8ea8;
 }
 
 .dark {
-  --bg: #0a0a0b;
-  --surface: #141418;
-  --card: #1e1e24;
-  --text: #f1f1f3;
-  --text2: #91919b;
-  --text3: #55555e;
-  --line: rgba(255,255,255,0.08);
-  --shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 1px 2px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.3);
-  --shadow-lg: 0 0 0 1px rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.2), 0 16px 48px rgba(0,0,0,0.4);
-  --glass: rgba(20,20,24,0.7);
+  color-scheme: dark;
+
+  --atlas-canvas: #0f1116;
+  --atlas-canvas-glow: #13161d;
+  --atlas-paper: #16181f;
+  --atlas-paper-soft: #1c1f28;
+  --atlas-paper-deep: #232734;
+
+  --atlas-ink: #f1f3f7;
+  --atlas-ink-soft: #b3b9c8;
+  --atlas-ink-muted: #7d8496;
+  --atlas-line: #262a36;
+  --atlas-line-strong: #343949;
+
+  --atlas-sky: #6b9aff;
+  --atlas-sky-deep: #88aeff;
+  --atlas-sky-soft: #1a2438;
+  --atlas-sky-ink: #0a0f1e;
+  --atlas-sun: #ff9a5c;
+  --atlas-sun-deep: #ffb088;
+  --atlas-sun-soft: #33241a;
+  --atlas-route: #3ecf9d;
+  --atlas-route-soft: #11291f;
+  --atlas-alert: #ff7a70;
+  --atlas-alert-soft: #361c1a;
+
+  --atlas-deck: #0c0f18;
+  --atlas-deck-ink: #e6e9f2;
+  --atlas-deck-soft: rgba(255, 255, 255, .05);
+  --atlas-deck-line: rgba(255, 255, 255, .06);
+
+  --atlas-shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+  --atlas-shadow-md: 0 2px 6px rgba(0, 0, 0, .3), 0 10px 24px rgba(0, 0, 0, .26);
+  --atlas-shadow-lg: 0 10px 32px rgba(0, 0, 0, .4), 0 28px 72px rgba(0, 0, 0, .5);
 }
 
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body,#root{height:100%;overflow:hidden}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif}
-body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;background:var(--bg);color:var(--text)}
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px}
+body {
+  background: var(--atlas-canvas);
+  color: var(--atlas-ink);
+  font-family: var(--atlas-font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 
-.glass{background:var(--glass);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%)}
+button, input, textarea { font: inherit; }
+button { color: inherit; }
 
-.markdown-body h1{font-size:1.3rem;font-weight:700;margin:1rem 0 .5rem;color:var(--text)}
-.markdown-body h2{font-size:1.1rem;font-weight:600;margin:.8rem 0 .4rem;color:var(--blue)}
-.markdown-body h3{font-size:1rem;font-weight:600;margin:.6rem 0 .2rem}
-.markdown-body p{margin:.4rem 0;line-height:1.72}
-.markdown-body ul,.markdown-body ol{margin:.4rem 0;padding-left:1.3rem}
-.markdown-body li{margin:.15rem 0}
-.markdown-body code{background:var(--surface);padding:2px 6px;border-radius:4px;font-size:.88em}
-.markdown-body pre{background:#1a1f36;color:#e8e8ed;padding:1rem 1.2rem;border-radius:12px;overflow-x:auto;margin:.6rem 0}
-.markdown-body pre code{background:none;color:inherit;padding:0}
-.markdown-body table{width:100%;border-collapse:collapse;margin:.6rem 0;font-size:.9em}
-.markdown-body th,.markdown-body td{border:1px solid var(--line);padding:7px 12px;text-align:left}
-.markdown-body th{background:var(--surface);font-weight:600}
-.markdown-body strong{font-weight:600}
-.dark .markdown-body h2{color:var(--blue2)}
-.dark .markdown-body pre{background:#0a0a0b}
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--atlas-sky) 78%, transparent);
+  outline-offset: 2px;
+}
 
-.amap-info-content{font-size:13px;line-height:1.5;max-width:220px}
-.amap-info-content h4{margin:0 0 4px;font-size:14px;color:var(--text)}
-.amap-info-content p{margin:2px 0;color:var(--text2);font-size:12px}
-.iw-tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;color:#fff;margin-bottom:4px}
+::selection { background: color-mix(in srgb, var(--atlas-sky) 24%, transparent); }
 
-.typing-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);animation:tdot 1.4s infinite}
-.typing-dot:nth-child(2){animation-delay:.16s}
-.typing-dot:nth-child(3){animation-delay:.32s}
-@keyframes tdot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--atlas-ink-muted) 30%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--atlas-ink-muted) 55%, transparent); }
 
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes stepIn{from{opacity:0;transform:translateY(8px)scale(.98)}to{opacity:1;transform:translateY(0)scale(1)}}
-@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+/* ---------- 共享小组件 ---------- */
 
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--atlas-sky);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  color: var(--atlas-ink-soft);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--atlas-r-chip);
+  cursor: pointer;
+  transition: color var(--atlas-fast), background var(--atlas-fast);
+}
+
+.icon-button:hover {
+  color: var(--atlas-ink);
+  background: var(--atlas-paper-soft);
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--atlas-sky-ink);
+  background: var(--atlas-sky);
+  border: 0;
+  border-radius: var(--atlas-r-btn);
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .1), inset 0 1px 0 rgba(255, 255, 255, .12);
+  transition: background var(--atlas-fast), box-shadow var(--atlas-fast), transform var(--atlas-fast);
+}
+
+.primary-button:hover:not(:disabled) { background: var(--atlas-sky-deep); }
+.primary-button:active:not(:disabled) { transform: scale(.985); }
+.primary-button:disabled { cursor: not-allowed; opacity: .45; }
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fff;
+  background: linear-gradient(135deg, #2b74ec 0%, #1c3d8f 100%);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+}
+
+/* ---------- 地图 ---------- */
+
+.map-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--atlas-paper-soft);
+}
+
+.map-canvas { width: 100%; height: 100%; }
+
+.map-state {
+  position: absolute;
+  inset: 10px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--atlas-ink-soft);
+  background: color-mix(in srgb, var(--atlas-sky) 3%, var(--atlas-paper));
+  border: 1.5px dashed var(--atlas-line-strong);
+  border-radius: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.map-state p, .map-state small { margin: 0; }
+.map-state p { font-weight: 600; }
+.map-state small { color: var(--atlas-ink-muted); font-size: 11.5px; }
+
+.map-error svg {
+  padding: 14px;
+  color: var(--atlas-sun-deep);
+  background: color-mix(in srgb, var(--atlas-sun) 13%, transparent);
+  border-radius: 50%;
+}
+
+.map-loader {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--atlas-line-strong);
+  border-top-color: var(--atlas-sky);
+  border-radius: 50%;
+  animation: atlas-spin .8s linear infinite;
+}
+
+.amap-info-content { min-width: 156px; max-width: 230px; padding: 4px 2px; font-family: var(--atlas-font); }
+.amap-info-content h4 { margin: 7px 0 4px; color: #171923; font-size: 13px; }
+.amap-info-content p { margin: 0; color: #5d6472; font-size: 12px; line-height: 1.5; }
+.iw-tag {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: #fff;
+  background: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ---------- Markdown 渲染 ---------- */
+
+.markdown-body { color: var(--atlas-ink-soft); font-size: 13.5px; line-height: 1.8; }
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  color: var(--atlas-ink);
+  font-family: var(--atlas-display);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.markdown-body h1 { margin: 6px 0 14px; font-size: 22px; }
+.markdown-body h2 { margin: 24px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--atlas-line); font-size: 17px; }
+.markdown-body h3 { margin: 18px 0 7px; font-size: 15px; }
+.markdown-body p { margin: 8px 0; }
+.markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 22px; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body strong { color: var(--atlas-ink); font-weight: 700; }
+.markdown-body blockquote {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--atlas-sun);
+  border-radius: 0 8px 8px 0;
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-sun-soft);
+}
+.markdown-body pre { overflow-x: auto; margin: 12px 0; padding: 13px; border-radius: 10px; color: #e8eefb; background: #1b1f2c; font-family: var(--atlas-mono); font-size: 12.5px; }
+.markdown-body code { padding: 2px 6px; border-radius: 5px; color: var(--atlas-sky); background: var(--atlas-sky-soft); font-family: var(--atlas-mono); font-size: .92em; }
+.markdown-body pre code { padding: 0; color: inherit; background: transparent; }
+.markdown-body table { width: 100%; margin: 12px 0; border-collapse: collapse; }
+.markdown-body th, .markdown-body td { padding: 8px 10px; border-bottom: 1px solid var(--atlas-line); text-align: left; vertical-align: top; }
+.markdown-body th { color: var(--atlas-ink); background: var(--atlas-paper-soft); font-size: 12.5px; }
+.markdown-body a { color: var(--atlas-sky); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- 登录框 ---------- */
+
+.auth-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; }
+.auth-backdrop { position: absolute; inset: 0; border: 0; background: rgba(10, 14, 26, .48); backdrop-filter: blur(10px); cursor: pointer; }
+.auth-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(820px, 100%);
+  min-height: 500px;
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--atlas-line) 70%, transparent);
+  border-radius: 16px;
+  background: var(--atlas-paper);
+  box-shadow: var(--atlas-shadow-lg);
+  animation: auth-dialog-in .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+.auth-dialog:focus { outline: none; }
+
+/* 左侧品牌面板：夜空 */
+.auth-story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 34px;
+  color: #e9ecf6;
+  background:
+    radial-gradient(1.5px 1.5px at 18% 22%, rgba(255, 255, 255, .45) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 72% 12%, rgba(255, 255, 255, .3) 50%, transparent 51%),
+    radial-gradient(2px 2px at 55% 42%, rgba(255, 255, 255, .24) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 84% 58%, rgba(255, 255, 255, .34) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 30% 70%, rgba(255, 255, 255, .26) 50%, transparent 51%),
+    radial-gradient(circle at 86% 88%, rgba(255, 138, 61, .14) 0 40%, transparent 58%),
+    linear-gradient(160deg, #1a2240 0%, #131a33 62%, #101629 100%);
+}
+
+.auth-story-orbit { position: absolute; border: 1px dashed rgba(255, 255, 255, .14); border-radius: 50%; }
+.auth-story-orbit-one { width: 340px; height: 340px; right: -200px; top: 40px; }
+.auth-story-orbit-two { width: 210px; height: 210px; right: -62px; top: 110px; }
+.auth-story-orbit-one::after, .auth-story-orbit-two::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--atlas-sun);
+  box-shadow: 0 0 0 5px rgba(255, 138, 61, .12);
+}
+.auth-story-orbit-one::after { left: 46px; top: 52px; }
+.auth-story-orbit-two::after { right: 30px; bottom: 40px; }
+
+.brand-mark-light { color: #161c2e; background: linear-gradient(135deg, #ffb37a 0%, var(--atlas-sun) 100%); }
+.auth-story-copy { position: relative; z-index: 1; }
+.eyebrow-light { color: #ffb37a; }
+.auth-story h2 { margin: 15px 0; font-family: var(--atlas-display); font-size: 30px; font-weight: 700; line-height: 1.3; }
+.auth-story p { max-width: 290px; margin: 0; color: rgba(233, 236, 246, .7); font-size: 13px; line-height: 1.8; }
+.auth-trust-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; color: rgba(233, 236, 246, .62); font-size: 12px; }
+
+.auth-form-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 46px 56px; }
+.auth-close { position: absolute; right: 18px; top: 18px; }
+.auth-heading h1 { margin: 10px 0 6px; font-family: var(--atlas-display); font-size: 26px; font-weight: 700; }
+.auth-heading p { margin: 0; color: var(--atlas-ink-muted); font-size: 13px; }
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 22px 0 16px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--atlas-paper-soft);
+}
+.segmented-control button {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--atlas-r-chip);
+  color: var(--atlas-ink-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color var(--atlas-fast), background var(--atlas-fast);
+}
+.segmented-control button.is-active { color: var(--atlas-ink); background: var(--atlas-paper); box-shadow: var(--atlas-shadow-sm); }
+
+.auth-fields { display: grid; gap: 13px; }
+.field-control > span { display: block; margin: 0 0 6px 2px; color: var(--atlas-ink-soft); font-size: 12.5px; font-weight: 600; }
+.field-control > div {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-input);
+  color: var(--atlas-ink-muted);
+  background: var(--atlas-paper);
+  transition: border-color var(--atlas-fast), box-shadow var(--atlas-fast);
+}
+.field-control > div:focus-within {
+  border-color: var(--atlas-sky);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--atlas-sky) 12%, transparent);
+}
+.field-control input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--atlas-ink); background: transparent; font-size: 14px; }
+.field-control input::placeholder { color: var(--atlas-ink-muted); }
+.field-action {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin-right: -8px;
+  padding: 0;
+  border: 0;
+  color: var(--atlas-ink-muted);
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--atlas-r-chip);
+}
+.field-action:hover { color: var(--atlas-ink); background: var(--atlas-paper-soft); }
+
+.auth-error { margin-top: 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--atlas-alert) 22%, transparent); border-radius: var(--atlas-r-chip); color: var(--atlas-alert); background: var(--atlas-alert-soft); font-size: 12.5px; }
+.auth-submit { width: 100%; height: 44px; justify-content: space-between; margin-top: 18px; padding: 0 15px; font-size: 14px; }
+.auth-switch { margin: 15px 0 0; color: var(--atlas-ink-muted); font-size: 12.5px; text-align: center; }
+.auth-switch button { margin-left: 6px; padding: 0; border: 0; color: var(--atlas-sky); background: transparent; cursor: pointer; font-weight: 650; }
+
+@keyframes atlas-spin { to { transform: rotate(360deg); } }
+@keyframes atlas-pulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+@keyframes auth-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 760px) {
+  .auth-dialog { grid-template-columns: 1fr; min-height: auto; }
+  .auth-story { display: none; }
+  .auth-form-panel { padding: 50px 26px 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

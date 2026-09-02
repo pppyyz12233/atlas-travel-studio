@@ -84,15 +84,24 @@ export interface StepOutput {
 // SSE 事件类型
 // ============================================================
 export type SSEEventType =
+  | 'graph_state'
   | 'guard'
+  | 'error'
   | 'plan'
   | 'step_start'
   | 'step_done'
   | 'aggregating'
+  | 'worker_think'
+  | 'worker_tools'
   | 'done'
 
 export interface SSEEvent {
   event: SSEEventType
+  node?: string
+  type?: string
+  round?: number
+  next_tools?: string[]
+  tools?: string[]
   // guard
   ok?: boolean
   blocked?: boolean
@@ -110,6 +119,8 @@ export interface SSEEvent {
   result_snippet?: string
   summary?: string
   locations?: Location[]
+  iterations?: number
+  tool_calls?: number
   // done
   reply?: string
   conversation_id?: number | null

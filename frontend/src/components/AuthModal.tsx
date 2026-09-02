@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { X, Mail, Phone, User, Lock, Eye, EyeOff } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowRight, Eye, EyeOff, LockKeyhole, Mail, MapPinned,
+  Phone, ShieldCheck, Sparkles, UserRound, X,
+} from 'lucide-react'
 
 interface Props {
   onClose: () => void
@@ -9,154 +12,220 @@ interface Props {
 }
 
 type Page = 'login' | 'register'
-type IdType = 'email' | 'phone'
+type Identity = 'email' | 'phone'
+
+const focusableSelector = [
+  'button:not([disabled]):not([tabindex="-1"])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'a[href]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 export default function AuthModal({ onClose, onLogin, onLoginByPhone, onRegister }: Props) {
   const [page, setPage] = useState<Page>('login')
-  const [idType, setIdType] = useState<IdType>('email')
+  const [identity, setIdentity] = useState<Identity>('email')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const identityInputRef = useRef<HTMLInputElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   const isRegister = page === 'register'
 
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const focusedBeforeOpen = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const appRoot = document.getElementById('root')
+    const rootWasInert = appRoot?.hasAttribute('inert') ?? false
+    const previousAriaHidden = appRoot?.getAttribute('aria-hidden')
+    appRoot?.setAttribute('inert', '')
+    appRoot?.setAttribute('aria-hidden', 'true')
+
+    const focusables = () => Array.from(
+      dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+    )
+    const focusTimer = window.setTimeout(() => {
+      identityInputRef.current?.focus()
+    }, 0)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialog) return
+      const items = focusables()
+      if (items.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKeyDown)
+      if (appRoot) {
+        appRoot.toggleAttribute('inert', rootWasInert)
+        if (previousAriaHidden == null) appRoot.removeAttribute('aria-hidden')
+        else appRoot.setAttribute('aria-hidden', previousAriaHidden)
+      }
+      if (focusedBeforeOpen?.isConnected) focusedBeforeOpen.focus()
+    }
+  }, [])
+
   const submit = async () => {
     setError('')
-
-    if (isRegister) {
-      if (!username || username.length < 2) { setError('用户名至少 2 位'); return }
-      if (!password || password.length < 6) { setError('密码至少 6 位'); return }
-      if (idType === 'email' && !email.trim()) { setError('请输入邮箱'); return }
-      if (idType === 'phone' && !phone.trim()) { setError('请输入手机号'); return }
-    } else {
-      if (!password || password.length < 6) { setError('密码至少 6 位'); return }
-      if (idType === 'email' && !email.trim()) { setError('请输入邮箱'); return }
-      if (idType === 'phone' && !phone.trim()) { setError('请输入手机号'); return }
+    if (isRegister && username.trim().length < 2) {
+      setError('用户名至少需要 2 个字符')
+      return
+    }
+    if (password.length < 6) {
+      setError('密码至少需要 6 个字符')
+      return
+    }
+    if (identity === 'email' && !email.trim()) {
+      setError('请输入邮箱地址')
+      return
+    }
+    if (identity === 'phone' && !phone.trim()) {
+      setError('请输入手机号')
+      return
     }
 
     setLoading(true)
-    let err: string | null = null
     try {
-      if (isRegister) {
-        err = await onRegister(
-          username, password,
-          idType === 'email' ? email.trim() : undefined,
-          idType === 'phone' ? phone.trim() : undefined,
+      const result = isRegister
+        ? await onRegister(
+          username.trim(),
+          password,
+          identity === 'email' ? email.trim() : undefined,
+          identity === 'phone' ? phone.trim() : undefined,
         )
-      } else if (idType === 'email') {
-        err = await onLogin(email, password)
-      } else {
-        err = await onLoginByPhone(phone, password)
-      }
-    } finally { setLoading(false) }
-    if (err) setError(err)
+        : identity === 'email'
+          ? await onLogin(email.trim(), password)
+          : await onLoginByPhone(phone.trim(), password)
+      if (result) setError(result)
+    } catch {
+      setError('操作失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const inputCls = "flex items-center gap-2.5 px-3.5 h-10 rounded-xl text-[13px] bg-[var(--surface)] text-[var(--text)]"
-  const iconCls = "text-[var(--text3)] flex-shrink-0"
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm animate-in">
-      <div className="rounded-3xl w-full max-w-sm mx-4 overflow-hidden animate-in-up" style={{ background: 'var(--card)', boxShadow: 'var(--shadow-lg)' }}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line)]">
-          <h2 className="font-semibold text-[15px] text-[var(--text)]">
-            {isRegister ? '创建账号' : '登录'}
-          </h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--surface)] transition-colors">
-            <X size={18} className="text-[var(--text2)]" />
-          </button>
-        </div>
+    <div className="auth-overlay">
+      <button type="button" tabIndex={-1} className="auth-backdrop" onClick={onClose} aria-label="关闭登录窗口" />
+      <div ref={dialogRef} className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title" tabIndex={-1}>
+        <section className="auth-story" aria-hidden="true">
+          <div className="auth-story-orbit auth-story-orbit-one" />
+          <div className="auth-story-orbit auth-story-orbit-two" />
+          <div className="brand-mark brand-mark-light"><MapPinned size={21} /></div>
+          <div className="auth-story-copy">
+            <span className="eyebrow eyebrow-light"><Sparkles size={13} /> AI travel atelier</span>
+            <h2>让每一次出发，<br />都从容而准确。</h2>
+            <p>保存专属偏好、管理历史方案，并在任何设备继续你的旅程。</p>
+          </div>
+          <div className="auth-trust-row">
+            <ShieldCheck size={16} />
+            <span>会话隔离 · 安全保存 · 随时可继续</span>
+          </div>
+        </section>
 
-        <div className="p-5 space-y-3.5">
-          {/* 邮箱 / 手机号 切换 */}
-          <div className="flex rounded-xl p-1 bg-[var(--surface)]">
-            <button
-              onClick={() => { setIdType('email'); setError('') }}
-              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                idType === 'email' ? 'bg-white text-[var(--text)] shadow-sm' : 'text-[var(--text3)]'
-              }`}
-            >
-              <Mail size={13} /> 邮箱
+        <section className="auth-form-panel">
+          <button type="button" className="icon-button auth-close" onClick={onClose} aria-label="关闭">
+            <X size={18} aria-hidden="true" />
+          </button>
+
+          <div className="auth-heading">
+            <span className="eyebrow">Private workspace</span>
+            <h1 id="auth-title">{isRegister ? '创建旅行档案' : '欢迎回来'}</h1>
+            <p>{isRegister ? '建立你的偏好档案，开始长期旅行规划。' : '登录后继续上一次尚未完成的旅程。'}</p>
+          </div>
+
+          <div className="segmented-control" aria-label="登录方式">
+            <button type="button" className={identity === 'email' ? 'is-active' : ''} aria-pressed={identity === 'email'} onClick={() => { setIdentity('email'); setError('') }}>
+              <Mail size={15} aria-hidden="true" /> 邮箱
             </button>
-            <button
-              onClick={() => { setIdType('phone'); setError('') }}
-              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                idType === 'phone' ? 'bg-white text-[var(--text)] shadow-sm' : 'text-[var(--text3)]'
-              }`}
-            >
-              <Phone size={13} /> 手机号
+            <button type="button" className={identity === 'phone' ? 'is-active' : ''} aria-pressed={identity === 'phone'} onClick={() => { setIdentity('phone'); setError('') }}>
+              <Phone size={15} aria-hidden="true" /> 手机
             </button>
           </div>
 
-          {/* 注册时：用户名 */}
-          {isRegister && (
-            <div className={inputCls}>
-              <User size={15} className={iconCls} />
-              <input value={username} onChange={e => setUsername(e.target.value)}
-                placeholder="用户名" onKeyDown={e => e.key === 'Enter' && submit()}
-                className="bg-transparent flex-1 outline-none placeholder:text-[var(--text3)]" />
-            </div>
-          )}
+          <div className="auth-fields">
+            {isRegister && (
+              <label className="field-control">
+                <span>用户名</span>
+                <div><UserRound size={17} /><input value={username} onChange={event => setUsername(event.target.value)} placeholder="你的称呼" autoComplete="username" /></div>
+              </label>
+            )}
 
-          {/* 邮箱输入 */}
-          {idType === 'email' && (
-            <div className={inputCls}>
-              <Mail size={15} className={iconCls} />
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="邮箱地址" onKeyDown={e => e.key === 'Enter' && submit()}
-                className="bg-transparent flex-1 outline-none placeholder:text-[var(--text3)]" />
-            </div>
-          )}
+            {identity === 'email' ? (
+              <label className="field-control">
+                <span>邮箱地址</span>
+                <div><Mail size={17} aria-hidden="true" /><input ref={identityInputRef} type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="name@example.com" autoComplete="email" aria-invalid={Boolean(error && !email.trim())} /></div>
+              </label>
+            ) : (
+              <label className="field-control">
+                <span>手机号</span>
+                <div><Phone size={17} aria-hidden="true" /><input ref={identityInputRef} type="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="138 0000 0000" autoComplete="tel" aria-invalid={Boolean(error && !phone.trim())} /></div>
+              </label>
+            )}
 
-          {/* 手机号输入 */}
-          {idType === 'phone' && (
-            <div className={inputCls}>
-              <Phone size={15} className={iconCls} />
-              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                placeholder="手机号" onKeyDown={e => e.key === 'Enter' && submit()}
-                className="bg-transparent flex-1 outline-none placeholder:text-[var(--text3)]" />
-            </div>
-          )}
-
-          {/* 密码 */}
-          <div className={inputCls}>
-            <Lock size={15} className={iconCls} />
-            <input type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="密码" onKeyDown={e => e.key === 'Enter' && submit()}
-              className="bg-transparent flex-1 outline-none placeholder:text-[var(--text3)]" />
-            <button onClick={() => setShowPwd(!showPwd)} type="button" className="flex-shrink-0">
-              {showPwd ? <EyeOff size={15} className={iconCls} /> : <Eye size={15} className={iconCls} />}
-            </button>
+            <label className="field-control">
+              <span>密码</span>
+              <div>
+                <LockKeyhole size={17} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  onKeyDown={event => { if (event.key === 'Enter') void submit() }}
+                  placeholder="至少 6 个字符"
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                />
+                <button type="button" className="field-action" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? '隐藏密码' : '显示密码'}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </label>
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-xs text-[var(--coral)] bg-[var(--coral)]/5 rounded-lg px-3 py-2">{error}</p>
-          )}
+          {error && <div className="auth-error" role="alert">{error}</div>}
 
-          {/* Submit */}
-          <button onClick={submit} disabled={loading}
-            className="w-full h-10 rounded-xl text-white text-[13px] font-semibold transition-all active:scale-[0.98] disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
-            {loading ? '处理中...' : isRegister ? '注册并登录' : '登录'}
+          <button type="button" className="primary-button auth-submit" onClick={() => void submit()} disabled={loading}>
+            <span>{loading ? '处理中…' : isRegister ? '创建并进入' : '进入工作台'}</span>
+            {!loading && <ArrowRight size={17} />}
           </button>
 
-          {/* 切换 登录/注册 */}
-          <p className="text-center text-[11px] text-[var(--text3)]">
-            {isRegister ? '已有账号？' : '没有账号？'}
-            <button
-              onClick={() => { setPage(isRegister ? 'login' : 'register'); setError('') }}
-              className="ml-1 text-[var(--blue)] font-medium hover:opacity-80 transition-opacity"
-            >
-              {isRegister ? '去登录' : '去注册'}
+          <p className="auth-switch">
+            {isRegister ? '已经拥有账号？' : '第一次使用？'}
+            <button type="button" onClick={() => { setPage(isRegister ? 'login' : 'register'); setError('') }}>
+              {isRegister ? '直接登录' : '创建账号'}
             </button>
           </p>
-        </div>
+        </section>
       </div>
     </div>
   )

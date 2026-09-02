@@ -17,7 +17,13 @@ def markdown_to_html(md_text: str) -> str:
         return f"<pre>{md_text}</pre>"
 
 
+def _deny_external_fetch(url: str, *args, **kwargs):
+    """WeasyPrint 自定义资源加载器：LLM 输出的 HTML 可能携带外链
+    <img>/<link>，服务端不该替它发起网络请求（SSRF/隐私面），一律拒绝。"""
+    raise ValueError(f"已禁止加载外部资源: {url}")
+
+
 def html_to_pdf(html: str) -> bytes:
-    """HTML → PDF bytes (使用 weasyprint)"""
+    """HTML → PDF bytes (使用 weasyprint，禁止加载任何外部资源)"""
     from weasyprint import HTML
-    return HTML(string=html).write_pdf()
+    return HTML(string=html, url_fetcher=_deny_external_fetch).write_pdf()

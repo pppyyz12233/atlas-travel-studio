@@ -1,6 +1,6 @@
 <div align="center">
 
-# ✈️ Smart Travel Planner
+# ✈️ Atlas · Smart Travel Planner
 
 ### Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
 
@@ -10,6 +10,7 @@
 <img src="https://img.shields.io/badge/LangGraph-0.2+-7B3FE4?style=flat-square" alt="LangGraph"/>
 <img src="https://img.shields.io/badge/LLM-DeepSeek-536DFE?style=flat-square" alt="DeepSeek"/>
 <img src="https://img.shields.io/badge/MCP-FastMCP-FF6F00?style=flat-square" alt="MCP"/>
+<img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white&style=flat-square" alt="React"/>
 <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"/>
 
 <br/><br/>
@@ -17,28 +18,38 @@
 
 ---
 
+## 项目亮点
+
+- **Plan-and-Execute 多智能体编排**：主图 7 节点 + 5 个 Worker 子图（独立 StateGraph ReAct 循环），按依赖分层并行调度，全程 SSE 流式可视
+- **确定性优先的成本控制**：意图路由的参数直通 Worker、窄意图跳过 LLM 规划、同城/一日游预过滤、历史瘦身与结构化提取，单次全流程 LLM 调用约 10-20 次
+- **带评测集的工程闭环**：30 条固定用例 + 双层基准评测（离线规则层 / 在线全链路层），量化意图路由、工具召回与错误调用、计划成功率、延迟与调用次数
+- **完整的安全设计**：JWT 登出吊销、登录/聊天限流、正则护栏、bcrypt、上传分块校验、PDF 外链隔离
+- **游客可用的产品化前端**：无需登录即可完整体验；登录后对话历史、长期偏好记忆（LangGraph Store）、Markdown/PDF 导出
+
+---
+
 ## 架构
 
 ```
                     ┌─────────────────────┐
-                    │  前端 (index.html)    │
-                    │  SSE EventSource     │
+                    │  React + Vite 前端    │
+                    │  Fetch SSE Stream    │
                     └─────────┬───────────┘
                               │ POST /api/chat/stream
                               ▼
 ┌──────────────────────────────────────────────────────────┐
-│              LangGraph 主图 (8 节点)                       │
+│              LangGraph 主图 (7 节点)                       │
 │                                                          │
 │  guard → memory_reader → intent_router → planner         │
 │                                                  │       │
 │                                                  ▼       │
 │  ┌───────────────────────────────────────────────┐      │
 │  │                executor                       │      │
-│  │  分层并行调度 5 个 Worker 子图                  │      │
+│  │  依赖分层并行调度 5 个 Worker 子图                │      │
 │  │                                               │      │
 │  │  ┌──────┐ ┌──────┐ ┌──────────┐ ┌────────┐ ┌──────┐│
-│  │  │flight│ │hotel │ │attraction│ │itinrary│ │budget│││
-│  │  │ 子图 │ │ 子图 │ │   子图   │ │  子图  │ │ 子图 │││
+│  │  │flight│ │hotel │ │attraction│ │itinrary│ │budget││
+│  │  │ 子图 │ │ 子图 │ │   子图   │ │  子图  │ │ 子图 ││
 │  │  └──┬───┘ └──┬───┘ └────┬─────┘ └───┬────┘ └──┬───┘││
 │  │     │        │          │           │         │    ││
 │  │     └────────┴──────────┴───────────┴─────────┘    ││
@@ -47,24 +58,168 @@
 │                         ▼                              │
 │  memory_writer → aggregator → END                      │
 │                                                          │
-│  持久化: SqliteSaver (状态存档) + InMemoryStore (偏好)     │
+│  持久化: AsyncSqliteSaver (状态) + AsyncSqliteStore (偏好) │
 └──────────────────────────────────────────────────────────┘
 ```
 
 | 层级 | 模式 | 说明 |
 |------|------|------|
-| 主 Agent | Plan-and-Execute | Guard → Memory → Intent → Plan → Execute → Aggregate |
-| Worker ×5 | StateGraph 子图 | 每个 Worker 是独立 StateGraph，内嵌 LLM ↔ Tool 标准 ReAct 循环 |
+| 主 Agent | Plan-and-Execute | Guard → Memory → Intent → Plan → Execute → Aggregate → Memory |
+| Worker ×5 | StateGraph 子图 | 每个 Worker 独立 StateGraph，内嵌 LLM ↔ Tool 标准 ReAct 循环（最大迭代数可配） |
 
 ---
 
 ## 快速开始
 
+### 1. 环境准备
+
 ```bash
 pip install -r requirements.txt
-cp .env.example .env        # 填 DEEPSEEK_API_KEY
-python main.py              # → http://localhost:8000
+cp .env.example .env
 ```
+
+在 `.env` 中至少配置：
+
+| 变量 | 说明 | 缺省行为 |
+|------|------|---------|
+| `DEEPSEEK_API_KEY` | DeepSeek 平台 API Key（必填才能出方案） | 未填可启动、可浏览前端，发起规划时返回明确配置提示 |
+| `DEEPSEEK_MODEL` | 模型名，默认 `deepseek-chat` | — |
+| `JWT_SECRET` | ≥32 位随机串，`python -c "import secrets; print(secrets.token_urlsafe(48))"` | 开发环境自动回退随机临时密钥（重启失效）并告警；生产环境拒绝启动 |
+| `SQLITE_PATH` | 业务库连接串 | 默认 SQLite；置空回退 MySQL 配置 |
+| `MAX_TOOL_ITERATIONS` | Worker ReAct 最大迭代数 | 3 |
+
+前端地图（可选）：在 `frontend/.env.local` 配置 `VITE_AMAP_KEY` / `VITE_AMAP_SECURITY_CODE`（高德开放平台免费申请）。
+
+### 2. 启动
+
+```bash
+# 方式一：单服务（前端已构建进 dist，推荐）
+cd frontend && npm install && npm run build && cd ..
+python main.py            # → http://localhost:8000
+
+# 方式二：前后端分离开发
+python main.py            # 终端 1
+cd frontend && npm run dev  # 终端 2 → http://localhost:5173
+```
+
+> SQLite 单写者：同一时刻只能跑一个实例，否则报 `database is locked`。
+
+---
+
+## Worker 与工具
+
+| Worker | 工具 | 数据源 |
+|--------|------|--------|
+| ✈️ flight | search_flights / get_flight_price | 模拟 8 条航班 |
+| 🏨 hotel | search_hotels | 模拟酒店库 |
+| 🎯 attraction | 无（纯 LLM 推理） | — |
+| 📅 itinerary | get_weather / get_forecast | wttr.in 真实天气 |
+| 💰 budget | get_exchange_rate | exchangerate-api 真实汇率（失败降级离线汇率表） |
+
+### MCP 双轨制
+
+| 层 | 技术 | 用途 |
+|----|------|------|
+| 外部 | FastMCP (stdio) | Claude Desktop 等 MCP 客户端 |
+| 内部 | `@tool` 注册表（`app/mcp/registry.py`） | Worker 子图直接绑定调用 |
+
+---
+
+## 安全设计
+
+| 项 | 实现 |
+|----|------|
+| 认证 | JWT（HS256，24h）+ bcrypt；token 带 `jti`，`POST /auth/logout` 登出吊销（内存黑名单，过期自动清理） |
+| 限流 | 登录 5 次/分钟（IP+账号维度）；聊天 20 次/分钟；滑动窗口 + 过期键清理；不信任可伪造的 `X-Forwarded-For` |
+| 护栏 | `app/agents/workflow/guard.py` 正则门卫（词边界匹配防误伤，交易/越狱/违规拦截） |
+| 上传 | 分块读取边读边限（50MB）、扩展名白名单、文件名 UUID 防覆盖、防路径穿越 |
+| 导出 | WeasyPrint 禁止加载外部资源（隔离 LLM 输出中的外链 SSRF 面）；渲染移入线程池不阻塞事件循环 |
+| CORS | 仅放行本机开发端口（前端生产模式与后端同源） |
+
+---
+
+## 评测体系（`eval/`）
+
+固定 30 条旅行场景用例（`eval/testcases.json`），双层评测：
+
+**用例构成**
+
+| 类别 | 数量 | 覆盖 |
+|------|------|------|
+| full_trip 完整规划 | 10 | 国内/海外、亲子、美食、一日游（去酒店）、不住酒店、红叶季 |
+| flight_only 只查航班 | 4 | 城市/日期/比价变体 |
+| hotel_only 只找酒店 | 4 | 性价比/河景/亲子/位置 |
+| attractions_only 只看景点 | 4 | 必去/小众/老人节奏/路线 |
+| budget_only 只算预算 | 3 | 海外（含汇率工具）/国内 |
+| itinerary_modify 修改行程 | 3 | 减项/换住宿/放宽节奏 |
+| guard 拦截 | 2 | 真实交易、越狱提示词 |
+
+**指标定义**
+
+| 指标 | 口径 |
+|------|------|
+| 意图路由准确率 | 非 guard 用例中，实际执行的 Worker 集合与标注完全一致的比例（guard 用例无意图，不进分母） |
+| Guard 拦截准确率 | guard 用例中正确拦截的比例（单独统计） |
+| 必须工具召回率 | Σ\|required ∩ called\| / Σ\|required\|（required 缺失即失分） |
+| 可选工具调用率 | Σ\|optional ∩ called\| / Σ\|optional\|（描述性指标，不判对错） |
+| 错误调用率 | 不属于 required∪optional 的调用次数 / 总调用次数（如国内行程查汇率） |
+| 过量调用率 | 重复调用（同工具第 2 次起）次数 / 总调用次数 |
+| 计划成功率 | 收到 done 且回复 ≥50 字且无失败步骤 / 全部用例（guard 用例为正确拦截）；另报非 guard 口径 |
+| 端到端延迟 | 客户端墙钟，报 avg / median / P95 |
+| LLM 调用次数(估) | 1(意图) + 计划(1，仅 full_trip>2 步) + Σ迭代轮数 + Σ成功步骤(结构化提取) + 1(汇总)，均值分母为非 guard 用例数 |
+| 工具调用次数 | Σ step.tool_calls（精确，仅非 guard 用例产生） |
+
+**运行**
+
+```bash
+# 离线层：校验确定性规则（guard / 城市提取 / Worker 映射 / 预过滤），无需 Key
+python eval/run_benchmark.py --mode offline
+
+# 在线层：全链路真实评测（需先启动服务并配置 DEEPSEEK_API_KEY）
+python eval/run_benchmark.py --mode online
+# 可选：--only full_trip --limit 5 --gap 4 --base-url http://127.0.0.1:8000
+```
+
+**离线基线**（确定性规则层，2026-08-29）
+
+| 指标 | 结果 |
+|------|------|
+| Guard 拦截准确率 | **100%**（30/30） |
+| 城市提取准确率 | **100%**（26/26，包含语义） |
+| Worker 映射准确率 | **100%**（28/28） |
+| 计划预过滤准确率 | **100%**（一日游/不住酒店剔除） |
+
+**在线基线**（30 条全链路真实评测，2026-08-31，报告 `eval/results/online_20260831_160526.json`）
+
+| 指标 | 结果 |
+|------|------|
+| 意图路由准确率 | **92.9%**（26/28，非 guard 口径） |
+| Guard 拦截准确率 | **100%**（2/2） |
+| 必须工具召回率 | **91.9%** |
+| 可选工具调用率 | 71.4% |
+| 错误调用率 | 11.5% |
+| 过量调用率 | 21.9% |
+| 计划成功率 | **100%**（30/30 含 guard；非 guard 28/28） |
+| 延迟 avg / median / P95 | 25.3s / 19.0s / 61.0s |
+| LLM 调用均值(估) / 工具调用均值 | 9.6 次/例 / 3.4 次/例（非 guard 口径） |
+
+已知短板：意图失败集中在 full_trip 的两处边界（住宿关键词强于行程语义被路由为 hotel_only；一日游场景 planner LLM 裁掉跨城航班步骤）；过量调用主要来自多步骤复用同一 Worker（去/返程各查一次航班），非无效重试。
+
+---
+
+## API 一览
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/chat/stream` | SSE 流式规划（游客可用，Cookie 会话保持上下文） |
+| POST | `/api/chat` | 非流式对话 |
+| GET | `/api/chat/history?conversation_id=` | 会话消息（需登录，校验归属） |
+| GET | `/api/chat/conversations` | 会话列表（需登录） |
+| POST | `/api/auth/register` · `/login/email` · `/login/phone` · `/logout` | 注册 / 登录 / 登出吊销 |
+| GET | `/api/auth/me` | 当前用户 |
+| GET | `/api/export/{id}?format=md\|pdf` | 导出方案（需登录） |
+| GET | `/api/search/flights` · `/hotels` · `/attractions` | 结构化搜索（分页） |
+| · | `/api/admin/*` | 用户管理、文档上传（需 admin） |
 
 ---
 
@@ -72,64 +227,43 @@ python main.py              # → http://localhost:8000
 
 ```
 travel_planning_agent/
-├── main.py                          # FastAPI 入口 + Checkpointer 初始化
-├── index.html                       # 前端 SPA (Apple Design)
+├── main.py                          # FastAPI 入口 + Checkpointer/Store 初始化
+├── eval/                            # ★ 基准评测
+│   ├── testcases.json               #   30 条固定用例（含期望标注）
+│   ├── run_benchmark.py             #   离线/在线双层评测脚本
+│   └── results/                     #   报告落盘（JSON）
+├── frontend/                        # React 18 + Vite 前端（蓝天航线视觉）
+│   ├── src/features/journey/        #   会话/时间线/行程工作台/状态机
+│   ├── src/pages/AIPage.tsx         #   页面编排
+│   └── src/hooks/                   #   SSE / API / 认证 / 主题
 ├── app/
 │   ├── agents/                      # ★ Agent 核心
-│   │   ├── supervisor.py            #   主图 8 节点
-│   │   ├── state.py                 #   AgentState
+│   │   ├── supervisor.py            #   主图 7 节点 + 分层执行 + 结构化提取
 │   │   ├── intent_router.py         #   LLM 意图分类 (6 类)
-│   │   ├── planner.py               #   计划生成 + 预过滤
-│   │   ├── tools.py                 #   @tool 装饰器封装
-│   │   ├── skill_loader.py          #   skills/*.md 加载器
-│   │   ├── skills/                  #   7 个角色说明书
-│   │   ├── workers/
-│   │   │   ├── factory.py           #   build_worker_subgraph()
-│   │   │   └── *_worker.py          #   5 个 Worker 导出
-│   │   └── workflow/
-│   │       └── guard.py             #   正则安全护栏
-│   ├── mcp/                         # 标准 MCP + 内部注册表
-│   │   ├── server.py                #   FastMCP stdio 服务器
-│   │   ├── registry.py              #   ToolRegistry
+│   │   ├── planner.py               #   计划生成 + 确定性预过滤
+│   │   ├── skill_loader.py          #   skills/*.md 加载器（带缓存）
+│   │   ├── skills/                  #   角色说明书
+│   │   ├── workers/factory.py       #   build_worker_subgraph() 通用 ReAct 工厂
+│   │   └── workflow/guard.py        #   正则安全护栏
+│   ├── mcp/
+│   │   ├── server.py                #   FastMCP stdio 服务器（外部）
+│   │   ├── registry.py              #   @tool 注册表（内部）
 │   │   └── servers/                 #   航班 / 酒店 / 天气 / 汇率
-│   ├── utils/                       # LLM / Config / DB / 限流
-│   ├── auth/                        # JWT + bcrypt
-│   ├── models/                      # SQLAlchemy ORM
-│   ├── crud/                        # 数据访问层
-│   ├── routers/                     # chat / auth / admin / export
-│   └── schemas/                     # Pydantic 模型
-├── static/
-│   └── marked.js                    # Markdown 渲染
-└── tests/                           # pytest (16 个)
+│   ├── auth/                        # JWT + bcrypt + 登出黑名单 + 游客 HMAC 会话
+│   ├── utils/                       # LLM 客户端 / 配置 / DB / 限流 / PDF
+│   ├── models/ · crud/ · schemas/   # ORM / 数据访问 / Pydantic
+│   └── routers/                     # chat / auth / admin / export / search
+└── uploads/                         # 管理端上传目录（UUID 命名）
 ```
 
 ---
 
-## Worker 与工具对应
+## 已知限制
 
-| Worker | 工具 | 数据源 |
-|--------|------|--------|
-| ✈️ flight | search_flights / get_flight_price | 模拟 8 条航班 |
-| 🏨 hotel | search_hotels | 模拟 15 家酒店 |
-| 🎯 attraction | 无（纯 LLM 推理） | — |
-| 📅 itinerary | get_weather / get_forecast | wttr.in 真实天气 |
-| 💰 budget | get_exchange_rate | exchangerate-api 真实汇率 |
-
-### MCP 双轨制
-
-| 层 | 技术 | 用途 |
-|----|------|------|
-| 外部 | FastMCP (stdio) | Claude Desktop 等 MCP 客户端 |
-| 内部 | @tool 装饰器 | Worker 子图通过 ToolNode 调用 |
-
----
-
-## 技术栈
-
-```
-LangGraph · DeepSeek · FastMCP · StateGraph 子图 · ReAct
-FastAPI · SQLite · JWT · 高德地图 · SSE 流式
-```
+- 限流器与 JWT 黑名单为**进程内存态**：多进程部署或重启后失效，生产应换 Redis
+- 航班/酒店为模拟数据（天气/汇率为真实 API）；接入真实供应商只需替换 `app/mcp/servers/`
+- Guard 为轻量正则第一道防线，深度防护依赖 Worker system prompt
+- SQLite 单实例（单写者），高并发场景切 MySQL（`SQLITE_PATH` 置空即用 `DB_URL`）
 
 ---
 
