@@ -7,6 +7,8 @@ import OrchestrationTimeline from './OrchestrationTimeline'
 import type { JourneyStep } from './model'
 import type { ItineraryViewModel } from './viewModel'
 
+const EXPORT_MENU_ID = 'atlas-export-menu'
+
 interface ItineraryWorkspaceProps {
   viewModel: ItineraryViewModel
   city: string
@@ -76,12 +78,38 @@ export default function ItineraryWorkspace({
   people,
 }: ItineraryWorkspaceProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [exportOpen, setExportOpen] = useState(false)
   const copyTimerRef = useRef<number | null>(null)
+  const exportRef = useRef<HTMLDivElement | null>(null)
+  const exportTriggerRef = useRef<HTMLButtonElement | null>(null)
   const maxBudget = Math.max(...viewModel.budgetItems.map(item => item.amount), 1)
 
   useEffect(() => () => {
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current)
   }, [])
+
+  // R3 导出菜单：Esc 关闭并回焦触发钮；点击菜单外区域关闭
+  useEffect(() => {
+    if (!exportOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setExportOpen(false)
+        exportTriggerRef.current?.focus()
+      }
+    }
+    const onPointerDown = (event: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(event.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [exportOpen])
 
   const copyPlan = async () => {
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current)
@@ -95,6 +123,11 @@ export default function ItineraryWorkspace({
     } catch {
       setCopyStatus('error')
     }
+  }
+
+  const runExport = (format: 'md' | 'pdf') => {
+    setExportOpen(false)
+    onExport?.(format)
   }
 
   return (
@@ -115,16 +148,38 @@ export default function ItineraryWorkspace({
                 查看完整行程 <ArrowUpRight size={15} aria-hidden="true" />
               </button>
             )}
-            <button type="button" onClick={() => void copyPlan()} aria-label={copyStatus === 'success' ? '已复制方案' : copyStatus === 'error' ? '复制失败，重试复制方案' : '复制方案'}>
-              {copyStatus === 'success' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
-              {copyStatus === 'success' ? '已复制' : copyStatus === 'error' ? '重试复制' : '复制'}
-            </button>
-            {onExport && (
-              <>
-                <button type="button" onClick={() => onExport('md')} aria-label="导出 Markdown"><FileText size={15} aria-hidden="true" /> Markdown</button>
-                <button type="button" onClick={() => onExport('pdf')} aria-label="导出 PDF"><FileDown size={15} aria-hidden="true" /> PDF</button>
-              </>
-            )}
+            <div className="atlas-export-wrap" ref={exportRef}>
+              <button
+                type="button"
+                ref={exportTriggerRef}
+                className={`atlas-export-trigger ${exportOpen ? 'is-open' : ''}`}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+                aria-controls={EXPORT_MENU_ID}
+                onClick={() => setExportOpen(value => !value)}
+              >
+                <FileDown size={15} aria-hidden="true" /> 导出
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+              {exportOpen && (
+                <div id={EXPORT_MENU_ID} className="atlas-export-menu" role="menu" aria-label="导出操作">
+                  <button type="button" role="menuitem" onClick={() => { setExportOpen(false); void copyPlan() }}>
+                    {copyStatus === 'success' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                    {copyStatus === 'success' ? '已复制，再复制一份' : '复制方案'}
+                  </button>
+                  {onExport && (
+                    <>
+                      <button type="button" role="menuitem" onClick={() => runExport('md')}>
+                        <FileText size={15} aria-hidden="true" /> 导出 Markdown
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => runExport('pdf')}>
+                        <FileDown size={15} aria-hidden="true" /> 导出 PDF
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <p className="atlas-reading-stats">

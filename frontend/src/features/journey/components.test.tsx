@@ -289,7 +289,8 @@ describe('Atlas journey interface', () => {
     expect(screen.getByRole('list', { name: '逐日行程时间轴' })).toHaveTextContent('入住银座酒店')
     expect(screen.getByText('抵达东京')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '导出 PDF' }))
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 PDF' }))
     expect(onExport).toHaveBeenCalledWith('pdf')
   })
 

@@ -120,12 +120,14 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
     })
     render(<ItineraryWorkspace {...baseProps} viewModel={buildItineraryViewModel('# 东京方案')} />)
 
-    await user.click(screen.getByRole('button', { name: '复制方案' }))
+    // 导出动作收进菜单：先打开菜单再复制
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '复制方案' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('复制失败')
   })
 
-  it('forwards markdown and pdf exports', async () => {
+  it('forwards markdown and pdf exports from the export menu', async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
     render(
@@ -136,10 +138,33 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: '导出 Markdown' }))
-    await user.click(screen.getByRole('button', { name: '导出 PDF' }))
+    // 菜单收起时不显示具体导出动作
+    expect(screen.queryByRole('menuitem', { name: '导出 Markdown' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 Markdown' }))
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 PDF' }))
     expect(onExport).toHaveBeenCalledWith('md')
     expect(onExport).toHaveBeenCalledWith('pdf')
+  })
+
+  it('closes the export menu with Escape and reports aria state', async () => {
+    const user = userEvent.setup()
+    render(<ItineraryWorkspace {...baseProps} onExport={() => undefined} viewModel={buildItineraryViewModel(structured)} />)
+
+    const trigger = screen.getByRole('button', { name: /导出/ })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(trigger.getAttribute('aria-controls')).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '导出 PDF' })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('menuitem', { name: '导出 PDF' })).not.toBeInTheDocument()
   })
 
   it('renders a narrative fallback when no structured days exist', () => {

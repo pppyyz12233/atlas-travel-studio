@@ -329,7 +329,8 @@ describe('Atlas page integration', () => {
     act(() => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: null })
     })
-    await user.click(screen.getByRole('button', { name: '导出 Markdown' }))
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 Markdown' }))
 
     expect(setShowAuthModal).not.toHaveBeenCalled()
     expect(createObjectURL).toHaveBeenCalledOnce()
@@ -354,7 +355,8 @@ describe('Atlas page integration', () => {
     act(() => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: 55 })
     })
-    await user.click(screen.getByRole('button', { name: '导出 PDF' }))
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 PDF' }))
 
     expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('导出失败')

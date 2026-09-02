@@ -2150,3 +2150,63 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 
 .atlas-fold-panel { padding: 14px 2px 4px; animation: atlas-rise .3s var(--atlas-ease) both; }
 .atlas-fold-panel .atlas-orchestration { padding: 0; }
+
+/* ---------- R3 导出菜单 ---------- */
+.atlas-export-wrap { position: relative; display: inline-flex; }
+
+.atlas-export-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-btn);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--atlas-shadow-sm);
+  transition: color var(--atlas-fast), border-color var(--atlas-fast);
+}
+.atlas-export-trigger:hover { color: var(--atlas-ink); border-color: var(--atlas-line-strong); }
+.atlas-export-trigger svg:last-child { transition: transform var(--atlas-fast); }
+.atlas-export-trigger.is-open svg:last-child { transform: rotate(180deg); }
+
+.atlas-export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 172px;
+  padding: 5px;
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line-strong);
+  border-radius: var(--atlas-r-card);
+  box-shadow: var(--atlas-shadow-md);
+  animation: atlas-rise .18s var(--atlas-ease) both;
+}
+.atlas-export-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 11px;
+  color: var(--atlas-ink-soft);
+  background: none;
+  border: 0;
+  border-radius: var(--atlas-r-chip);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--atlas-fast), background var(--atlas-fast);
+}
+.atlas-export-menu > button:hover,
+.atlas-export-menu > button:focus-visible {
+  color: var(--atlas-ink);
+  background: var(--atlas-paper-soft);
+  outline: none;
+}
