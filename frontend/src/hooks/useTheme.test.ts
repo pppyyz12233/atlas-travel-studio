@@ -34,7 +34,7 @@ describe('theme hook', () => {
 
     expect(result.current.isDark).toBe(true)
     expect(document.documentElement.classList.contains('dark')).toBe(true)
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#16130f')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#141210')
   })
 
   it('follows the system color scheme until the user picks a theme manually', () => {

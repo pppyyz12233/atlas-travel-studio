@@ -207,26 +207,14 @@ describe('journey state persistence', () => {
     expect(state.activeId).toBe(state.sessions[0].id)
   })
 
-  it('prefers the session id from the location hash when restoring', () => {
-    const first = createJourneySession({ id: 'hash-first' })
-    const second = createJourneySession({ id: 'hash-second' })
+  it('falls back to the first session when the stored activeId is missing', () => {
+    const first = createJourneySession({ id: 'stored-first' })
+    const second = createJourneySession({ id: 'stored-second' })
     sessionStorage.setItem(
       JOURNEY_STORAGE_KEY,
-      serializeJourneyState({ sessions: [first, second], activeId: 'hash-first' }) ?? '',
+      JSON.stringify({ sessions: [first, second], activeId: 'gone' }),
     )
-    location.hash = '#s=hash-second'
 
-    expect(loadInitialJourneyState().activeId).toBe('hash-second')
-  })
-
-  it('ignores a hash that does not match any persisted session', () => {
-    const only = createJourneySession({ id: 'only-session' })
-    sessionStorage.setItem(
-      JOURNEY_STORAGE_KEY,
-      serializeJourneyState({ sessions: [only], activeId: 'only-session' }) ?? '',
-    )
-    location.hash = '#s=does-not-exist'
-
-    expect(loadInitialJourneyState().activeId).toBe('only-session')
+    expect(loadInitialJourneyState().activeId).toBe('stored-first')
   })
 })

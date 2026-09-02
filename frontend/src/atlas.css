@@ -111,11 +111,10 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--atlas-amber-ink);
-  background: linear-gradient(135deg, #ffd166 0%, var(--atlas-amber) 100%);
-  border: 1.5px solid rgba(36, 28, 5, .3);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
   border-radius: 9px;
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .2);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
 }
 
 .atlas-brand-block > span:last-child { min-width: 0; display: grid; }
@@ -137,19 +136,19 @@
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  color: var(--atlas-amber-ink);
-  background: var(--atlas-amber);
-  border: 1.5px solid rgba(36, 28, 5, .3);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .2);
   border-radius: var(--atlas-r-btn);
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .26);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
   transition: filter var(--atlas-fast), transform var(--atlas-fast);
 }
 
-.atlas-new-journey:hover { filter: brightness(1.04); }
-.atlas-new-journey:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 rgba(36, 28, 5, .26); }
-.atlas-new-journey span { margin-left: auto; color: rgba(36, 28, 5, .55); font-size: 11px; font-family: var(--atlas-mono); }
+.atlas-new-journey:hover { background: var(--atlas-cta-deep); }
+.atlas-new-journey:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
+.atlas-new-journey span { margin-left: auto; color: color-mix(in srgb, var(--atlas-cta-ink) 60%, transparent); font-size: 11px; font-family: var(--atlas-mono); }
 
 .atlas-rail-section { margin-top: 22px; }
 
@@ -351,9 +350,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--atlas-amber-ink);
-  background: var(--atlas-amber);
-  border: 1.5px solid rgba(36, 28, 5, .28);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
   border-radius: 50%;
   font-size: 13px;
   font-weight: 800;
@@ -740,18 +738,18 @@
   gap: 8px;
   margin-top: 20px;
   padding: 0 24px;
-  color: var(--atlas-amber-ink);
-  background: var(--atlas-amber);
-  border: 1.5px solid rgba(36, 28, 5, .3);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .2);
   border-radius: var(--atlas-r-btn);
   font-size: 13.5px;
   font-weight: 700;
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .28);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
   transition: background var(--atlas-fast), transform var(--atlas-fast), box-shadow var(--atlas-fast);
 }
 
-.atlas-primary-action:hover:not(:disabled) { background: var(--atlas-amber-deep); }
-.atlas-primary-action:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 rgba(36, 28, 5, .28); }
+.atlas-primary-action:hover:not(:disabled) { background: var(--atlas-cta-deep); }
+.atlas-primary-action:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
 
 .atlas-form-note { display: inline-block; margin: 0 0 0 13px; color: var(--atlas-ink-muted); font-size: 12px; }
 
@@ -1422,16 +1420,16 @@
   justify-content: center;
   gap: 6px;
   flex: 0 0 auto;
-  color: var(--atlas-amber-ink);
-  background: var(--atlas-amber);
-  border: 1.5px solid rgba(36, 28, 5, .3);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .2);
   border-radius: var(--atlas-r-btn);
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .24);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
   transition: background var(--atlas-fast), transform var(--atlas-fast), box-shadow var(--atlas-fast);
 }
 
-.atlas-send-action:hover:not(:disabled) { background: var(--atlas-amber-deep); }
-.atlas-send-action:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 rgba(36, 28, 5, .24); }
+.atlas-send-action:hover:not(:disabled) { background: var(--atlas-cta-deep); }
+.atlas-send-action:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
 .atlas-send-action:disabled { opacity: .4; }
 
 .atlas-stop-action {

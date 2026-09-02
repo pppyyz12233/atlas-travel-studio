@@ -1,120 +1,129 @@
 /* ==========================================================
    Atlas — 基础层：设计令牌 / 重置 / 共享组件（登录框、地图、Markdown）
-   v4 "旅行手账工作台"：暖白画布 + 沙色内容 + 薄荷辅助 + 珊瑚强调 +
-   琥珀 CTA + 轻微硬阴影；保留分层纪律与紧凑密度
+   v5 "编辑杂志"：暖白纸面 + 发丝线 + 橄榄强调 + 砖红运行态 +
+   墨色 CTA + 衬线 Display 标题；克制硬阴影
    ========================================================== */
 
 :root {
   color-scheme: light;
 
-  /* 表面：暖白画布，沙色分层 */
-  --atlas-canvas: #faf7f2;
-  --atlas-canvas-glow: #f4eee3;
+  /* 表面：暖白纸面 */
+  --atlas-canvas: #fbfaf7;
+  --atlas-canvas-glow: #f4efe4;
   --atlas-paper: #ffffff;
-  --atlas-paper-soft: #f6f1e7;
-  --atlas-paper-deep: #efe7d8;
+  --atlas-paper-soft: #f4efe5;
+  --atlas-paper-deep: #ece5d5;
 
-  /* 墨色：深暖墨，三级拉开（muted 需在沙底上 ≥4.5:1） */
-  --atlas-ink: #221f1a;
-  --atlas-ink-soft: #575046;
-  --atlas-ink-muted: #776e60;
-  --atlas-line: #e6dfd1;
-  --atlas-line-strong: #cfc4af;
+  /* 墨色：深墨三级（muted 于沙底 ≥4.5:1） */
+  --atlas-ink: #1f1c17;
+  --atlas-ink-soft: #4f4a40;
+  --atlas-ink-muted: #746d5f;
+  --atlas-line: #e6e0d4;
+  --atlas-line-strong: #d3cab6;
 
-  /* 语义色（沿用旧令牌名，语义已迁移）：
-     sky 系 = 珊瑚强调（链接/焦点/激活）
-     sun 系 = 珊瑚运行态（脉冲/进行中）
-     route 系 = 薄荷完成态
-     amber 系 = 琥珀主 CTA */
-  --atlas-sky: #c04435;
-  --atlas-sky-deep: #a53a2c;
-  --atlas-sky-soft: #fbeae6;
-  --atlas-sky-ink: #ffffff;
-  --atlas-sun: #e85d4a;
-  --atlas-sun-deep: #c04435;
-  --atlas-sun-soft: #fceae6;
-  --atlas-route: #2f9e77;
-  --atlas-route-soft: #e3f4ec;
-  --atlas-alert: #d92d20;
-  --atlas-alert-soft: #fdeceb;
+  /* 语义色（令牌名沿用，语义 v5）：
+     sky 系 = 橄榄强调（链接/焦点/激活）
+     sun 系 = 砖红运行态
+     route 系 = 橄榄绿完成态
+     amber 系 = 焦糖小标签（kicker 等），主 CTA 已改墨色 */
+  --atlas-sky: #56633f;
+  --atlas-sky-deep: #43502f;
+  --atlas-sky-soft: #eef0e2;
+  --atlas-sky-ink: #f7f5ec;
+  --atlas-sun: #b04a2f;
+  --atlas-sun-deep: #93392a;
+  --atlas-sun-soft: #f6e8e1;
+  --atlas-route: #4c7a3f;
+  --atlas-route-soft: #edf0e1;
+  --atlas-alert: #b3261e;
+  --atlas-alert-soft: #f9e9e7;
 
-  --atlas-amber: #f2b01e;
-  --atlas-amber-deep: #d99a0d;
-  --atlas-amber-soft: #fdf3d7;
-  --atlas-amber-ink: #241c05;
+  --atlas-amber: #a8742a;
+  --atlas-amber-deep: #8a5c1c;
+  --atlas-amber-soft: #f4ead6;
+  --atlas-amber-ink: #2b1f07;
 
-  /* 沙色纸面侧栏 */
+  /* 沙色纸面侧栏（规划工作台） */
   --atlas-deck: #f2ecdf;
-  --atlas-deck-ink: #221f1a;
-  --atlas-deck-soft: rgba(34, 31, 26, .05);
+  --atlas-deck-ink: #1f1c17;
+  --atlas-deck-soft: rgba(31, 28, 23, .05);
   --atlas-deck-line: #ddd2bd;
+
+  /* 主 CTA 墨色 */
+  --atlas-cta: #1f1c17;
+  --atlas-cta-deep: #000000;
+  --atlas-cta-ink: #fbfaf7;
 
   /* 阴影：轻微硬阴影（纸片叠放感） */
   --atlas-shadow-sm: 2px 2px 0 0 var(--atlas-line-strong);
   --atlas-shadow-md: 3px 3px 0 0 var(--atlas-line-strong);
-  --atlas-shadow-lg: 5px 5px 0 0 rgba(34, 31, 26, .12), 0 14px 36px rgba(34, 31, 26, .16);
+  --atlas-shadow-lg: 5px 5px 0 0 rgba(31, 28, 23, .12), 0 14px 36px rgba(31, 28, 23, .16);
   --atlas-fast: 130ms;
   --atlas-normal: 200ms;
   --atlas-ease: cubic-bezier(.25, 1, .35, 1);
 
-  /* 圆角体系：统一收敛，工具感 */
+  /* 圆角体系：收敛 */
   --atlas-r-card: 12px;
   --atlas-r-input: 10px;
   --atlas-r-btn: 10px;
   --atlas-r-chip: 8px;
 
-  /* 字体 */
+  /* 字体：正文无衬线，标题衬线（本地字体栈，无网络依赖） */
   --atlas-font: "Segoe UI Variable Text", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
     "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
-  --atlas-display: "Segoe UI Variable Display", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
-    "Microsoft YaHei UI", system-ui, sans-serif;
+  --atlas-display: "Noto Serif SC", "Source Han Serif SC", "STZhongsong", "SimSun",
+    Georgia, "Times New Roman", serif;
   --atlas-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
 
   /* 预算分类色（对齐 worker 色） */
-  --atlas-budget-flight: #d95b47;
-  --atlas-budget-hotel: #33586e;
-  --atlas-budget-attraction: #2f9e77;
-  --atlas-budget-food: #d99a0d;
+  --atlas-budget-flight: #b04a2f;
+  --atlas-budget-hotel: #2f4a6b;
+  --atlas-budget-attraction: #4c7a3f;
+  --atlas-budget-food: #a8742a;
   --atlas-budget-transit: #8a6a3e;
-  --atlas-budget-other: #8d8477;
+  --atlas-budget-other: #746d5f;
 }
 
 .dark {
   color-scheme: dark;
 
-  --atlas-canvas: #16130f;
-  --atlas-canvas-glow: #1b1712;
-  --atlas-paper: #1e1a15;
-  --atlas-paper-soft: #272219;
-  --atlas-paper-deep: #332b20;
+  --atlas-canvas: #141210;
+  --atlas-canvas-glow: #1a1714;
+  --atlas-paper: #1c1915;
+  --atlas-paper-soft: #25211b;
+  --atlas-paper-deep: #322c22;
 
-  --atlas-ink: #f2ede3;
-  --atlas-ink-soft: #c3b9aa;
-  --atlas-ink-muted: #9a917f;
-  --atlas-line: #352d22;
-  --atlas-line-strong: #4d4231;
+  --atlas-ink: #efe9dd;
+  --atlas-ink-soft: #bfb7a8;
+  --atlas-ink-muted: #a49b89;
+  --atlas-line: #3a3327;
+  --atlas-line-strong: #524936;
 
-  --atlas-sky: #ff8a76;
-  --atlas-sky-deep: #ffa08e;
-  --atlas-sky-soft: #3a211c;
-  --atlas-sky-ink: #2a0f0a;
-  --atlas-sun: #f07a63;
-  --atlas-sun-deep: #ff9482;
-  --atlas-sun-soft: #3a201a;
-  --atlas-route: #46c395;
-  --atlas-route-soft: #163028;
-  --atlas-alert: #ff8578;
-  --atlas-alert-soft: #3a1d19;
+  --atlas-sky: #a8b878;
+  --atlas-sky-deep: #bcc996;
+  --atlas-sky-soft: #262b1c;
+  --atlas-sky-ink: #14160c;
+  --atlas-sun: #d0785a;
+  --atlas-sun-deep: #e08a6c;
+  --atlas-sun-soft: #33211a;
+  --atlas-route: #8fae72;
+  --atlas-route-soft: #1d2617;
+  --atlas-alert: #e07a6e;
+  --atlas-alert-soft: #351c18;
 
-  --atlas-amber: #f7bd3a;
-  --atlas-amber-deep: #ffca57;
-  --atlas-amber-soft: #3a3018;
-  --atlas-amber-ink: #241c05;
+  --atlas-amber: #c99a4b;
+  --atlas-amber-deep: #d9ab62;
+  --atlas-amber-soft: #332915;
+  --atlas-amber-ink: #2b1f07;
 
   --atlas-deck: #121009;
   --atlas-deck-ink: #e9e3d6;
   --atlas-deck-soft: rgba(255, 255, 255, .05);
   --atlas-deck-line: rgba(255, 255, 255, .07);
+
+  --atlas-cta: #efe9dd;
+  --atlas-cta-deep: #ffffff;
+  --atlas-cta-ink: #141210;
 
   --atlas-shadow-sm: 2px 2px 0 0 rgba(0, 0, 0, .3);
   --atlas-shadow-md: 3px 3px 0 0 rgba(0, 0, 0, .34);
@@ -189,18 +198,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--atlas-amber-ink);
-  background: var(--atlas-amber);
-  border: 1.5px solid rgba(36, 28, 5, .28);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .22);
   border-radius: var(--atlas-r-btn);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .3);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
   transition: background var(--atlas-fast), box-shadow var(--atlas-fast), transform var(--atlas-fast);
 }
 
-.primary-button:hover:not(:disabled) { background: var(--atlas-amber-deep); }
-.primary-button:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 rgba(36, 28, 5, .3); }
+.primary-button:hover:not(:disabled) { background: var(--atlas-cta-deep); }
+.primary-button:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
 .primary-button:disabled { cursor: not-allowed; opacity: .45; }
 
 .brand-mark {
@@ -209,11 +218,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--atlas-amber-ink);
-  background: linear-gradient(135deg, #ffd166 0%, var(--atlas-amber) 100%);
-  border: 1.5px solid rgba(36, 28, 5, .3);
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
   border-radius: 10px;
-  box-shadow: 2px 2px 0 0 rgba(36, 28, 5, .22);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
 }
 
 /* ---------- 地图 ---------- */

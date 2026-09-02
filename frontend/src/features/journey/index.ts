@@ -15,7 +15,6 @@ export {
   journeyReducer,
   loadInitialJourneyState,
   saveJourneyState,
-  writeSessionIdToHash,
 } from './model'
 export {
   fallbackWorkerMeta,

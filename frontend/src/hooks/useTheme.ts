@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const LIGHT_THEME_COLOR = '#faf7f2'
-const DARK_THEME_COLOR = '#16130f'
+const LIGHT_THEME_COLOR = '#fbfaf7'
+const DARK_THEME_COLOR = '#141210'
 
 function readStoredTheme(): string | null {
   try {

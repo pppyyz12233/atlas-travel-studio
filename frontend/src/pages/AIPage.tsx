@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LogIn, Map as MapIcon, Menu, Moon, Sparkles, Sun } from 'lucide-react'
 import type { MapApi } from '../components/MapView'
 import {
@@ -11,19 +11,15 @@ import {
   MissionBrief,
   OrchestrationTimeline,
   SessionRail,
-  activeJourneySession,
   buildItineraryViewModel,
   createJourneySession,
   eventToJourneyActions,
   getWorkerMeta,
   journeyProgress,
-  journeyReducer,
-  loadInitialJourneyState,
-  saveJourneyState,
-  writeSessionIdToHash,
 } from '../features/journey'
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
+import { useJourney } from '../app/JourneyProvider'
 import { api } from '../hooks/useApi'
 import type { useAuth } from '../hooks/useAuth'
 import { useSSE } from '../hooks/useSSE'
@@ -52,9 +48,8 @@ function fallbackBrief(form: TripForm): string {
 }
 
 export default function AIPage({ auth, theme }: Props) {
-  // 惰性初始化：优先从 sessionStorage 恢复刷新前的会话，其次看 #s= 锚点，最后新会话
-  const [journeyState, dispatch] = useReducer(journeyReducer, undefined, loadInitialJourneyState)
-  const activeSession = activeJourneySession(journeyState)
+  // 会话状态来自 App 级 JourneyProvider：首页/详情页/我的行程与规划页共享同一份
+  const { state: journeyState, dispatch, activeSession } = useJourney()
   const { isStreaming, startStream, stopStream } = useSSE()
   const [input, setInput] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -106,15 +101,6 @@ export default function AIPage({ auth, theme }: Props) {
   useEffect(() => {
     void refreshConversations()
   }, [refreshConversations])
-
-  // 刷新恢复 + URL 锚点
-  useEffect(() => {
-    saveJourneyState(journeyState)
-  }, [journeyState])
-
-  useEffect(() => {
-    writeSessionIdToHash(activeSession.id)
-  }, [activeSession.id])
 
   useEffect(() => {
     setResultNotice(null)

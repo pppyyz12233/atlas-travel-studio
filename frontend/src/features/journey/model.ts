@@ -172,22 +172,11 @@ export function restoreJourneyState(raw: string | null): JourneyState | null {
   }
 }
 
-function readSessionIdFromHash(hash: string): string | null {
-  const match = /^#s=([A-Za-z0-9-]+)$/.exec(hash.trim())
-  return match ? match[1] : null
-}
-
 export function loadInitialJourneyState(): JourneyState {
   const persisted = restoreJourneyState(
     typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(JOURNEY_STORAGE_KEY),
   )
-  if (persisted) {
-    const hashId = typeof location === 'undefined' ? null : readSessionIdFromHash(location.hash)
-    if (hashId && persisted.sessions.some(session => session.id === hashId)) {
-      return { ...persisted, activeId: hashId }
-    }
-    return persisted
-  }
+  if (persisted) return persisted
   const session = createJourneySession()
   return { sessions: [session], activeId: session.id }
 }
@@ -198,14 +187,6 @@ export function saveJourneyState(state: JourneyState): void {
     if (serialized) sessionStorage.setItem(JOURNEY_STORAGE_KEY, serialized)
   } catch {
     // 隐私模式 / 存储配额满：放弃持久化，不影响当前会话
-  }
-}
-
-export function writeSessionIdToHash(sessionId: string): void {
-  try {
-    history.replaceState(null, '', `#s=${sessionId}`)
-  } catch {
-    // history 不可用（如沙箱 iframe）时忽略
   }
 }
 

@@ -7,6 +7,7 @@ import type { useAuth } from '../hooks/useAuth'
 import type { StreamError } from '../hooks/useSSE'
 import type { useTheme } from '../hooks/useTheme'
 import AIPage from './AIPage'
+import { JourneyProvider } from '../app/JourneyProvider'
 
 interface StreamOptions {
   onEvent: (event: NormalizedSSEEvent) => void
@@ -57,6 +58,9 @@ describe('Atlas page integration', () => {
     location.hash = ''
   })
 
+  // 会话状态已提升到 JourneyProvider，测试中包一层
+  const renderPage = (ui: React.ReactElement) => render(ui, { wrapper: JourneyProvider })
+
   const guestAuth = () => ({
     user: null, token: null, isLoggedIn: false, isValidating: false,
     login: vi.fn(), loginByPhone: vi.fn(), register: vi.fn(), logout: vi.fn(),
@@ -81,7 +85,7 @@ describe('Atlas page integration', () => {
       activeId: session.id,
     }))
 
-    render(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
 
     expect(screen.getByRole('heading', { name: /旅程工作区/ })).toBeInTheDocument()
     expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶')).toBeInTheDocument()
@@ -98,7 +102,7 @@ describe('Atlas page integration', () => {
       activeId: session.id,
     }))
 
-    render(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
 
     expect(screen.getAllByText('已停止').length).toBeGreaterThan(0)
     expect(screen.getByText(/页面刷新，生成已中断/)).toBeInTheDocument()
@@ -121,7 +125,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
 
     expect(within(screen.getByLabelText('对话记录')).getByText(/从上海去东京/)).toBeInTheDocument()
@@ -161,7 +165,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(screen.getByRole('button', { name: /周末松弛之旅/ }))
 
     expect(streamHarness.startStream).toHaveBeenCalledWith(
@@ -203,7 +207,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(await screen.findByRole('button', { name: /东京旧行程/ }))
 
     const feed = await screen.findByLabelText('对话记录')
@@ -231,7 +235,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    const { rerender } = render(<AIPage auth={loggedInAuth} theme={theme} />)
+    const { rerender } = renderPage(<AIPage auth={loggedInAuth} theme={theme} />)
     await waitFor(() => expect(apiHarness.get).toHaveBeenCalledWith('/chat/conversations'))
     rerender(<AIPage auth={loggedOutAuth} theme={theme} />)
 
@@ -258,7 +262,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
     act(() => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: null })
@@ -283,7 +287,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
     act(() => {
       streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: 55 })
@@ -306,7 +310,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
     await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
     act(() => {
       streamHarness.options?.onError?.({ message: '登录已过期', status: 401 })
@@ -329,7 +333,7 @@ describe('Atlas page integration', () => {
     } as ReturnType<typeof useAuth>
     const theme = { isDark: false, toggle: vi.fn() } as ReturnType<typeof useTheme>
 
-    render(<AIPage auth={auth} theme={theme} />)
+    renderPage(<AIPage auth={auth} theme={theme} />)
 
     await waitFor(() => expect(setShowAuthModal).toHaveBeenCalledWith(true))
     expect(logout).toHaveBeenCalledOnce()
