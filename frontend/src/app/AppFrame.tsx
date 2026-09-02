@@ -1,4 +1,4 @@
-import { Compass, Home, LogIn, LogOut, Map, Moon, Navigation, Sun, UserRound } from 'lucide-react'
+import { Compass, Home, LogIn, LogOut, Map, Moon, Navigation, Plus, Sun, UserRound } from 'lucide-react'
 import { Link, useRouter } from './router'
 import type { RouteName } from './router'
 import type { useAuth } from '../hooks/useAuth'
@@ -10,15 +10,15 @@ interface AppFrameProps {
   children: React.ReactNode
 }
 
+// R4 导航收敛：规划不再是导航里的一个"地方"——它由首页输入与中央主按钮触发
 const navItems: Array<{ to: string; label: string; name: RouteName; icon: typeof Home }> = [
   { to: '/', label: '首页', name: 'home', icon: Home },
-  { to: '/plan', label: 'AI 规划', name: 'plan', icon: Navigation },
   { to: '/explore', label: '探索', name: 'explore', icon: Compass },
   { to: '/trips', label: '我的行程', name: 'trips', icon: Map },
 ]
 
 export default function AppFrame({ auth, theme, children }: AppFrameProps) {
-  const { route } = useRouter()
+  const { route, navigate } = useRouter()
 
   return (
     <div className="mag-frame">
@@ -78,7 +78,25 @@ export default function AppFrame({ auth, theme, children }: AppFrameProps) {
       </main>
 
       <nav className="mag-mobilenav" aria-label="底部导航">
-        {navItems.map(item => {
+        {navItems.slice(0, 2).map(item => {
+          const Icon = item.icon
+          const active = route.name === item.name
+          return (
+            <Link key={item.to} to={item.to} className={`mag-mobilenav-link ${active ? 'is-active' : ''}`}>
+              <Icon size={19} aria-hidden="true" />
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+        <button
+          type="button"
+          className="mag-mobilenav-fab"
+          onClick={() => navigate('/plan')}
+          aria-label="开始新的规划"
+        >
+          <Plus size={22} aria-hidden="true" />
+        </button>
+        {navItems.slice(2).map(item => {
           const Icon = item.icon
           const active = route.name === item.name
           return (

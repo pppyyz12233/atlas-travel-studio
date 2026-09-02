@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Cloud, Heart, LogIn, MapPin, Search } from 'lucide-react'
+import { ChevronDown, Cloud, Heart, LogIn, MapPin, Search } from 'lucide-react'
 import { Link, useRouter } from '../app/router'
 import { useJourney } from '../app/JourneyProvider'
 import { api } from '../hooks/useApi'
@@ -26,6 +26,8 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
   const [query, setQuery] = useState('')
   const [cloud, setCloud] = useState<CloudState>({ status: 'idle' })
   const [loadingHistory, setLoadingHistory] = useState<number | null>(null)
+  // R4：收藏为次级内容，默认折叠（无收藏时直接显示空态引导）
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
 
   const loadCloud = useCallback(async () => {
     if (!auth.isLoggedIn) {
@@ -215,7 +217,20 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
       <section className="mag-trips-section" aria-labelledby="mag-trips-favorites">
         <header className="mag-section-head">
           <h2 id="mag-trips-favorites"><Heart size={15} aria-hidden="true" /> 收藏的目的地</h2>
-          <Link to="/explore" className="mag-section-more">去探索</Link>
+          {favoriteDestinations.length > 0 ? (
+            <button
+              type="button"
+              className={`mag-section-more mag-collapse-toggle ${favoritesOpen ? 'is-open' : ''}`}
+              aria-expanded={favoritesOpen}
+              aria-controls="mag-favorites-body"
+              onClick={() => setFavoritesOpen(value => !value)}
+            >
+              {favoritesOpen ? '收起' : `展开 (${favoriteDestinations.length})`}
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          ) : (
+            <Link to="/explore" className="mag-section-more">去探索</Link>
+          )}
         </header>
         {favoriteDestinations.length === 0 ? (
           <EmptyState
@@ -223,8 +238,8 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
             description="在探索页点亮任意目的地的心标，它会出现在这里。"
             action={<Link to="/explore" className="mag-cta is-ghost">探索目的地</Link>}
           />
-        ) : (
-          <div className="mag-destination-grid">
+        ) : favoritesOpen ? (
+          <div id="mag-favorites-body" className="mag-destination-grid">
             {favoriteDestinations.map(destination => (
               <DestinationCard
                 key={destination.id}
@@ -233,7 +248,7 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
               />
             ))}
           </div>
-        )}
+        ) : null}
       </section>
     </div>
   )

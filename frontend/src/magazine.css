@@ -252,6 +252,28 @@
 }
 .mag-mobilenav-link.is-active { color: var(--atlas-ink); }
 
+/* 移动端中央主行动：凸起的「开始规划」 */
+.mag-mobilenav-fab {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin-top: -20px;
+  color: var(--atlas-cta-ink);
+  background: var(--atlas-cta);
+  border: 1.5px solid rgba(31, 28, 23, .22);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 3px 0 0 var(--atlas-line-strong), 0 8px 18px rgba(31, 28, 23, .18);
+  transition: transform var(--atlas-fast), box-shadow var(--atlas-fast);
+}
+.mag-mobilenav-fab:active { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--atlas-line-strong); }
+
+.mag-collapse-toggle svg { transition: transform var(--atlas-fast); }
+.mag-collapse-toggle.is-open svg { transform: rotate(180deg); }
+
 /* ---------- 页面头 ---------- */
 
 .mag-page-head { max-width: 720px; margin-bottom: clamp(24px, 4vw, 40px); }
@@ -527,7 +549,7 @@
   box-shadow: var(--atlas-shadow-sm);
   transition: transform var(--atlas-normal) var(--atlas-ease), box-shadow var(--atlas-normal) var(--atlas-ease);
 }
-.mag-destination-card:hover { transform: translateY(-3px); box-shadow: var(--atlas-shadow-md); }
+.mag-destination-card:hover { transform: translateY(-2px); box-shadow: var(--atlas-shadow-md); }
 
 .mag-destination-cover {
   position: relative;
@@ -583,7 +605,7 @@
 .mag-destination-fav:hover { transform: scale(1.06); }
 .mag-destination-fav.is-active { color: var(--atlas-sun); }
 
-.mag-destination-body { display: grid; gap: 10px; padding: 16px 16px 14px; }
+.mag-destination-body { display: grid; gap: 9px; padding: 14px 14px 12px; }
 .mag-destination-body header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .mag-destination-body h3 {
   margin: 0;
@@ -641,7 +663,7 @@
 
 .mag-destination-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(264px, 1fr));
   gap: 14px;
 }
 .mag-destination-cell { display: grid; gap: 8px; }

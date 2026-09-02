@@ -149,12 +149,14 @@ describe('explore page', () => {
 describe('trips page', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.removeItem('atlas_favorite_destinations')
     location.hash = '#/trips'
     apiGet.mockReset()
     apiGet.mockResolvedValue([])
   })
   afterEach(() => {
     sessionStorage.clear()
+    localStorage.removeItem('atlas_favorite_destinations')
     location.hash = ''
   })
 
@@ -187,6 +189,19 @@ describe('trips page', () => {
     await user.click(draftCard)
 
     expect(window.location.hash).toBe('#/trip/draft-ready')
+  })
+
+  it('keeps favorites collapsed by default and expands on demand', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('atlas_favorite_destinations', JSON.stringify(['tokyo', 'kyoto']))
+
+    renderApp(<TripsPage auth={guestAuth()} />)
+
+    expect(screen.queryByRole('button', { name: '规划前往 东京 的旅行' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /展开 \(/ }))
+    expect(screen.getByRole('button', { name: '规划前往 东京 的旅行' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '规划前往 京都 的旅行' })).toBeInTheDocument()
   })
 })
 
