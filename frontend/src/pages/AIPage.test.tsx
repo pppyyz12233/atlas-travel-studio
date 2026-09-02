@@ -108,6 +108,47 @@ describe('Atlas page integration', () => {
     expect(screen.getByText(/页面刷新，生成已中断/)).toBeInTheDocument()
   })
 
+  it('auto-starts planning from a home page brief exactly once', async () => {
+    sessionStorage.setItem('atlas_pending_brief', '十一月去京都看红叶，两个人')
+
+    const { rerender } = renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    await waitFor(() => {
+      expect(streamHarness.startStream).toHaveBeenCalledWith(
+        '十一月去京都看红叶，两个人',
+        null,
+        null,
+        expect.any(Object),
+      )
+    })
+    expect(within(screen.getByLabelText('对话记录')).getByText('十一月去京都看红叶，两个人')).toBeInTheDocument()
+
+    // 重渲染（StrictMode 二次挂载同理）不会重复发送：handoff 已被消费
+    rerender(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    expect(streamHarness.startStream).toHaveBeenCalledTimes(1)
+    expect(sessionStorage.getItem('atlas_pending_brief')).toBeNull()
+  })
+
+  it('marks an in-flight session as cancelled when the planner unmounts', async () => {
+    const user = userEvent.setup()
+    // 还原真实挂载关系：Provider 常驻，只有规划页卸载（路由切换）
+    const Probe = ({ show }: { show: boolean }) => (
+      show ? <AIPage auth={guestAuth()} theme={lightTheme()} /> : null
+    )
+    const { rerender } = render(<JourneyProvider><Probe show /></JourneyProvider>)
+
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+    rerender(<JourneyProvider><Probe show={false} /></JourneyProvider>)
+
+    await waitFor(() => {
+      const persisted = JSON.parse(sessionStorage.getItem('atlas_journey_state') ?? '{}')
+      const sessions = (persisted.sessions ?? []) as Array<{ phase?: string; statusMessage?: string }>
+      expect(sessions.some(session =>
+        session.phase === 'cancelled' && session.statusMessage?.includes('已离开规划页'),
+      )).toBe(true)
+    })
+  })
+
   it('lets a guest plan and renders a completed stream in the journey workspace', async () => {
     const user = userEvent.setup()
     const setShowAuthModal = vi.fn()

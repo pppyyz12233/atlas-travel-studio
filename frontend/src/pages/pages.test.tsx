@@ -60,13 +60,44 @@ describe('home page', () => {
     location.hash = ''
   })
 
-  it('renders the editorial hero with primary actions', () => {
+  it('renders the editorial hero with a single primary input action', () => {
     renderApp(<HomePage />)
 
     expect(screen.getByRole('heading', { name: /让下一段旅程/ })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '输入你的旅行想法' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /开始规划/ })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /探索目的地/ })).toBeInTheDocument()
-    expect(screen.getByText('编辑部精选')).toBeInTheDocument()
+    // 主输入是唯一的表单级行动；探索降为次级链接
+    expect(screen.queryByRole('heading', { name: /工作方式/ })).not.toBeInTheDocument()
+  })
+
+  it('starts planning directly from a one-line brief', async () => {
+    const user = userEvent.setup()
+    renderApp(<HomePage />)
+
+    await user.type(
+      screen.getByRole('textbox', { name: '输入你的旅行想法' }),
+      '十一月去京都看红叶，两个人，预算一万',
+    )
+    await user.click(screen.getByRole('button', { name: /开始规划/ }))
+
+    expect(window.location.hash).toBe('#/plan')
+    expect(sessionStorage.getItem('atlas_pending_brief')).toBe('十一月去京都看红叶，两个人，预算一万')
+  })
+
+  it('does not navigate or store anything for an empty brief', async () => {
+    const user = userEvent.setup()
+    renderApp(<HomePage />)
+
+    const submit = screen.getByRole('button', { name: /开始规划/ })
+    expect(submit).toBeDisabled()
+
+    await user.type(
+      screen.getByRole('textbox', { name: '输入你的旅行想法' }),
+      '   ',
+    )
+    expect(submit).toBeDisabled()
+    expect(window.location.hash).not.toBe('#/plan')
+    expect(sessionStorage.getItem('atlas_pending_brief')).toBeNull()
   })
 
   it('starts a planning journey from a featured destination', async () => {

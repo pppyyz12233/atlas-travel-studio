@@ -20,6 +20,7 @@ import {
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 import { useJourney } from '../app/JourneyProvider'
+import { consumePendingBrief } from '../app/pendingBrief'
 import { api } from '../hooks/useApi'
 import type { useAuth } from '../hooks/useAuth'
 import { useSSE } from '../hooks/useSSE'
@@ -318,6 +319,25 @@ export default function AIPage({ auth, theme }: Props) {
       dispatch({ type: 'cancel', id: sessionId, reason: '已停止生成，当前完成的步骤仍然保留。' })
     }
   }, [stopStream])
+
+  // 首页一句话 handoff：mount 时一次性消费并自动发起规划（读后即删，刷新/重挂载不重复）
+  const handoffConsumedRef = useRef(false)
+  useEffect(() => {
+    if (handoffConsumedRef.current) return
+    handoffConsumedRef.current = true
+    const brief = consumePendingBrief()
+    if (brief) send(brief)
+  }, [send])
+
+  // 离开规划页（路由切换卸载）时中止在途流，并把会话标记为已停止，
+  // 避免回来时永远停在"规划中"；已完成的步骤照常保留
+  useEffect(() => () => {
+    const sessionId = streamingSessionIdRef.current
+    streamingSessionIdRef.current = null
+    if (sessionId) {
+      dispatch({ type: 'cancel', id: sessionId, reason: '已离开规划页，生成已停止；已完成的步骤仍然保留。' })
+    }
+  }, [])
 
   const createNewJourney = useCallback(() => {
     dispatch({ type: 'add' })

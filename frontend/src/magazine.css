@@ -335,6 +335,63 @@
 
 .mag-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 
+/* 首页主输入区：唯一的表单级行动 */
+.mag-hero-input {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 28px;
+}
+.mag-hero-input textarea {
+  flex: 1;
+  min-height: 76px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 14px 16px;
+  color: var(--atlas-ink);
+  background: var(--atlas-paper);
+  border: 1.5px solid var(--atlas-line-strong);
+  border-radius: var(--atlas-r-card);
+  outline: 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  box-shadow: var(--atlas-shadow-sm);
+  transition: border-color var(--atlas-fast), box-shadow var(--atlas-fast);
+}
+.mag-hero-input textarea::placeholder { color: var(--atlas-ink-muted); }
+.mag-hero-input textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--atlas-sky) 80%, transparent);
+  outline-offset: 2px;
+}
+.mag-hero-input textarea:focus {
+  border-color: var(--atlas-sky);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--atlas-sky) 12%, transparent), var(--atlas-shadow-sm);
+}
+.mag-hero-input .mag-cta { align-self: flex-end; min-height: 48px; }
+.mag-hero-input .mag-cta:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+.mag-hero-assist {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--atlas-ink-muted);
+  font-size: 12px;
+}
+
+.mag-hero-explore-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  color: var(--atlas-sky);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.mag-hero-explore-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
 .mag-hero-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
