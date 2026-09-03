@@ -111,6 +111,9 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
   const infoWindowRef = useRef<AMap.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
+  // 折叠面板（display:none）下容器尺寸为 0：AMap 在 0 尺容器的 fitView 会退化，
+  // 懒挂载的 marker 在容器恢复后不会自动重算——恢复尺寸时重画并触发 resize。
+  const [containerVisible, setContainerVisible] = useState(true)
 
   // 派生渲染计划（纯函数，编号/分组/折线/降级计数都在这里决定）
   const plan: MapRenderPlan | null = useMemo(
@@ -218,9 +221,23 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
     return () => { cancelled = true }
   }, [clearMarkers, onMapReady, searchAndMark, focusLocation])
 
-  // 消费渲染计划：清旧（marker+折线）→ 画编号 marker → 画每日折线 → 自适应视野
+  // 容器尺寸监听：0 尺寸（右栏折叠）→ 恢复可见时置位重画；jsdom 无 ResizeObserver 时跳过
   useEffect(() => {
-    if (!ready || !mapRef.current) return
+    const el = containerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      const hasSize = el.clientWidth > 0 && el.clientHeight > 0
+      setContainerVisible(current => (current === hasSize ? current : hasSize))
+      if (hasSize) window.dispatchEvent(new Event('resize'))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // 消费渲染计划：清旧（marker+折线）→ 画编号 marker → 画每日折线 → 自适应视野
+  // containerVisible 守卫：容器不可见时跳过，恢复可见后重画（含 fitView，marker 懒挂载得以重算）
+  useEffect(() => {
+    if (!ready || !containerVisible || !mapRef.current) return
     clearMarkers()
 
     if (plan) {
@@ -245,7 +262,7 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
         mapRef.current.setCenter([only.lng, only.lat])
       }
     }
-  }, [plan, ready, clearMarkers, addRoutedMarker])
+  }, [plan, ready, containerVisible, clearMarkers, addRoutedMarker])
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
