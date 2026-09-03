@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Copy, Check, Download, FileDown, FileText,
   MapPinned, Users, Wallet,
@@ -12,6 +12,7 @@ import MapView from '../components/MapView'
 import type { MapApi } from '../components/MapView'
 import { EmptyState } from '../components/states'
 import { buildItineraryViewModel } from '../features/journey'
+import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
 import { getWorkerMeta } from '../features/journey'
 
 export default function TripDetailPage({ sessionId }: { sessionId: string }) {
@@ -25,6 +26,18 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
     () => buildItineraryViewModel(session?.finalReply ?? '', session?.tripState),
     [session?.finalReply, session?.tripState],
   )
+
+  // 阶段4：地点派生 + 时间轴 → 地图聚焦（未命中回落 POI 搜索）
+  const routedLocations = useMemo(
+    () => buildRoutedLocations(session?.locations ?? [], viewModel.days).routed,
+    [session?.locations, viewModel.days],
+  )
+  const focusOrSearchMap = useCallback((itemText: string): boolean => {
+    const key = findLocationKeyByText(routedLocations, itemText)
+    if (key && mapRef.current?.focusLocation(key)) return true
+    searchMap(itemText.slice(0, 28), session?.form.destination ?? '')
+    return true
+  }, [routedLocations, session?.form.destination])
 
   if (!session) {
     return (
@@ -169,7 +182,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
         <section className="mag-detail-timeline" aria-label="逐日行程">
           <h2>逐日行程</h2>
           {viewModel.days.length > 0 ? (
-            <TripTimeline days={viewModel.days} city={session.form.destination} onSearchMap={searchMap} />
+            <TripTimeline days={viewModel.days} city={session.form.destination} onSearchMap={searchMap} onFocusLocation={focusOrSearchMap} />
           ) : (
             <p className="mag-timeline-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
           )}
@@ -178,7 +191,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
         <aside className="mag-detail-map" aria-label="行程地图">
           <h2><MapPinned size={15} aria-hidden="true" /> 行程地图</h2>
           <div className="mag-map-frame">
-            <MapView locations={session.locations} onMapReady={apiInstance => { mapRef.current = apiInstance }} />
+            <MapView locations={session.locations} days={viewModel.days} onMapReady={apiInstance => { mapRef.current = apiInstance }} />
           </div>
           <p className="mag-map-note">{session.locations.length > 0 ? '坐标来自智能体检索的真实地点。' : '本次执行未返回坐标数据。'}</p>
         </aside>

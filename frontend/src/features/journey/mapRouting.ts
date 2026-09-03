@@ -126,12 +126,15 @@ export function buildRoutedLocations(
     .filter(entry => !assigned.has(locationKey(entry.location)))
     .sort((a, b) => a.index - b.index)
 
-  const ordered = [...scheduled, ...unscheduled]
+  const ordered: Array<{ location: Location; match: { day: number; orderInDay: number } | null }> = [
+    ...scheduled.map(entry => ({ location: entry.location, match: entry.match })),
+    ...unscheduled.map(entry => ({ location: entry.location, match: null })),
+  ]
   const routed: RoutedLocation[] = ordered.map((entry, position) => ({
     ...entry.location,
     key: locationKey(entry.location),
-    day: 'match' in entry && entry.match ? entry.match.day : null,
-    orderInDay: 'match' in entry && entry.match ? entry.match.orderInDay : null,
+    day: entry.match ? entry.match.day : null,
+    orderInDay: entry.match ? entry.match.orderInDay : null,
     displayIndex: position + 1,
   }))
 

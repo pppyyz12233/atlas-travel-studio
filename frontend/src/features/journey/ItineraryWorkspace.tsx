@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Check, CheckCircle2, ChevronDown, Copy, FileDown, FileText } from 'lucide-react'
+import { ArrowUpRight, Check, CheckCircle2, ChevronDown, Copy, FileDown, FileText, MapPinned } from 'lucide-react'
 import SafeMarkdown from '../../components/SafeMarkdown'
 import TripTimeline from '../../components/TripTimeline'
 import OrchestrationTimeline from './OrchestrationTimeline'
@@ -27,6 +27,10 @@ interface ItineraryWorkspaceProps {
   route?: string
   date?: string
   people?: number
+  /** 阶段4：打开右栏地图（移动端完成态的地图入口） */
+  onOpenMap?: () => void
+  /** 阶段4：时间轴条目 → 地图聚焦（返回 false 回落 POI 搜索） */
+  onFocusLocation?: (itemText: string) => boolean
 }
 
 interface LocationLike {
@@ -76,6 +80,8 @@ export default function ItineraryWorkspace({
   route,
   date,
   people,
+  onOpenMap,
+  onFocusLocation,
 }: ItineraryWorkspaceProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [exportOpen, setExportOpen] = useState(false)
@@ -148,6 +154,11 @@ export default function ItineraryWorkspace({
                 查看完整行程 <ArrowUpRight size={15} aria-hidden="true" />
               </button>
             )}
+            {onOpenMap && (
+              <button type="button" className="atlas-viewmap-action" onClick={onOpenMap}>
+                <MapPinned size={15} aria-hidden="true" /> 查看地图
+              </button>
+            )}
             <div className="atlas-export-wrap" ref={exportRef}>
               <button
                 type="button"
@@ -204,7 +215,7 @@ export default function ItineraryWorkspace({
       <section className="atlas-reading-days" aria-label="每日安排">
         <h3>每日安排</h3>
         {viewModel.days.length > 0 ? (
-          <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} collapsible />
+          <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} onFocusLocation={onFocusLocation} collapsible />
         ) : (
           <p className="atlas-reading-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
         )}

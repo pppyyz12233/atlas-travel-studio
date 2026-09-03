@@ -456,6 +456,24 @@ describe('Atlas page integration', () => {
     expect(screen.getByRole('button', { name: /已存为本地草稿/ })).toBeInTheDocument()
   })
 
+  it('opens the map panel from the reading state map entry', async () => {
+    const user = userEvent.setup()
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+    act(() => {
+      streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\n真实结果', conversationId: null })
+    })
+
+    // 完成态右栏默认收起，「查看地图」入口可重新打开
+    await waitFor(() => {
+      expect(screen.getByLabelText('地图与执行详情')).toHaveClass('is-collapsed')
+    })
+    await user.click(screen.getByRole('button', { name: /查看地图/ }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('地图与执行详情')).not.toHaveClass('is-collapsed')
+    })
+  })
+
   it('opens login and keeps the current draft when an SSE token expires', async () => {
     const user = userEvent.setup()
     const logout = vi.fn()

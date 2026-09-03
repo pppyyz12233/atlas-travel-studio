@@ -17,6 +17,7 @@ import {
   getWorkerMeta,
   journeyProgress,
 } from '../features/journey'
+import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 import { useJourney } from '../app/JourneyProvider'
@@ -76,6 +77,21 @@ export default function AIPage({ auth, theme }: Props) {
     () => buildItineraryViewModel(activeSession.finalReply, activeSession.tripState),
     [activeSession.finalReply, activeSession.tripState],
   )
+  // 阶段4：地点派生（编号/分组），供时间轴 → 地图聚焦解析
+  const routedLocations = useMemo(
+    () => buildRoutedLocations(activeSession.locations, viewModel.days).routed,
+    [activeSession.locations, viewModel.days],
+  )
+
+  // 时间轴条目 → 优先聚焦编号 marker，未命中回落 POI 搜索；同时确保地图面板打开
+  const focusOrSearchMap = useCallback((itemText: string) => {
+    setContextOpen(true)
+    const key = findLocationKeyByText(routedLocations, itemText)
+    if (key && mapRef.current?.focusLocation(key)) return true
+    const destination = activeSession.form.destination.trim()
+    mapRef.current?.searchAndMark(itemText.slice(0, 28), destination, itemText.slice(0, 12), getWorkerMeta('itinerary').markerColor)
+    return true
+  }, [routedLocations, activeSession.form.destination])
 
   const requestLoginForExpiredSession = useCallback(() => {
     auth.logout()
@@ -462,6 +478,8 @@ export default function AIPage({ auth, theme }: Props) {
             route={`${activeSession.form.origin} → ${activeSession.form.destination}`}
             date={activeSession.form.date}
             people={activeSession.form.people}
+            onOpenMap={() => setContextOpen(true)}
+            onFocusLocation={focusOrSearchMap}
           />
         )}
       </div>
@@ -514,6 +532,7 @@ export default function AIPage({ auth, theme }: Props) {
           steps={activeSession.steps}
           phase={activeSession.phase}
           progress={progress}
+          days={viewModel.days}
           onMapReady={apiInstance => { mapRef.current = apiInstance }}
         />
       )}

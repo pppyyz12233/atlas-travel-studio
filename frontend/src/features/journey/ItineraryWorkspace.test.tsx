@@ -207,4 +207,19 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
     await user.click(screen.getByRole('button', { name: /已存为本地草稿/ }))
     expect(onLogin).toHaveBeenCalledOnce()
   })
+
+  it('offers a map entry action for the reading state', async () => {
+    const user = userEvent.setup()
+    const onOpenMap = vi.fn()
+    render(
+      <ItineraryWorkspace
+        {...baseProps}
+        onOpenMap={onOpenMap}
+        viewModel={buildItineraryViewModel(structured)}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /查看地图/ }))
+    expect(onOpenMap).toHaveBeenCalledOnce()
+  })
 })

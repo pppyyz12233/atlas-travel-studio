@@ -2,6 +2,7 @@ import { ArrowRight, CalendarDays, MapPinned, Radio, Users, Wallet } from 'lucid
 import MapView from '../../components/MapView'
 import type { MapApi } from '../../components/MapView'
 import type { Location } from '../../types'
+import type { DayPlan } from './viewModel'
 import type { JourneyPhase, JourneyStep, TripForm } from './model'
 import OrchestrationTimeline from './OrchestrationTimeline'
 
@@ -11,6 +12,8 @@ interface JourneyContextPanelProps {
   steps: JourneyStep[]
   phase: JourneyPhase
   progress: number
+  /** 逐日行程：驱动地图编号 / 每日分组 / 折线 */
+  days?: DayPlan[]
   onMapReady?: (api: MapApi) => void
 }
 
@@ -28,6 +31,7 @@ export default function JourneyContextPanel({
   steps,
   phase,
   progress,
+  days,
   onMapReady,
 }: JourneyContextPanelProps) {
   return (
@@ -41,7 +45,7 @@ export default function JourneyContextPanel({
       </header>
 
       <div className="atlas-map-frame">
-        <MapView locations={locations} onMapReady={onMapReady} />
+        <MapView locations={locations} days={days} onMapReady={onMapReady} />
         <span className="atlas-map-label"><MapPinned size={13} aria-hidden="true" /> {locations.length} 个真实坐标</span>
       </div>
 

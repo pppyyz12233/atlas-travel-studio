@@ -5,15 +5,18 @@ import type { DayPlan } from '../features/journey/viewModel'
 // 行程时间轴：编辑式双栏（日期轨 + 内容），逐项 stagger 进入。
 // collapsible=true 时为手风琴模式（阅读态）：Day 1 默认展开，其余折叠，
 // 标题按钮可展开/收起，支持键盘操作与 aria-expanded / aria-controls。
+// onFocusLocation（阶段4）：优先把条目聚焦到地图编号 marker；未命中回落 POI 搜索。
 export default function TripTimeline({
   days,
   city,
   onSearchMap,
+  onFocusLocation,
   collapsible = false,
 }: {
   days: DayPlan[]
   city: string
   onSearchMap?: (keyword: string, city: string) => void
+  onFocusLocation?: (itemText: string) => boolean
   collapsible?: boolean
 }) {
   const [openIndex, setOpenIndex] = useState<number>(0)
@@ -59,10 +62,13 @@ export default function TripTimeline({
                         <li key={`${item.description}-${itemIndex}`}>
                           <time>{item.time || String(itemIndex + 1)}</time>
                           <span>{item.description}</span>
-                          {onSearchMap && (
+                          {(onSearchMap || onFocusLocation) && (
                             <button
                               type="button"
-                              onClick={() => onSearchMap(item.description.slice(0, 28), city)}
+                              onClick={() => {
+                                if (onFocusLocation?.(item.description)) return
+                                onSearchMap?.(item.description.slice(0, 28), city)
+                              }}
                               aria-label={`在地图查看 ${item.description.slice(0, 18)}`}
                             >
                               <MapPin size={13} aria-hidden="true" />

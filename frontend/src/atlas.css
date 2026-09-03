@@ -2263,3 +2263,21 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 
 /* ---------- R7 阅读态隐藏工作区顶栏 ---------- */
 .atlas-workspace-frame.is-reading { grid-template-rows: minmax(0, 1fr) auto; }
+
+/* 阅读态「查看地图」次级按钮（移动端完成态的地图入口） */
+.atlas-viewmap-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--atlas-sky);
+  background: var(--atlas-paper);
+  border: 1px solid color-mix(in srgb, var(--atlas-sky) 32%, var(--atlas-line));
+  border-radius: var(--atlas-r-btn);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--atlas-fast), background var(--atlas-fast);
+}
+.atlas-viewmap-action:hover { background: var(--atlas-sky-soft); }

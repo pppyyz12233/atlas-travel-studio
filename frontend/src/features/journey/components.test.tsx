@@ -9,6 +9,7 @@ import JourneyContextPanel from './JourneyContextPanel'
 import MissionBrief from './MissionBrief'
 import OrchestrationTimeline from './OrchestrationTimeline'
 import SessionRail from './SessionRail'
+import TripTimeline from '../../components/TripTimeline'
 import { createJourneySession } from './model'
 import { buildItineraryViewModel } from './viewModel'
 
@@ -334,5 +335,25 @@ describe('Atlas journey interface', () => {
     expect(screen.getByText('实时执行地图')).toBeInTheDocument()
     expect(screen.getByText('路线概览')).toBeInTheDocument()
     expect(screen.getByText('智能体执行')).toBeInTheDocument()
+  })
+
+  it('prefers map focus for a timeline item and falls back to POI search', async () => {
+    const user = userEvent.setup()
+    const focus = vi.fn().mockReturnValue(true)
+    const fallback = vi.fn()
+    const days = buildItineraryViewModel('## 日程\n### 第 1 天\n- 09:00：浅草寺').days
+
+    const { rerender } = render(
+      <TripTimeline days={days} city="东京" onSearchMap={fallback} onFocusLocation={focus} />,
+    )
+    await user.click(screen.getByRole('button', { name: /在地图查看 浅草寺/ }))
+    expect(focus).toHaveBeenCalledWith(expect.stringContaining('浅草寺'))
+    expect(fallback).not.toHaveBeenCalled()
+
+    // focus 未命中（返回 false）→ 回落 POI 搜索
+    const miss = vi.fn().mockReturnValue(false)
+    rerender(<TripTimeline days={days} city="东京" onSearchMap={fallback} onFocusLocation={miss} />)
+    await user.click(screen.getByRole('button', { name: /在地图查看 浅草寺/ }))
+    expect(fallback).toHaveBeenCalledWith(expect.stringContaining('浅草寺'), '东京')
   })
 })
