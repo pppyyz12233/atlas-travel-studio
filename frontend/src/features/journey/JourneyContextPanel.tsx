@@ -14,6 +14,8 @@ interface JourneyContextPanelProps {
   progress: number
   /** 逐日行程：驱动地图编号 / 每日分组 / 折线 */
   days?: DayPlan[]
+  /** flight = 航班查询任务：右栏不渲染旧城市地图，显示任务说明 */
+  mode?: 'map' | 'flight'
   onMapReady?: (api: MapApi) => void
 }
 
@@ -32,6 +34,7 @@ export default function JourneyContextPanel({
   phase,
   progress,
   days,
+  mode = 'map',
   onMapReady,
 }: JourneyContextPanelProps) {
   return (
@@ -44,10 +47,20 @@ export default function JourneyContextPanel({
         <span className={`atlas-context-state is-${phase}`}><i aria-hidden="true" />{phaseLabels[phase]}</span>
       </header>
 
-      <div className="atlas-map-frame">
-        <MapView locations={locations} days={days} onMapReady={onMapReady} />
-        <span className="atlas-map-label"><MapPinned size={13} aria-hidden="true" /> {locations.length} 个真实坐标</span>
-      </div>
+      {mode === 'flight' ? (
+        // 航班查询任务没有景点路线：明确说明，不渲染旧城市地图
+        <div className="atlas-map-frame atlas-map-frame--flight" role="status">
+          <p className="atlas-flight-task-note">
+            当前任务是航班查询，暂无景点路线地图。<br />
+            航班结果在左侧结果区查看；点击「加入行程」后地图会随行程恢复。
+          </p>
+        </div>
+      ) : (
+        <div className="atlas-map-frame">
+          <MapView locations={locations} days={days} onMapReady={onMapReady} />
+          <span className="atlas-map-label"><MapPinned size={13} aria-hidden="true" /> {locations.length} 个真实坐标</span>
+        </div>
+      )}
 
       <div className="atlas-context-scroll">
         <section className="atlas-route-manifest" aria-label="路线清单">

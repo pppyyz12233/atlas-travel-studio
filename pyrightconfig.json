@@ -1,0 +1,7 @@
+{
+  "typeCheckingMode": "basic",
+  "pythonPath": "D:/Users/bl856/anaconda3/python.exe",
+  "include": ["app", "main.py"],
+  "exclude": ["eval", "**/__pycache__"],
+  "reportMissingImports": false
+}

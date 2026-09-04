@@ -36,3 +36,4 @@ frontend/.env.local
 
 # 本地视觉 QA 产物
 docs/superpowers/qa/
+frontend/lint_out.txt

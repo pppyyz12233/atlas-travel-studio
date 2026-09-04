@@ -6,6 +6,8 @@ import TripTimeline from '../../components/TripTimeline'
 import OrchestrationTimeline from './OrchestrationTimeline'
 import type { JourneyStep } from './model'
 import { getTransportGuide, hasTripTransport } from '../../content/transportGuides'
+import FlightCards from './FlightCards'
+import type { FlightQueryConditions, FlightRow } from './FlightCards'
 import type { TransportGuide } from '../../content/transportGuides'
 import type { ItineraryViewModel } from './viewModel'
 
@@ -50,6 +52,14 @@ interface ItineraryWorkspaceProps {
   onOpenMap?: () => void
   /** 阶段4：时间轴条目 → 地图聚焦（返回 false 回落 POI 搜索） */
   onFocusLocation?: (itemText: string) => boolean
+  /** 航班结果卡：worker 结构化数据或正文解析（无则不渲染该区） */
+  flights?: FlightRow[]
+  flightSource?: 'worker' | 'reply'
+  flightConditions?: FlightQueryConditions
+  /** 当前结果是航班查询（无坐标无日程）：显示航班模式提示，不渲染空行程结构 */
+  isFlightResultTask?: boolean
+  onFlightRequery?: () => void
+  onFlightAddToTrip?: () => void
 }
 
 interface LocationLike {
@@ -102,6 +112,12 @@ export default function ItineraryWorkspace({
   people,
   onOpenMap,
   onFocusLocation,
+  flights,
+  flightSource = 'reply',
+  flightConditions,
+  isFlightResultTask = false,
+  onFlightRequery,
+  onFlightAddToTrip,
 }: ItineraryWorkspaceProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [exportOpen, setExportOpen] = useState(false)
@@ -234,10 +250,28 @@ export default function ItineraryWorkspace({
         </p>
       )}
 
+      {flights && flights.length > 0 && flightConditions && (
+        <FlightCards
+          flights={flights}
+          conditions={flightConditions}
+          source={flightSource}
+          onRequery={onFlightRequery}
+          onAddToTrip={onFlightAddToTrip}
+        />
+      )}
+
+      {isFlightResultTask && (
+        <p className="atlas-flight-mode-note" role="status">
+          本次为航班查询结果，未生成新行程；原方案可在对话航迹查看，需要并入时点击「加入行程」。
+        </p>
+      )}
+
       <section className="atlas-reading-days" aria-label="每日安排">
         <h3>每日安排</h3>
         {viewModel.days.length > 0 ? (
           <TripTimeline days={viewModel.days} city={city} onSearchMap={onSearchMap} onFocusLocation={onFocusLocation} collapsible />
+        ) : isFlightResultTask ? (
+          <p className="atlas-reading-note">航班查询任务没有逐日行程；完整航班信息见上方结果卡。</p>
         ) : (
           <p className="atlas-reading-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
         )}

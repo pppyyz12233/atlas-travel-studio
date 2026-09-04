@@ -17,11 +17,17 @@ class GuestExportRequest(BaseModel):
     destination: str = Field(default="旅行方案", max_length=80)
     dates: str = Field(default="", max_length=80)
     content: str = Field(min_length=1, max_length=120_000)
+    days: int | None = Field(default=None, ge=1, le=99)
+    people: int | None = Field(default=None, ge=1, le=99)
+    budget: int | None = Field(default=None, ge=0)
 
 @router.post("/guest")
 async def export_guest_trip(payload: GuestExportRequest):
     """游客 PDF 导出：只在内存中处理，不认证、不落库。"""
-    md = build_markdown(payload.content, payload.destination, payload.dates)
+    md = build_markdown(
+        payload.content, payload.destination, payload.dates,
+        days=payload.days, people=payload.people, budget=payload.budget,
+    )
     # 渲染丢线程池：xhtml2pdf/weasyprint 都是同步 CPU 操作，不能阻塞事件循环（SSE 会被卡住）
     pdf_bytes = await asyncio.to_thread(render_plan_pdf, md, payload.destination)
     return Response(

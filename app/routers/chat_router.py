@@ -112,6 +112,7 @@ async def chat(
     # 获取全局 agent（带 checkpointer/store）
     from main import get_agent
     agent = get_agent()
+    assert agent is not None  # lifespan 已初始化；为 None 属启动异常
 
     config = {
         "configurable": {
@@ -191,6 +192,7 @@ async def chat_stream(
         # 3. 获取 agent
         from main import get_agent
         agent = get_agent()
+        assert agent is not None  # lifespan 已初始化；为 None 属启动异常
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -265,7 +267,7 @@ async def chat_stream(
                     except asyncio.QueueFull:  # 消费循环在下一段统一排空，满时丢弃即可
                         pass
                 async def _run():
-                    await _run_step_with_subgraph(layer[0], _build_context(steps), on_event=_push, search_params=state.get("trip_state", {}).get("search_params"))
+                    await _run_step_with_subgraph(layer[0], _build_context(steps), on_event=_push, search_params=state.get("trip_state", {}).get("search_params") or {})
                 task = asyncio.ensure_future(_run())
                 while not task.done() or not q.empty():
                     try:
@@ -285,7 +287,7 @@ async def chat_stream(
                 await asyncio.gather(*[
                     _run_step_with_subgraph(
                         s, _build_context(steps), on_event=_push2,
-                        search_params=state.get("trip_state", {}).get("search_params"),
+                        search_params=state.get("trip_state", {}).get("search_params") or {},
                     )
                     for s in layer
                 ])
@@ -318,6 +320,7 @@ async def chat_stream(
         if user is not None:
             try:
                 async with AsyncSessionLocal() as _s:
+                    assert conv_id is not None  # 登录分支在第 2 步已创建
                     await message.add_message(_s, conv_id, "user", msg)
                     await message.add_message(_s, conv_id, "assistant", state["final_answer"])
                     await _s.commit()
@@ -326,7 +329,13 @@ async def chat_stream(
 
         try:
             reply = state.get("final_answer", "")
-            payload = json.dumps({"event": "done", "reply": reply, "conversation_id": conv_id}, ensure_ascii=False)
+            # trip_state 一并下发：前端航班结果卡/酒店数据来自 worker 的结构化输出，
+            # 而不是让用户去执行日志或 Markdown 表格里翻
+            trip_state_payload = state.get("trip_state") or {}
+            payload = json.dumps({
+                "event": "done", "reply": reply, "conversation_id": conv_id,
+                "trip_state": trip_state_payload,
+            }, ensure_ascii=False, default=str)
             yield f"data: {payload}\n\n"
         except Exception as e:
             print(f"[SSE] done 事件构造失败: {e}")
@@ -389,10 +398,65 @@ async def conversations(
     user=Depends(get_current_user),
 ):
     convs = await conversation.list_by_user(db, user.id)
-    return {
-        "code": 200, "message": "",
-        "data": [
-            {"id": c.id, "title": c.title, "created_at": str(c.created_at)}
-            for c in convs
-        ],
-    }
+    from sqlalchemy import select as _select
+
+    from app.models.message import Message as MessageModel
+    from app.utils.trip_meta import derive_trip_meta
+
+    data = []
+    seen_ids: set[int] = set()
+    for c in convs[:100]:
+        if c.id in seen_ids:  # 同一会话只出一张卡片
+            continue
+        seen_ids.add(c.id)
+        # 首条用户消息 + 最后一条 assistant 回复：派生目的地/天数/出发地/出发日期
+        first_user = (await db.execute(
+            _select(MessageModel.content)
+            .where(MessageModel.conversation_id == c.id, MessageModel.role == "user")
+            .order_by(MessageModel.created_at.asc())
+            .limit(1)
+        )).scalar() or ""
+        last_assistant = (await db.execute(
+            _select(MessageModel.content)
+            .where(MessageModel.conversation_id == c.id, MessageModel.role == "assistant")
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+        )).scalar() or ""
+        last_at = (await db.execute(
+            _select(MessageModel.created_at)
+            .where(MessageModel.conversation_id == c.id)
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+        )).scalar()
+        meta = derive_trip_meta(first_user, last_assistant)
+        data.append({
+            "id": c.id,
+            "title": c.title,
+            "created_at": str(c.created_at),
+            # 行程元数据（派生失败为 None，前端显示"待定"，不编造）
+            "destination": meta["destination"],
+            "origin": meta["origin"],
+            "days": meta["days"],
+            "start_date": meta["start_date"],
+            "updated_at": str(last_at or c.created_at),
+        })
+    return {"code": 200, "message": "", "data": data}
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """删除云端会话及其全部消息（归属校验在 crud 内）。"""
+    from sqlalchemy import delete as _delete
+
+    from app.models.message import Message as MessageModel
+
+    await conversation.verify_owner(db, conversation_id, user.id)
+    await db.execute(
+        _delete(MessageModel).where(MessageModel.conversation_id == conversation_id)
+    )
+    await conversation.delete_conversation(db, conversation_id, user.id)
+    return {"code": 200, "message": "已删除", "data": None}

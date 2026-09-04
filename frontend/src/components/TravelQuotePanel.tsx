@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+// 引语来源标注规则：可验证出处的保留作者+作品；无法核验的一律标注
+// 「Atlas 编辑部原创」——不伪造作者与出处。
 const quotes = [
-  { text: '世界是一本书，不旅行的人只读了一页。', author: '奥古斯丁', source: '《忏悔录》' },
-  { text: '旅行是对偏见、盲从和狭隘思想最有效的疗法。', author: '马克·吐温', source: '《傻瓜威尔逊的新日历》' },
-  { text: '真正的发现之旅，不在于寻找新的风景，而在于拥有新的眼光。', author: '马塞尔·普鲁斯特', source: '常见译文' },
-  { text: '不要只是为了抵达而旅行，要让沿途也成为目的地。', author: 'Atlas 编辑部', source: 'Atlas 原创文案' },
+  { text: '世界是一本书，不旅行的人只读了一页。', author: '奥古斯丁', source: '《忏悔录》（常见转引）' },
+  { text: '旅行是对偏见、盲从和狭隘思想最有效的疗法。', author: '马克·吐温', source: '《傻瓜威尔逊》（常见转引）' },
+  { text: '不要只是为了抵达而旅行，要让沿途也成为目的地。', author: 'Atlas 编辑部', source: '原创文案' },
 ]
 
 const QUOTE_INTERVAL = 90_000
@@ -17,6 +18,8 @@ export default function TravelQuotePanel() {
 
   useEffect(() => {
     if (paused) return
+    // 动效减弱偏好：不自动轮换，只在用户悬停/聚焦交互外保持静态
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     timer.current = window.setInterval(() => setIndex(current => (current + 1) % quotes.length), QUOTE_INTERVAL)
     return () => { if (timer.current !== null) window.clearInterval(timer.current) }
   }, [paused])

@@ -287,6 +287,11 @@ describe('destination inference（首页串线修复）', () => {
     expect(inferOriginFromBrief('想去广州')).toBeNull()
   })
 
+  it('strips Chinese-numeral day blocks from reply titles (广州一日游方案)', () => {
+    expect(deriveDestinationFromReply('## 广州一日游方案')).toBe('广州')
+    expect(deriveDestinationFromReply('## 东京四日游行程')).toBe('东京')
+  })
+
   it('derives the destination from the reply title', () => {
     // 真实 aggregator 输出形态
     expect(deriveDestinationFromReply('## 广州4天3晚旅行方案（2人）\n\n### 航班\n…')).toBe('广州')

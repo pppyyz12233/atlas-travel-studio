@@ -104,7 +104,7 @@ async def health():
 async def global_handler(request: Request, exc: Exception):
     from fastapi import HTTPException
     status = getattr(exc, "status_code", 500) if isinstance(exc, HTTPException) else 500
-    detail = str(exc.detail) if isinstance(exc, HTTPException) and hasattr(exc, "detail") else "服务器内部错误"
+    detail = str(getattr(exc, "detail", "")) if isinstance(exc, HTTPException) else "服务器内部错误"
     print(f"[ERROR {status}] {request.method} {request.url.path}: {exc}")
     return JSONResponse({"code": status, "message": detail}, status_code=status)
 

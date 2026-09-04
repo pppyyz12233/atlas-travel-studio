@@ -192,12 +192,16 @@ class TestMarkdownPdfConsistency:
         return "\n".join(page.extract_text() for page in reader.pages)
 
     def test_pdf_and_markdown_come_from_same_reply(self):
-        # PDF 正文 = build_markdown 包装（抬头+正文）；剥掉抬头后必须逐字等于 finalReply
+        # PDF 正文 = build_markdown 包装（封面元数据 + 正文）；剥掉封面块后必须逐字等于 finalReply
         from app.utils.pdf_export import build_markdown
-        md = build_markdown(self.REPLY, "巴黎", "2026-09-04")
-        # 抬头 = "# 旅行方案 — 巴黎\n\n**日期:** 2026-09-04\n\n---\n\n"
-        stripped = md.removeprefix("# 旅行方案 — 巴黎\n\n**日期:** 2026-09-04\n\n---\n\n")
+        md = build_markdown(self.REPLY, "巴黎", "2026-09-04", days=4, people=2, budget=9000)
+        # 封面 = 头部到第一条水平分隔线（含）为止
+        marker = "---\n\n"
+        stripped = md.split(marker, 1)[1] if marker in md else md
         assert stripped == self.REPLY
+        # 封面含与表单同源的元数据 + 生成日期
+        for fact in ("巴黎", "2026-09-04", "4 天", "2 人", "¥9,000", "生成日期"):
+            assert fact in md, fact
 
     def test_both_formats_cover_transport_and_daily_plan_with_same_dest_and_date(self):
         from app.utils.pdf_export import build_markdown, render_plan_pdf

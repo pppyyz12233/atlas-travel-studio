@@ -42,6 +42,12 @@ export interface Conversation {
   id: number
   title: string
   created_at: string
+  /** 列表接口派生的行程元数据（未知为 null，不编造） */
+  destination?: string | null
+  origin?: string | null
+  days?: number | null
+  start_date?: string | null
+  updated_at?: string
 }
 
 export interface Message {

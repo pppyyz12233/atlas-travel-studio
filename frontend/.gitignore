@@ -1,0 +1,5 @@
+
+# Playwright 产物
+test-results/
+playwright-report/
+pw_install.log

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { TRANSPORT_DISCLAIMER, getTransportGuide, hasTripTransport } from './transportGuides'
 
 describe('Atlas 编辑部交通指南', () => {
-  const requiredCities = ['上海', '广州', '巴黎', '东京', '新加坡']
+  const requiredCities = ['上海', '广州', '巴黎', '东京', '新加坡', '北京', '杭州', '京都', '大阪', '香港']
 
   it('curates guides for the required cities (国内 + 国外)', () => {
     for (const city of requiredCities) {
@@ -14,7 +14,7 @@ describe('Atlas 编辑部交通指南', () => {
   })
 
   it('covers any other destination with a generic guide (国内外兜底)', () => {
-    for (const city of ['京都', '巴厘岛', '乌鲁木齐', '某未知小城']) {
+    for (const city of ['巴厘岛', '乌鲁木齐', '某未知小城']) {
       const guide = getTransportGuide(city)
       expect(guide.tips.length).toBeGreaterThanOrEqual(4)
       expect(guide.disclaimer).toBe(TRANSPORT_DISCLAIMER)

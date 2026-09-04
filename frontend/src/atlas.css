@@ -2136,7 +2136,8 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   font-size: 17px;
   font-weight: 700;
 }
-.atlas-transit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+/* 独立内容区：卡片按自身高度显示，左侧不再因住宿长内容被拉出大片空白 */
+.atlas-transit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
 .atlas-transit-card {
   min-width: 0;
   padding: 14px 16px;
@@ -2379,3 +2380,74 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   transition: border-color var(--atlas-fast), background var(--atlas-fast);
 }
 .atlas-viewmap-action:hover { background: var(--atlas-sky-soft); }
+
+
+/* ---------- 航班结果卡（从执行日志独立出来的一等结果区） ---------- */
+.atlas-flight-cards {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-card);
+}
+.atlas-flight-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: var(--atlas-display);
+  font-size: 16px;
+}
+.atlas-flight-conds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+  color: var(--atlas-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.atlas-flight-route { color: var(--atlas-ink); font-weight: 700; }
+.atlas-flight-source { display: block; margin-top: 6px; color: var(--atlas-ink-muted); font-size: 11.5px; }
+.atlas-flight-toolbar { display: flex; gap: 8px; margin-top: 12px; }
+.atlas-flight-sort {
+  min-height: 30px;
+  padding: 0 12px;
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-paper-soft);
+  border: 1px solid var(--atlas-line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.atlas-flight-sort.is-active { color: var(--atlas-paper); background: var(--atlas-ink); border-color: var(--atlas-ink); }
+.atlas-flight-list { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.atlas-flight-row {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--atlas-paper-soft);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-chip);
+  font-size: 13px;
+}
+.atlas-flight-no { font-weight: 700; color: var(--atlas-ink); }
+.atlas-flight-detail { color: var(--atlas-ink-soft); min-width: 0; }
+.atlas-flight-price { color: var(--atlas-route); font-weight: 750; font-variant-numeric: tabular-nums; }
+.atlas-flight-actions { display: flex; gap: 10px; margin-top: 12px; }
+.atlas-flight-mode-note {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  background: var(--atlas-paper-soft);
+  border-left: 3px solid var(--atlas-route);
+  border-radius: var(--atlas-r-chip);
+  color: var(--atlas-ink-soft);
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .atlas-flight-row { grid-template-columns: 1fr; gap: 4px; }
+}
+.atlas-map-frame--flight { display: grid; place-items: center; min-height: 160px; }
+.atlas-flight-task-note { margin: 0; padding: 18px 16px; color: var(--atlas-ink-muted); font-size: 12.5px; text-align: center; line-height: 1.8; }

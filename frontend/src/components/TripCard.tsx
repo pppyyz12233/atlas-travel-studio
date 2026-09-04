@@ -6,7 +6,7 @@ export interface TripCardData {
   title: string
   route: string
   date: string
-  days: number
+  days: number | null
   phase: JourneyPhase
   /** 来源标记：cloud = 登录用户的云端会话；local = 本地草稿 */
   source: 'cloud' | 'local'
@@ -41,7 +41,7 @@ export default function TripCard({
         <span className="mag-trip-route"><MapPin size={13} aria-hidden="true" />{trip.route}</span>
         <span className="mag-trip-meta">
           <time dateTime={trip.date}><Clock3 size={12} aria-hidden="true" />{trip.date}</time>
-          <em>{trip.days} 天</em>
+          <em>{trip.days ? `${trip.days} 天` : '天数待定'}</em>
           {trip.phase === 'planning' && <em className="mag-trip-live"><Sparkles size={12} aria-hidden="true" />生成中</em>}
         </span>
         <ArrowRight className="mag-trip-arrow" size={16} aria-hidden="true" />

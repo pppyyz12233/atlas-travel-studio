@@ -228,7 +228,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
 
       {viewModel.days.length > 0 ? (
         <>
-          <nav className="trip-day-switcher" aria-label="行程日期"><span>查看行程</span>{viewModel.days.map((day, index) => <button type="button" key={day.day} className={activeDay === index ? 'is-active' : ''} aria-pressed={activeDay === index} onClick={() => setActiveDay(index)}><b>{String(index + 1).padStart(2, '0')}</b><span>第{index + 1}天</span><small>{buildRoutedLocations(session.locations, viewModel.days).plan.legendDays.find(item => item.day === index + 1)?.count ?? 0} 个地点</small></button>)}<button type="button" className={activeDay === null ? 'is-active' : ''} aria-pressed={activeDay === null} onClick={() => setActiveDay(null)}><b>—</b><span>全部</span><small>完整行程</small></button></nav>
+          <nav className="trip-day-switcher" aria-label="行程日期"><span>查看行程</span>{viewModel.days.map((day, index) => <button type="button" key={day.day} className={activeDay === index ? 'is-active' : ''} aria-pressed={activeDay === index} onClick={() => setActiveDay(index)}><b>{String(index + 1).padStart(2, '0')}</b><span>第{index + 1}天</span><small>{(() => { const located = buildRoutedLocations(session.locations, viewModel.days).plan.legendDays.find(item => item.day === index + 1)?.count ?? 0; return `${day.items.length} 个行程地点 · ${located} 个可定位` })()}</small></button>)}<button type="button" className={activeDay === null ? 'is-active' : ''} aria-pressed={activeDay === null} onClick={() => setActiveDay(null)}><b>—</b><span>全部</span><small>完整行程</small></button></nav>
 
           <div className="mag-detail-grid">
             <section className="mag-detail-timeline" aria-label="逐日行程">

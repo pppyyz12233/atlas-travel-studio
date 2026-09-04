@@ -1,0 +1,10 @@
+[
+  {"device":{"w":1440,"h":900}},
+  {"navigate":"http://localhost:8000/"},
+  {"eval":"(()=>{const ctx=window.__ctx;if(!ctx)return 'no-ctx';localStorage.setItem('travel_token',ctx.token);location.hash='#/trips';return 'ready'})()","label":"prep"},
+  {"reload":true},
+  {"wait":3500},
+  {"eval":"(()=>{const cards=[...document.querySelectorAll('.mag-trips-section')].find(s=>s.querySelector('#mag-trips-cloud'))?.querySelectorAll('.mag-trip-card')||[];return {cardCount:cards.length,cards:[...cards].map(c=>({title:(c.querySelector('strong')||{textContent:''}).textContent.trim(),meta:(c.querySelector('.mag-trip-meta')||{innerText:''}).innerText.replace(/\s+/g,' ').trim(),route:(c.querySelector('.mag-trip-route')||{textContent:''}).textContent.trim()}))}})()","label":"cloudCards"},
+  {"screenshot":"trips_cloud_fixed.png"},
+  {"eval":"(()=>{const cards=[...document.querySelectorAll('.mag-trip-card')];const zeroDay=cards.filter(c=>/0 天/.test(c.innerText)).length;const rawTitle=cards.filter(c=>/从上海去东京|去广州一天$/.test((c.querySelector('strong')||{textContent:''}).textContent)).length;return {zeroDayCards:zeroDay,rawPromptTitles:rawTitle,daysTBC:cards.filter(c=>/天数待定/.test(c.innerText)).length}})()","label":"noZeroDays"}
+]

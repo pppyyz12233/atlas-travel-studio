@@ -299,17 +299,22 @@
   text-align: center;
 }
 .mag-brand-mark svg { width: 22px; height: 22px; }
-.travel-quote-panel::after { content: ''; position: absolute; width: 220px; height: 220px; right: -72px; bottom: -150px; border: 1px solid var(--atlas-line-strong); border-radius: 50%; pointer-events: none; }
-.travel-quote-panel__quote { max-width: 760px; margin: 18px auto 10px; color: var(--atlas-ink); font-family: var(--atlas-display); font-size: clamp(22px, 3.2vw, 36px); line-height: 1.45; }
-.travel-quote-panel__author { margin: 0; color: var(--atlas-ink-soft); font-size: 13px; }
-.travel-quote-panel__author span { margin-left: 10px; color: var(--atlas-ink-muted); font-size: 11px; }
+.travel-quote-panel::after { content: ''; position: absolute; width: 220px; height: 220px; right: -72px; bottom: -150px; border: 1px solid color-mix(in srgb, var(--atlas-line) 55%, transparent); border-radius: 50%; pointer-events: none; }
+/* 图三视觉优化：正文 2–3 行内（收窄 max-width + 降字号）、行高收紧，
+   作者/来源整体置于正文下方，装饰圆环降到最低对比 */
+.travel-quote-panel__quote { max-width: 460px; margin: 12px auto 8px; color: var(--atlas-ink); font-family: var(--atlas-display); font-size: clamp(15px, 1.6vw, 19px); line-height: 1.65; }
+.travel-quote-panel__author { margin: 4px 0 0; color: var(--atlas-ink-soft); font-size: 12px; display: grid; gap: 2px; text-align: center; }
+.travel-quote-panel__author span { margin: 0; color: var(--atlas-ink-muted); font-size: 10.5px; }
 .travel-quote-panel__quote { animation: quote-fade .7s var(--atlas-ease) both; }
+@media (prefers-reduced-motion: reduce) {
+  .travel-quote-panel__quote { animation: none; }
+}
 .travel-quote-panel__next { margin-top: 14px; padding: 5px 10px; color: var(--atlas-ink-muted); background: transparent; border: 1px solid var(--atlas-line); border-radius: 999px; font-size: 11px; cursor: pointer; }
 .travel-quote-panel__next:hover { color: var(--atlas-ink); background: var(--atlas-paper-soft); }
 .mag-hero-visual .travel-quote-panel { width: 100%; min-height: 0; margin: auto 0 0; padding: 0; background: transparent; border: 0; text-align: right; }
 .mag-hero-visual .travel-quote-panel::after { display: none; }
 .mag-hero-visual .travel-quote-panel .mag-kicker { display: none; }
-.mag-hero-visual .travel-quote-panel__quote { margin: 0 0 10px; font-size: clamp(24px, 3vw, 38px); }
+.mag-hero-visual .travel-quote-panel__quote { margin: 0 0 10px; max-width: 340px; margin-left: auto; font-size: clamp(14px, 1.4vw, 17px); line-height: 1.7; }
 .mag-hero-visual .travel-quote-panel__author { font-size: 13px; }
 
 .mag-section { margin-top: clamp(40px, 6vw, 72px); }
@@ -1115,6 +1120,11 @@
 .mag-detail-map--solo { margin-top: 8px; }
 .mag-detail-transit { margin-top: clamp(28px, 4vw, 44px); }
 
+/* 落地与住下：卡片按自身内容高度显示（不等高拉扯），桌面双列移动单列 */
+.mag-detail-transit .atlas-transit-grid { align-items: start; }
+.mag-detail-transit h2 { display: inline-flex; align-items: baseline; gap: 10px; }
+.mag-detail-transit h2 small { color: var(--atlas-ink-muted); font-size: 12px; font-weight: 500; }
+
 /* 目的地攻略条（编辑部策展内容，详情页头部下方） */
 .mag-destination-strip {
   margin: 22px 0 0;
@@ -1156,7 +1166,9 @@
 .mag-detail-document > section { scroll-margin-top: 96px; }
 .mag-detail-document { margin-top: clamp(28px, 4vw, 44px); }
 .today-execution, .trip-checklist { margin-top: clamp(28px, 4vw, 44px); padding: 22px; background: var(--atlas-paper); border: 1px solid var(--atlas-line); border-radius: var(--atlas-r-card); }
-.trip-day-switcher { display: flex; align-items: stretch; gap: 8px; margin: 22px 0 0; padding: 12px 0 14px; border-bottom: 1px solid var(--atlas-line); overflow-x: auto; scrollbar-width: none; }
+/* 查看行程 + 每日安排 = 一个连续区块：切换器是查询控件，时间轴是结果，
+   两者之间的多余分隔线已去掉（mag-detail-grid 顶部不再重复横线） */
+.trip-day-switcher { display: flex; align-items: stretch; gap: 8px; margin: 22px 0 0; padding: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
 .trip-day-switcher::-webkit-scrollbar { display: none; }
 .trip-day-switcher > span { align-self: center; flex: 0 0 auto; margin-right: 4px; color: var(--atlas-ink-muted); font-size: 11px; font-weight: 700; }
 .trip-day-switcher button { min-width: 132px; min-height: 52px; display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: 1fr 1fr; column-gap: 8px; align-items: center; padding: 7px 12px; color: var(--atlas-ink-soft); background: var(--atlas-paper); border: 1px solid var(--atlas-line); border-radius: 10px; font-size: 12px; text-align: left; cursor: pointer; }

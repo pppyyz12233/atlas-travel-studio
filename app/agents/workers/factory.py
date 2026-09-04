@@ -19,7 +19,7 @@ class WorkerState(TypedDict):
 
 
 #构建单个Worker子图
-def build_worker_subgraph(worker_name: str, max_iterations: int = None, build_prompt=None):
+def build_worker_subgraph(worker_name: str, max_iterations: int | None = None, build_prompt=None):
     """构建一个 Worker 的标准 ReAct 子图。
 
     参数:

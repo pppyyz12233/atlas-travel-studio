@@ -315,7 +315,7 @@ async def planner_node(state: AgentState) -> AgentState:
 
 
 #执行节点（调用 Worker 子图）
-async def _run_step_with_subgraph(step: dict, ctx: list | None, on_event=None, search_params: dict = None) -> None:
+async def _run_step_with_subgraph(step: dict, ctx: list | None, on_event=None, search_params: dict | None = None) -> None:
     """对单个步骤调用对应的Worker子图。on_event 可选回调，用于流式推送 worker 内部进度。
     search_params: intent_router 提取的参数（origin/destination），直接注入 Worker 输入，省 LLM 推理。"""
     worker_name = step.get("worker", "")
@@ -451,11 +451,11 @@ async def executor_node(state: AgentState) -> AgentState:
         layer_ctx = _build_context(steps)
 
         if len(layer) == 1:
-            await _run_step_with_subgraph(layer[0], layer_ctx if layer_ctx else None, search_params=sp)
+            await _run_step_with_subgraph(layer[0], layer_ctx if layer_ctx else None, search_params=sp or {})
         else:
             print(f"  [Executor] 并行执行 {len(layer)} 步: {[s['name'] for s in layer]}")
             await asyncio.gather(*[
-                _run_step_with_subgraph(s, layer_ctx if layer_ctx else None, search_params=sp)
+                _run_step_with_subgraph(s, layer_ctx if layer_ctx else None, search_params=sp or {})
                 for s in layer
             ])
 

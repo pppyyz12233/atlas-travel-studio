@@ -1,4 +1,6 @@
 import logging
+import re
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +16,23 @@ logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────
 
 
-def build_markdown(reply: str, destination: str = "", dates: str = "") -> str:
-    """把 aggregator 输出的 Markdown 包装成完整文档"""
+def build_markdown(reply: str, destination: str = "", dates: str = "",
+                   days: int | None = None, people: int | None = None, budget: int | None = None) -> str:
+    """把 aggregator 输出的 Markdown 包装成完整文档（与前端表单同源的封面元数据）"""
     header = f"# 旅行方案 — {destination}\n\n"
+    facts = []
     if dates:
-        header += f"**日期:** {dates}\n\n"
+        facts.append(f"**日期:** {dates}")
+    if days:
+        facts.append(f"**天数:** {days} 天")
+    if people:
+        facts.append(f"**人数:** {people} 人")
+    if budget is not None:
+        facts.append(f"**人均预算:** ¥{budget:,}")
+    if facts:
+        header += " · ".join(facts) + "\n\n"
+    today = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+    header += f"**生成日期:** {today}\n\n"
     header += "---\n\n"
     return header + reply
 
@@ -57,6 +71,25 @@ def _space_long_cjk_runs(md_text: str, threshold: int = 120, chunk: int = 60) ->
         if len(line) > threshold and " " not in line and "|" not in line:
             lines[index] = " ".join(line[i:i + chunk] for i in range(0, len(line), chunk))
     return "\n".join(lines)
+
+
+def _markdown_tables_to_text(md_text: str) -> str:
+    """matplotlib 降级档的表格净化：| 分隔行渲染为对齐文本列。
+
+    原始 `| 时段 | 地点 |` 与 `|---|---|` 分隔行不允许原样出现在 PDF 里——
+    转成 "时段  地点" 空格对齐文本，分隔行直接丢弃。
+    """
+    out: list[str] = []
+    for line in md_text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|") and len(stripped) > 2:
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+                continue  # |---|---| 分隔行
+            out.append("  ".join(c for c in cells if c))
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def html_to_pdf_xhtml2pdf(body_html: str, destination: str = "") -> bytes:
@@ -149,9 +182,10 @@ def cjk_text_pdf(md_text: str, destination: str = "") -> bytes:
     from matplotlib.backends.backend_pdf import PdfPages
 
     family = _resolve_cjk_font()
+    md_text = _markdown_tables_to_text(md_text)
     # 中文无空格不可自动换行：按固定列宽软换行，避免右侧截断；
-    # 表格分隔行（|---|---|）换行后可能残留孤立 '-'，跳过纯 '-' 行
-    wrapped: list[tuple[str, int, int]] = []  # (文本, 字号, 是否加粗)
+    # 换行后可能残留孤立 '-'，跳过纯 '-' 行
+    wrapped: list[tuple[str, float, bool]] = []  # (文本, 字号, 是否加粗)
     for raw in md_text.splitlines():
         stripped = raw.strip()
         if not stripped:

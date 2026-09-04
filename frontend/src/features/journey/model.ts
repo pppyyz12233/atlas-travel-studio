@@ -212,7 +212,7 @@ export function deriveDestinationFromReply(reply: string): string | null {
   if (!titleLine) return null
   const wordIndex = titleLine.search(TRIP_WORD)
   let name = titleLine.slice(0, wordIndex)
-    .replace(/[\d０-９]+\s*(?:天|日|晚)\S*/g, '')
+    .replace(/(?:[\d０-９一二两三四五六七八九十]+)\s*(?:天|日|晚)\S*/g, '')
     .replace(/(?:天|日|晚|人|往返|游|美食|深度|休闲|亲子|蜜月|度假)+$/g, '')
     .replace(/[\s·•，,、()（）\-—:：/]+/g, '')
   const cut = Math.max(

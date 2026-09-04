@@ -9,7 +9,8 @@ import DestinationCard from '../components/DestinationCard'
 import TripCard from '../components/TripCard'
 import type { TripCardData } from '../components/TripCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/states'
-import { createJourneySession, routeLabel } from '../features/journey'
+import { createJourneySession, inferDaysFromBrief, inferDestinationFromBrief, manualOrigin, routeLabel } from '../features/journey'
+import { normalizeCloudTrips } from '../features/journey/tripCardMeta'
 import { destinationById, destinations } from '../content/destinations'
 import type { Conversation } from '../types'
 
@@ -43,6 +44,19 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
     }
   }, [auth.isLoggedIn])
 
+  // 云端行程删除：调用 DELETE /chat/conversations/{id}；本地同时清掉对应已恢复会话
+  const removeCloudConversation = useCallback(async (conversationId: number, title: string) => {
+    if (!window.confirm(`删除云端行程「${title}」？此操作不可撤销。`)) return
+    try {
+      await api.delete(`/chat/conversations/${conversationId}`)
+      const local = state.sessions.find(session => session.conversationId === conversationId)
+      if (local) dispatch({ type: 'remove', id: local.id })
+      await loadCloud()
+    } catch {
+      window.alert('云端行程删除失败（接口不可用或登录已过期），请稍后重试。')
+    }
+  }, [state.sessions, dispatch, loadCloud])
+
   useEffect(() => {
     void loadCloud()
   }, [loadCloud])
@@ -50,6 +64,8 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
   const keyword = query.trim()
 
   const drafts: TripCardData[] = useMemo(() => state.sessions
+    // 云端已保存的会话不进本地草稿区（否则同一行程出现两张卡）
+    .filter(session => session.conversationId === null)
     .filter(session => session.phase !== 'idle' || session.messages.length > 0 || session.title !== '未命名旅程')
     .slice().reverse()
     .map(session => ({
@@ -64,19 +80,19 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
     .filter(trip => !keyword || trip.title.includes(keyword) || trip.route.includes(keyword)),
   [state.sessions, keyword])
 
-  const cloudTrips: TripCardData[] = cloud.status === 'ready'
-    ? cloud.conversations
-      .filter(conversation => !keyword || conversation.title.includes(keyword))
-      .map(conversation => ({
-        id: `cloud-${conversation.id}`,
-        title: conversation.title,
-        route: '云端会话',
-        date: conversation.created_at.slice(0, 10),
-        days: 0,
+  const cloudTrips: TripCardData[] = useMemo(() => cloud.status === 'ready'
+    ? normalizeCloudTrips(cloud.conversations)
+      .filter(trip => !keyword || trip.title.includes(keyword) || trip.destination?.includes(keyword))
+      .map(trip => ({
+        id: trip.key,
+        title: trip.title,
+        route: trip.route,
+        date: trip.date,
+        days: trip.days,
         phase: 'ready' as const,
         source: 'cloud' as const,
       }))
-    : []
+    : [], [cloud, keyword])
 
   // 云端会话 → 拉取历史并落地为本地会话，再进详情页
   const openCloudConversation = async (conversation: Conversation) => {
@@ -95,12 +111,24 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
         .filter(item => item.role === 'user' || item.role === 'assistant')
         .map(item => ({ role: item.role as 'user' | 'assistant', content: item.content }))
       const finalReply = [...normalized].reverse().find(item => item.role === 'assistant')?.content ?? ''
+      const firstUser = normalized.find(item => item.role === 'user')?.content ?? ''
+      const destination = conversation.destination
+        ?? (finalReply.match(/^#{1,4}\s*(.{2,12}?)(?=\d|行程|方案|之旅)/m)?.[1] ?? inferDestinationFromBrief(firstUser))
+      const days = conversation.days ?? inferDaysFromBrief(firstUser)
+      const title = destination ? `${destination}${days ? ` · ${days}天` : ' 行程'}` : conversation.title
       const session = createJourneySession({
-        title: conversation.title,
+        title,
         conversationId: conversation.id,
         phase: finalReply ? 'ready' : 'idle',
         finalReply,
         messages: normalized,
+        form: {
+          ...createJourneySession().form,
+          origin: conversation.origin ? { label: conversation.origin, latitude: null, longitude: null, source: 'manual' as const } : manualOrigin(''),
+          destination: destination ?? '',
+          date: conversation.start_date ?? '',
+          days: days ?? 1,
+        },
       })
       dispatch({ type: 'add', session })
       navigate(`/trip/${session.id}`)
@@ -170,13 +198,16 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
           <EmptyState title="云端还没有行程" description="完成一次规划并登录，行程会自动保存到这里。" />
         ) : (
           <div className="mag-trip-grid">
-            {cloudTrips.map((trip, index) => {
-              const conversation = cloud.status === 'ready' ? cloud.conversations[index] : undefined
+            {cloudTrips.map(trip => {
+              const conversation = cloud.status === 'ready'
+                ? cloud.conversations.find(item => item.id === Number(trip.id.replace('cloud-', '')))
+                : undefined
               return (
                 <div key={trip.id} className="mag-trip-cell">
                   <TripCard
                     trip={trip}
                     onOpen={() => conversation && void openCloudConversation(conversation)}
+                    onRemove={conversation ? () => void removeCloudConversation(conversation.id, trip.title) : undefined}
                   />
                   {loadingHistory === conversation?.id && <LoadingState label="正在读取历史" />}
                 </div>

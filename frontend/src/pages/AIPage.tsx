@@ -27,6 +27,9 @@ import {
 import { FACTORY_FORM_DEFAULTS } from '../features/journey/model'
 import type { OriginPlace } from '../features/journey/model'
 import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
+import { detectFlightQuery, MISSING_FIELD_COPY } from '../features/journey/flightIntent'
+import type { FlightQueryConditions } from '../features/journey/flightIntent'
+import { parseFlightsFromReply } from '../features/journey/FlightCards'
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
 import { useJourney } from '../app/JourneyProvider'
@@ -101,6 +104,35 @@ export default function AIPage({ auth, theme }: Props) {
     () => buildRoutedLocations(activeSession.locations, viewModel.days).routed,
     [activeSession.locations, viewModel.days],
   )
+
+  // 航班结果卡数据：优先 done 事件 trip_state.flights（worker 结构化检索），
+  // 回落解析方案正文的航班表格（模型建议，卡片上必须标注"示例结果，非实时价格"）
+  const flightData = useMemo(() => {
+    // trip_state.flights 是 Record<string,unknown>[]（sseContract 归一化层）——只取安全字段
+    const workerFlights = (activeSession.tripState?.flights ?? [])
+      .map(item => ({
+        name: typeof item.name === 'string' ? item.name : '',
+        detail: typeof item.detail === 'string' ? item.detail : '',
+        price: typeof item.price === 'string' ? item.price : '',
+        date: typeof item.date === 'string' ? item.date : '',
+      }))
+      .filter(item => item.name || item.detail)
+    if (workerFlights.length > 0) return { rows: workerFlights, source: 'worker' as const }
+    const replyFlights = parseFlightsFromReply(activeSession.finalReply)
+    return replyFlights.length > 0 ? { rows: replyFlights, source: 'reply' as const } : null
+  }, [activeSession.tripState, activeSession.finalReply])
+  const flightConditions = useMemo<FlightQueryConditions>(() => {
+    const lastUser = [...activeSession.messages].reverse().find(message => message.role === 'user')?.content ?? ''
+    const intent = detectFlightQuery(lastUser)
+    const explicitOrigin = originLabel(activeSession.form)
+    return {
+      origin: intent?.conditions.origin
+        ?? (explicitOrigin && explicitOrigin !== FACTORY_FORM_DEFAULTS.origin ? explicitOrigin : null),
+      destination: intent?.conditions.destination ?? (activeSession.form.destination.trim() || null),
+      date: intent?.conditions.date ?? (activeSession.form.date || null),
+    }
+  }, [activeSession.messages, activeSession.form])
+  const isFlightResultTask = Boolean(flightData) && activeSession.locations.length === 0
 
   // 时间轴条目 → 优先聚焦编号 marker，未命中回落 POI 搜索；同时确保地图面板打开
   const focusOrSearchMap = useCallback((itemText: string) => {
@@ -302,6 +334,29 @@ export default function AIPage({ auth, theme }: Props) {
 
     const sessionId = activeSession.id
     const effectiveForm = { ...activeSession.form, ...formPatch }
+
+    // 航班查询门卫：纯检索请求先核对必要条件，缺出发地/目的地/日期明确追问——
+    // 不拿旧会话的工厂默认值顶上，也不发起一次注定失败的规划
+    const flightIntent = detectFlightQuery(text)
+    if (flightIntent) {
+      const explicitOrigin = originLabel(effectiveForm)
+      const explicitDestination = effectiveForm.destination.trim()
+      const conditions: FlightQueryConditions = {
+        origin: flightIntent.conditions.origin
+          ?? (explicitOrigin && explicitOrigin !== FACTORY_FORM_DEFAULTS.origin ? explicitOrigin : null),
+        destination: flightIntent.conditions.destination
+          ?? (explicitDestination && explicitDestination !== FACTORY_FORM_DEFAULTS.destination ? explicitDestination : null),
+        date: flightIntent.conditions.date ?? (effectiveForm.date || null),
+      }
+      const missing = (['origin', 'destination', 'date'] as const).filter(key => !conditions[key])
+      if (missing.length > 0) {
+        setResultNotice({
+          tone: 'error',
+          message: `航班查询还缺：${missing.map(key => MISSING_FIELD_COPY[key]).join('、')}。请补充后重试，例如「查询上海到东京 2026-09-10 的机票」。`,
+        })
+        return
+      }
+    }
     // 任务文本是用户最新意图：显式写了目的地/出发地/天数就无条件生效
     //（此前只在"表单未被手动改过"时生效，导致"去广州一天"的追问仍显示旧东京
     //  ——标题/路线/地图城市/编辑部交通指南全部跟着旧 form 走，即串线截图的根因）。
@@ -587,6 +642,18 @@ export default function AIPage({ auth, theme }: Props) {
             people={activeSession.form.people}
             onOpenMap={() => setContextOpen(true)}
             onFocusLocation={focusOrSearchMap}
+            flights={flightData?.rows}
+            flightSource={flightData?.source}
+            flightConditions={flightConditions}
+            isFlightResultTask={isFlightResultTask}
+            onFlightRequery={() => {
+              setComposerOpen(true)
+              setInput(`查询${flightConditions.origin ?? ''}到${flightConditions.destination ?? ''}${flightConditions.date ?? ''}的机票`.replace(/到(?=到)/, ''))
+            }}
+            onFlightAddToTrip={() => {
+              setComposerOpen(true)
+              setInput('把上面查到的航班加入我的行程，并据此调整交通与预算')
+            }}
           />
         )}
       </div>
@@ -640,6 +707,7 @@ export default function AIPage({ auth, theme }: Props) {
           phase={activeSession.phase}
           progress={progress}
           days={viewModel.days}
+          mode={isFlightResultTask ? 'flight' : 'map'}
           onMapReady={apiInstance => { mapRef.current = apiInstance }}
         />
       )}
