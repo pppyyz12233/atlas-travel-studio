@@ -171,7 +171,7 @@ export default function AppShell({
         role={isCompact && contextOpen ? 'dialog' : undefined}
         tabIndex={-1}
       >
-        <button type="button" className="atlas-drawer-close atlas-context-close" onClick={onCloseContext} aria-label="关闭地图与执行详情">
+        <button type="button" className="atlas-drawer-close atlas-context-close" onClick={onCloseContext} aria-label="关闭地图面板">
           <X size={18} aria-hidden="true" />
         </button>
         {context}

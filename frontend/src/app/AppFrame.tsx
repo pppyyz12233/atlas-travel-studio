@@ -1,4 +1,4 @@
-import { Compass, Home, LogIn, LogOut, Map, Moon, Navigation, Plus, Sun, UserRound } from 'lucide-react'
+import { Compass, Home, LogIn, LogOut, Map, Moon, Plus, Sun, UserRound } from 'lucide-react'
 import { Link, useRouter } from './router'
 import type { RouteName } from './router'
 import type { useAuth } from '../hooks/useAuth'
@@ -26,7 +26,7 @@ export default function AppFrame({ auth, theme, children }: AppFrameProps) {
 
       <header className="mag-header">
         <Link to="/" className="mag-brand" ariaLabel="Atlas 首页">
-          <span className="mag-brand-mark" aria-hidden="true"><Navigation size={17} /></span>
+          <span className="mag-brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M16 3 27 9v14l-11 6-11-6V9l11-6Z" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m7 11 9 5 9-5M16 16v11" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="16" cy="10" r="2" fill="currentColor"/></svg></span>
           <span className="mag-brand-copy">
             <strong>Atlas</strong>
             <small>智能旅行工作室</small>

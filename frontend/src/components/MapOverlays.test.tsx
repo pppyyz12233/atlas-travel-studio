@@ -44,9 +44,9 @@ describe('map overlays', () => {
     const user = userEvent.setup()
     render(<MapOverlays plan={planOf([loc('浅草寺', 139.79, 35.71)])} />)
     const legend = screen.getByRole('group') as HTMLDetailsElement
-    expect(legend.open).toBe(false)
-    await user.click(screen.getByText('图例'))
     expect(legend.open).toBe(true)
+    await user.click(screen.getByText('图例'))
+    expect(legend.open).toBe(false)
   })
 
   it('labels unscheduled locations in the legend', () => {

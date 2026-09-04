@@ -22,9 +22,36 @@ export interface Destination {
   palette: [string, string, string]
   /** 预填到规划表单的默认值 */
   formDefaults: { destination: string; days: number; budget: number }
+  coverImage?: string
+  coverImages?: string[]
+  quote?: { text: string; author: string }
+  coverAlt?: string
+  sections?: { title: string; content: string; items?: string[]; days?: { day: string; title: string; places: string[]; note: string }[] }[]
+  planningPrompts?: string[]
+  travelStyle?: string
+  recommendedDays?: string
+  updatedAt?: string
+}
+
+const covers: Record<string, string> = {
+  tokyo: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1200&q=80',
+  kyoto: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&q=80',
+  hangzhou: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=1200&q=80',
+  beijing: 'https://images.unsplash.com/photo-1508804185872-d7_bad_?w=1200&q=80',
+  chengdu: 'https://images.unsplash.com/photo-1548919973-5cef591cdbc9?w=1200&q=80',
+  xiamen: 'https://images.unsplash.com/photo-1507528279846-5f9c1f7b8d0f?w=1200&q=80',
+  singapore: 'https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=1200&q=80',
+  paris: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1200&q=80',
 }
 
 export const destinations: Destination[] = [
+  {
+    id: 'paris', name: '巴黎', nameEn: 'Paris', region: '法国 · 法兰西岛',
+    coords: '48.86°N 2.35°E', styles: ['文化探索', '浪漫旅行'],
+    blurb: '沿着塞纳河散步，把博物馆、街角面包店和黄昏的城市光线串成一天。',
+    bestSeason: '4-6 月 / 9-10 月', suggestDays: '4 天 · ¥9,000+', palette: ['#e8e1d9', '#52657a', '#b06b4e'],
+    formDefaults: { destination: '巴黎', days: 4, budget: 9000 },
+  },
   {
     id: 'tokyo', name: '东京', nameEn: 'Tokyo', region: '日本 · 关东',
     coords: '35.68°N 139.69°E', styles: ['城市漫游', '美食旅行'],
@@ -130,6 +157,33 @@ export const destinations: Destination[] = [
     formDefaults: { destination: '香港', days: 3, budget: 5000 },
   },
 ]
+
+for (const destination of destinations) {
+  destination.coverImage = covers[destination.id]
+  destination.coverAlt = `${destination.name}旅行风景`
+  destination.coverImages = [1, 2, 3].map(n => `/images/destinations/${destination.id}-${n}.jpg`)
+  destination.coverImage = destination.coverImages[0]
+  destination.travelStyle = destination.styles.join('、')
+  destination.recommendedDays = destination.suggestDays
+  destination.updatedAt = '2026-09'
+  destination.planningPrompts = [`${destination.name}第一次去，${destination.suggestDays.split('·')[0].trim()}，重点看地标和当地美食`, `帮我安排一份适合${destination.styles[0]}的${destination.name}行程`]
+  const placeSets: Record<string, string[]> = {
+    tokyo: ['浅草寺与仲见世', '涩谷街区', '明治神宫与代代木公园'], kyoto: ['清水寺与二年坂', '伏见稻荷大社', '祇园与花见小路'], hangzhou: ['西湖与断桥', '灵隐寺', '龙井村茶园'], beijing: ['故宫与景山', '长城', '天坛与前门'], shanghai: ['外滩与陆家嘴', '豫园与城隍庙', '武康路与梧桐区'], guangzhou: ['陈家祠', '沙面岛', '广州塔'], dali: ['洱海环线', '大理古城', '苍山与崇圣寺三塔'], chengdu: ['大熊猫繁育研究基地', '宽窄巷子', '春熙路与太古里'], singapore: ['滨海湾花园', '鱼尾狮公园', '圣淘沙'], osaka: ['大阪城公园', '道顿堀', '新世界与通天阁'], xiamen: ['鼓浪屿', '环岛路', '沙坡尾'], qingdao: ['栈桥与小鱼山', '八大关', '崂山'], hongkong: ['维多利亚港', '太平山顶', '中环与西九龙'], paris: ['埃菲尔铁塔', '卢浮宫', '蒙马特高地'], }
+  const places = placeSets[destination.id] ?? [`${destination.name}城市地标`, `${destination.name}当地街区`, `${destination.name}文化体验`]
+  destination.sections = [
+    { title: '一句话定位', content: destination.blurb },
+    { title: '城市印象', content: `第一次到${destination.name}，建议把节奏放在${destination.styles[0]}上：每天安排 2—3 个重点，其余时间留给街区和临时发现。` },
+    { title: '适合什么人', content: `适合${destination.styles.join('、')}的旅行者。${destination.name}更适合愿意步行、接受弹性安排，并且会为一两顿特色餐留出时间的人。` },
+    { title: '推荐季节与区域', content: `推荐季节：${destination.bestSeason}。住宿和活动可优先围绕${places[0]}、${places[1]}所在区域选择，减少每天跨城移动。` },
+    { title: '必看景点', content: '以下景点适合作为初次到访的主线，具体开放时间和预约规则请以官方信息为准。', items: places.map((p, i) => `${p} · 建议停留 ${i === 1 ? '2—4 小时' : '2—3 小时'} · 适合${i === 2 ? '慢游与拍照' : '第一次到访'}`) },
+    { title: '景点怎么组合', content: `可以把${places[0]}和${places[1]}安排在同一天，${places[2]}单独留出半天；若遇到天气或人流变化，优先保留同一区域的组合。` },
+    { title: '一日 / 两日思路', content: '先用紧凑的一日主线建立城市印象，再把第二天交给街区、美食或自然景观。', days: [{ day: 'Day 1', title: '城市代表性主线', places: places.slice(0, 2), note: '上午安排核心景点，下午放慢节奏，晚上选择交通方便的用餐区域。' }, { day: 'Day 2', title: '街区与体验', places: [places[2], `${destination.name}当地街区`], note: '留出机动时间，不要把所有行程排满。' }] },
+    { title: '吃什么', content: `建议围绕住宿和当天景点就近尝试${destination.name}的代表性风味，先看本地人较多、评价稳定的店。`, items: ['当地早餐或市场小吃', '一顿具有地方特色的正餐', '留时间尝试街区咖啡、甜品或茶饮'] },
+    { title: '交通与住宿', content: `优先选择公共交通或步行串联相邻区域；住宿建议靠近主要车站、核心街区或${places[0]}附近，减少往返。高峰期和节假日请预留换乘、排队时间。` },
+    { title: '避坑提醒', content: '行程信息会随季节和政策变化，请以景点、交通和商家官方信息为准。', items: ['不要一天安排过多跨区域景点', '热门景点提前确认预约与入场规则', '警惕过低价格、临时揽客和非官方购票渠道'] },
+    { title: '行前准备', content: '出发前确认天气、证件、支付方式、网络和必要预约；将重要地址保存为当地语言，方便问路或打车。' },
+  ]
+}
 
 export function destinationById(id: string): Destination | undefined {
   return destinations.find(destination => destination.id === id)

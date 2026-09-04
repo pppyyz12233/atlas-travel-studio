@@ -29,7 +29,7 @@ export default function TripTimeline({
         const panelId = `mag-day-panel-${index}`
         const dayTitle = day.title.replace(/^Day\s*\d+\s*[-—：:]?\s*/i, '') || `${city}行程日`
         return (
-          <li className="mag-timeline-day" key={`${day.day}-${index}`} style={{ '--i': index } as React.CSSProperties}>
+          <li className="mag-timeline-day" data-day-index={index} key={`${day.day}-${index}`} style={{ '--i': index } as React.CSSProperties}>
             <div className="mag-timeline-rail" aria-hidden="true">
               <b>{String(index + 1).padStart(2, '0')}</b>
               <i />
@@ -59,9 +59,9 @@ export default function TripTimeline({
                   {day.items.length > 0 ? (
                     <ul className="mag-timeline-items">
                       {day.items.map((item, itemIndex) => (
-                        <li key={`${item.description}-${itemIndex}`}>
+                        <li className="mag-timeline-item" key={`${item.description}-${itemIndex}`}>
                           <time>{item.time || String(itemIndex + 1)}</time>
-                          <span>{item.description}</span>
+                          <span className="mag-timeline-item-content"><strong>{item.description}</strong></span>
                           {(onSearchMap || onFocusLocation) && (
                             <button
                               type="button"

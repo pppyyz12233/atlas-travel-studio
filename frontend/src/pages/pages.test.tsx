@@ -65,7 +65,7 @@ describe('home page', () => {
 
     expect(screen.getByRole('heading', { name: /让下一段旅程/ })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: '输入你的旅行想法' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /开始规划/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('textbox', { name: '输入你的旅行想法' }).closest('.mag-hero-input') as HTMLElement).getByRole('button', { name: /开始规划/ })).toBeInTheDocument()
     // 主输入是唯一的表单级行动；探索降为次级链接
     expect(screen.queryByRole('heading', { name: /工作方式/ })).not.toBeInTheDocument()
   })
@@ -78,7 +78,7 @@ describe('home page', () => {
       screen.getByRole('textbox', { name: '输入你的旅行想法' }),
       '十一月去京都看红叶，两个人，预算一万',
     )
-    await user.click(screen.getByRole('button', { name: /开始规划/ }))
+    await user.click(within(screen.getByRole('textbox', { name: '输入你的旅行想法' }).closest('.mag-hero-input') as HTMLElement).getByRole('button', { name: /开始规划/ }))
 
     expect(window.location.hash).toBe('#/plan')
     expect(sessionStorage.getItem('atlas_pending_brief')).toBe('十一月去京都看红叶，两个人，预算一万')
@@ -88,7 +88,7 @@ describe('home page', () => {
     const user = userEvent.setup()
     renderApp(<HomePage />)
 
-    const submit = screen.getByRole('button', { name: /开始规划/ })
+    const submit = within(screen.getByRole('textbox', { name: '输入你的旅行想法' }).closest('.mag-hero-input') as HTMLElement).getByRole('button', { name: /开始规划/ })
     expect(submit).toBeDisabled()
 
     await user.type(
@@ -106,7 +106,7 @@ describe('home page', () => {
 
     const tokyoCard = screen.getByRole('button', { name: '规划前往 东京 的旅行' })
       .closest('.mag-destination-card') as HTMLElement
-    await user.click(within(tokyoCard).getByRole('button', { name: /规划行程/ }))
+    await user.click(within(tokyoCard).getByRole('button', { name: '开始规划' }))
 
     expect(window.location.hash).toBe('#/plan')
   })
@@ -164,7 +164,7 @@ describe('trips page', () => {
     renderApp(<TripsPage auth={guestAuth()} />)
 
     expect(screen.getByText('登录后同步云端行程')).toBeInTheDocument()
-    expect(screen.getByText('还没有草稿')).toBeInTheDocument()
+    expect(screen.getByText('还没有下一段旅程')).toBeInTheDocument()
     expect(screen.getByText('还没有收藏')).toBeInTheDocument()
   })
 
@@ -234,9 +234,32 @@ describe('trip detail page', () => {
     expect(screen.getByRole('heading', { name: /东京 · 5 天行程/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /继续调整/ })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: '逐日行程时间轴' })).toBeInTheDocument()
-    expect(screen.getByText('入住银座酒店')).toBeInTheDocument()
+    expect(screen.getAllByText('入住银座酒店').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('预算结构')).toBeInTheDocument()
     expect(screen.getByText('方案全文')).toBeInTheDocument()
+  })
+
+  it('filters the visible itinerary by the selected day', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'detail-days',
+      title: '杭州两日',
+      phase: 'ready',
+      finalReply: '# 杭州方案\n## 日程\n### Day 1 西湖\n- 09:00：灵隐寺\n- 11:00：断桥\n### Day 2 龙井\n- 10:00：龙井村',
+      messages: [{ role: 'assistant', content: '杭州两日' }],
+    })
+    sessionStorage.setItem('atlas_journey_state', JSON.stringify({ sessions: [session], activeId: session.id }))
+
+    renderApp(<TripDetailPage sessionId="detail-days" />)
+
+    const timeline = screen.getByRole('region', { name: '逐日行程' })
+    expect(within(timeline).getByText('灵隐寺')).toBeInTheDocument()
+    expect(within(timeline).queryByText('龙井村')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /第2天/ }))
+    expect(within(timeline).getByText('龙井村')).toBeInTheDocument()
+    expect(within(timeline).queryByText('灵隐寺')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '每日安排' })).toBeInTheDocument()
   })
 
   it('handles a missing session gracefully', () => {

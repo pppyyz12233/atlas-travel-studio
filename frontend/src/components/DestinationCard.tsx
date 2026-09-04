@@ -17,12 +17,13 @@ export default function DestinationCard({
   onToggleFavorite,
   onPlan,
 }: DestinationCardProps) {
+  const openDocument = () => { window.location.hash = `#/destination/${destination.id}` }
   return (
     <article className={`mag-destination-card is-${variant}`}>
       <button
         type="button"
         className="mag-destination-cover"
-        onClick={() => onPlan(destination)}
+        onClick={openDocument}
         aria-label={`规划前往 ${destination.name} 的旅行`}
       >
         <DestinationCover destination={destination} />
@@ -49,9 +50,10 @@ export default function DestinationCard({
           <span className="mag-destination-tags">
             {destination.styles.map(style => <i key={style}>{style}</i>)}
           </span>
-          <button type="button" className="mag-destination-plan" onClick={() => onPlan(destination)}>
-            规划行程 <ArrowUpRight size={14} aria-hidden="true" />
+          <button type="button" className="mag-destination-plan" onClick={openDocument}>
+            阅读攻略 <ArrowUpRight size={14} aria-hidden="true" />
           </button>
+          <button type="button" className="mag-destination-plan" onClick={() => onPlan(destination)}>开始规划</button>
         </footer>
       </div>
     </article>

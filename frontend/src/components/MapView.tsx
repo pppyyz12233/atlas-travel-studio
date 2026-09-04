@@ -148,7 +148,8 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
   const addRoutedMarker = useCallback((spec: MapRenderPlan['markers'][number]) => {
     const map = mapRef.current
     if (!map || !window.AMap) return
-    const badge = `<div class="amap-num-marker" style="background:${spec.color}"><span>${spec.number}</span></div>`
+    const label = spec.location.day === null ? `·${spec.number}` : `D${spec.location.day + 1}·${(spec.location.orderInDay ?? 0) + 1}`
+    const badge = `<div class="amap-num-marker" style="background:${spec.color}"><span>${label}</span></div>`
     const marker = new window.AMap.Marker({
       position: [spec.location.lng, spec.location.lat],
       content: badge,
@@ -278,10 +279,12 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
   }, [])
 
   return (
-    <div className={`map-surface ${className}`}>
-      <div ref={containerRef} className="map-canvas" />
-      {!ready && !error && <div className="map-state"><span className="map-loader" /><p>正在展开地图</p></div>}
-      {error && <div className="map-state map-error"><MapPinned size={26} aria-hidden="true" /><p>地图尚未接入</p><small>{error} · 规划不受影响</small></div>}
+    <div className={`map-view-stack ${className}`}>
+      <div className="map-surface">
+        <div ref={containerRef} className="map-canvas" />
+        {!ready && !error && <div className="map-state"><span className="map-loader" /><p>正在展开地图</p></div>}
+        {error && <div className="map-state map-error"><MapPinned size={26} aria-hidden="true" /><p>地图尚未接入</p><small>{error} · 规划不受影响</small></div>}
+      </div>
       {ready && <MapOverlays plan={plan} />}
     </div>
   )

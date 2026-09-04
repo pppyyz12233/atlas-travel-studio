@@ -14,7 +14,8 @@ function isSafeUrl(value: string): boolean {
 }
 
 export function sanitizeMarkdown(markdown: string): string {
-  const raw = String(marked.parse(markdown, { breaks: true, gfm: true }))
+  const cleaned = String(markdown).replace(/^(\s*(?:#{1,6}\s*)?)(?:💰|🗺️?|🏨|✈️?|📍|🔹|✅)\s*/gmu, '$1')
+  const raw = String(marked.parse(cleaned, { breaks: true, gfm: true }))
   const doc = new DOMParser().parseFromString(raw, 'text/html')
 
   for (const element of Array.from(doc.body.querySelectorAll('*'))) {

@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage'
 import ExplorePage from './pages/ExplorePage'
 import TripsPage from './pages/TripsPage'
 import TripDetailPage from './pages/TripDetailPage'
+import DestinationDetailPage from './pages/DestinationDetailPage'
 import AppFrame from './app/AppFrame'
 import { RouterProvider, useRouter } from './app/router'
 import { JourneyProvider } from './app/JourneyProvider'
@@ -22,6 +23,8 @@ function Routes({ auth, theme }: {
       return <AIPage auth={auth} theme={theme} />
     case 'explore':
       return <ExplorePage />
+    case 'destination':
+      return route.sessionId ? <DestinationDetailPage destinationId={route.sessionId} /> : <ExplorePage />
     case 'trips':
       return <TripsPage auth={auth} />
     case 'trip':

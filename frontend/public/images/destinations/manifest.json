@@ -1,0 +1,5 @@
+{
+  "destinations": ["tokyo", "kyoto", "hangzhou", "beijing", "shanghai", "guangzhou", "dali", "chengdu", "singapore", "osaka", "xiamen", "qingdao", "hongkong"],
+  "format": "jpg",
+  "fallback": "fallback.svg"
+}

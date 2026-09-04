@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 // 自研而非引第三方：路由面很窄，且 FastAPI 静态托管下 hash 路由无需服务端回退
 // ────────────────────────────────────────────────────────────
 
-export type RouteName = 'home' | 'plan' | 'explore' | 'trips' | 'trip'
+export type RouteName = 'home' | 'plan' | 'explore' | 'destination' | 'trips' | 'trip'
 
 export interface AppRoute {
   name: RouteName
@@ -23,6 +23,7 @@ export function parseHash(hash: string): AppRoute {
   if (segments.length === 0) return { name: 'home', sessionId: null, raw }
   if (segments[0] === 'plan') return { name: 'plan', sessionId: null, raw }
   if (segments[0] === 'explore') return { name: 'explore', sessionId: null, raw }
+  if (segments[0] === 'destination' && segments[1]) return { name: 'destination', sessionId: segments[1], raw }
   if (segments[0] === 'trips') return { name: 'trips', sessionId: null, raw }
   if (segments[0] === 'trip' && segments[1]) {
     return { name: 'trip', sessionId: segments[1], raw }

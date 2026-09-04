@@ -18,7 +18,7 @@ export default function MapOverlays({ plan }: { plan: MapRenderPlan | null }) {
   const unscheduledCount = plan.markers.filter(marker => marker.location.day === null).length
 
   return (
-    <details className="map-legend">
+    <details className="map-legend" open>
       <summary aria-label="地图图例">图例</summary>
       <div className="map-legend-body">
         {plan.legendDays.map(item => (
