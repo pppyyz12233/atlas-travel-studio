@@ -2175,6 +2175,10 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 .atlas-source-tag.is-editorial { color: #6b5a2c; border-color: #d8cba8; background: #f7f3e8; }
 .atlas-transport-guide-summary { margin: 0 0 8px; color: var(--atlas-ink); font-weight: 600; }
 .atlas-transport-guide ul { margin: 0 0 8px; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.75; }
+/* 桌面宽卡内编辑部建议双栏排布，压缩纵向占用（移动端单栏不变） */
+@media (min-width: 900px) {
+  .atlas-transit-card .atlas-transport-guide ul { columns: 2; column-gap: 20px; }
+}
 .atlas-transport-guide-disclaimer {
   margin: 8px 0 0;
   padding: 6px 10px;

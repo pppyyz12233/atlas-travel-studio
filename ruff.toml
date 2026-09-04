@@ -1,0 +1,14 @@
+# 基础质量门槛：默认规则集 + 合理行宽；不做风格化重排（保持与现有代码一致）
+line-length = 120
+target-version = "py312"
+
+[lint]
+ignore = [
+  "E501",  # 行宽超限不阻塞
+  "E701",  # 存量紧凑单行风格（supervisor/planner），不做风格化重排
+  "E702",
+]
+
+[lint.per-file-ignores]
+"eval/*" = ["E402"]
+"tests/*" = ["E402"]

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-namespace -- AMap 1.4.15 全局类型声明用 namespace 是正当模式 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapPinned } from 'lucide-react'
 import type { Location } from '../types'

@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
         await _store.setup()
         store = _store
         _agent = build_graph(checkpointer=checkpointer, store=store)
-        print(f"[Agent] 已初始化 (checkpointer=AsyncSqliteSaver, store=AsyncSqliteStore)")
+        print("[Agent] 已初始化 (checkpointer=AsyncSqliteSaver, store=AsyncSqliteStore)")
 
         yield
     finally:

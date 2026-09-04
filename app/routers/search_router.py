@@ -1,6 +1,6 @@
 """搜索路由 —— 分页列表，供前端选航班/酒店/景点"""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from app.mcp.servers.flight_server import FLIGHTS
 from app.mcp.servers.hotel_server import HOTELS
 

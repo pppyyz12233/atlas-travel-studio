@@ -146,16 +146,48 @@ export function createJourneySession(overrides: Partial<JourneySession> = {}): J
   }
 }
 
-/** 从首页一句话中提取显式目的地，避免沿用默认东京造成行程串线。 */
+/** 从一句话中提取显式目的地，避免沿用默认/旧值造成行程串线。
+ *  lookahead 同时接受“一天/3天/两天”等时长词——否则“去广州一天”会把
+ *  “广州一天”整体当成目的地（串线截图里的真实案例）。 */
 export function inferDestinationFromBrief(brief: string): string | null {
-  const match = brief.match(/(?:想去|要去|去|到|前往|目的地(?:是|为)?)\s*([\u4e00-\u9fffA-Za-z][\u4e00-\u9fffA-Za-z·\-]{1,19}?)(?=旅游|旅行|玩|看看|看|，|,|。|！|!|\s|$)/)
+  const match = brief.match(/(?:想去|要去|去|到|前往|目的地(?:是|为)?)\s*([一-鿿A-Za-z][一-鿿A-Za-z·-]{1,19}?)(?=[0-9０-９一二两三四五六七八九十半]+\s*[天日]|旅游|旅行|玩|看看|看|，|,|。|！|!|\s|$)/)
   const destination = match?.[1]?.trim()
   return destination && destination.length >= 2 ? destination : null
 }
 
+const CN_DIGITS: Record<string, number> = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
+
+function parseCnNumber(text: string): number | null {
+  if (/^\d+$/.test(text)) return Number(text)
+  const m = text.match(/^(?:(十)|([一二两三四五六七八九])?十([一二两三四五六七八九])?|([一二两三四五六七八九])半?)$/)
+  if (!m) return null
+  if (m[1]) return 10
+  if (m[2] !== undefined || m[3] !== undefined) {
+    const tens = m[2] !== undefined ? CN_DIGITS[m[2]] : 1
+    const ones = m[3] !== undefined ? CN_DIGITS[m[3]] : 0
+    return tens * 10 + ones
+  }
+  if (m[4] !== undefined) return CN_DIGITS[m[4]]
+  return null
+}
+
+/** 从一句话中提取显式天数（“去广州一天”→1、“5天4晚”→5、“周末两天”→2）。
+ *  排除日期（“9月18日”的“18日”）与“当天/每天/明天”类词；超出 1-30 视为误匹配。 */
+export function inferDaysFromBrief(brief: string): number | null {
+  // 调整类措辞（多加/减少/延长…）表达的是相对变化，不是绝对天数，不覆盖
+  if (/(多加|再加|增加|减少|延长|缩短|多一天|少一天)/.test(brief)) return null
+  const match = brief.match(/(?<![0-9月第当每明后次改])([0-9０-９]+|[一二两三四五六七八九十]+半?)\s*[天日]/)
+  if (!match) return null
+  const raw = match[1].replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0)).replace(/半$/, '')
+  const value = parseCnNumber(raw)
+  if (value === null || value < 1 || value > 30) return null
+  return value
+}
+
+
 /** 从一句话中提取显式出发地（"从上海去广州"→上海）；没有则返回 null，避免静默显示默认上海。 */
 export function inferOriginFromBrief(brief: string): string | null {
-  const match = brief.match(/(?:从|由)\s*([一-鿿A-Za-z][一-鿿A-Za-z·\-]{1,11}?)(?=出发|去|到|飞|坐|乘|，|,|。|\s|$)/)
+  const match = brief.match(/(?:从|由)\s*([一-鿿A-Za-z][一-鿿A-Za-z·-]{1,11}?)(?=出发|去|到|飞|坐|乘|，|,|。|\s|$)/)
   const origin = match?.[1]?.trim()
   return origin && origin.length >= 2 && !/出发|如何|这里/.test(origin) ? origin : null
 }

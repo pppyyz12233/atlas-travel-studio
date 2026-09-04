@@ -6,6 +6,7 @@ import {
   createJourneySession,
   defaultDate,
   deriveDestinationFromReply,
+  inferDaysFromBrief,
   inferDestinationFromBrief,
   inferOriginFromBrief,
   journeyProgress,
@@ -47,6 +48,25 @@ describe('journey session model', () => {
     expect(inferDestinationFromBrief('想去广州旅游，三天两个人')).toBe('广州')
     expect(inferDestinationFromBrief('十一月去京都看红叶')).toBe('京都')
     expect(inferDestinationFromBrief('想吃火锅，预算五千')).toBeNull()
+  })
+
+  it('keeps duration words out of the destination ("去广州一天" → 广州)', () => {
+    expect(inferDestinationFromBrief('去广州一天')).toBe('广州')
+    expect(inferDestinationFromBrief('去巴黎 4 天，两个人')).toBe('巴黎')
+    expect(inferDestinationFromBrief('想带爸妈去西安5天')).toBe('西安')
+  })
+
+  it('infers explicit day counts and rejects dates/common words', () => {
+    expect(inferDaysFromBrief('去广州一天')).toBe(1)
+    expect(inferDaysFromBrief('周末两天')).toBe(2)
+    expect(inferDaysFromBrief('5天4晚')).toBe(5)
+    expect(inferDaysFromBrief('十一天的行程')).toBe(11)
+    expect(inferDaysFromBrief('十月一日出发')).toBeNull()   // 日期不是天数
+    expect(inferDaysFromBrief('9月18日出发')).toBeNull()   // "18日" 是日期
+    expect(inferDaysFromBrief('当天返回')).toBeNull()
+    expect(inferDaysFromBrief('每天步行两万步')).toBeNull()
+    expect(inferDaysFromBrief('预算五千元')).toBeNull()
+    expect(inferDaysFromBrief('想去广州')).toBeNull()
   })
 
   it('moves idle to planning to ready without inventing metrics', () => {

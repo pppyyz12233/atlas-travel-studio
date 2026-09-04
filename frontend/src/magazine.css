@@ -1115,6 +1115,38 @@
 .mag-detail-map--solo { margin-top: 8px; }
 .mag-detail-transit { margin-top: clamp(28px, 4vw, 44px); }
 
+/* 目的地攻略条（编辑部策展内容，详情页头部下方） */
+.mag-destination-strip {
+  margin: 22px 0 0;
+  padding: 16px 20px;
+  background: var(--atlas-paper-soft);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-card);
+}
+.mag-destination-strip > p {
+  margin: 8px 0 12px;
+  color: var(--atlas-ink-soft);
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+.mag-destination-strip dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+}
+.mag-destination-strip dt {
+  color: var(--atlas-ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mag-destination-strip dd {
+  margin: 3px 0 0;
+  color: var(--atlas-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .destination-detail-toc { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 22px; padding: 12px 0; background: var(--atlas-canvas); border-bottom: 1px solid var(--atlas-line); }
 .destination-detail-toc span { color: var(--atlas-ink-muted); font-size: 11px; font-weight: 700; }
 .destination-detail-toc a { color: var(--atlas-ink-soft); font-size: 12px; text-decoration: none; }

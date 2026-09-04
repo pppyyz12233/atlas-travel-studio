@@ -65,7 +65,7 @@ async def login_email(req: EmailLoginRequest, request: Request, db: AsyncSession
         return _token_response(await user.login_by_email(db, req.email, req.password))
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="登录失败，请稍后重试")
 
 
@@ -77,7 +77,7 @@ async def login_phone(req: PhoneLoginRequest, request: Request, db: AsyncSession
         return _token_response(await user.login_by_phone(db, req.phone, req.password))
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="登录失败，请稍后重试")
 
 

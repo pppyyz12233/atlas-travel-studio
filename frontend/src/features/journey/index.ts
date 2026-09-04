@@ -14,6 +14,7 @@ export {
   createJourneySession,
   defaultDate,
   deriveDestinationFromReply,
+  inferDaysFromBrief,
   inferDestinationFromBrief,
   inferOriginFromBrief,
   journeyProgress,

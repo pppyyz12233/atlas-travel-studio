@@ -260,8 +260,10 @@ async def chat_stream(
                 # 单 worker：用队列中转，流式推送内部进度
                 q = asyncio.Queue()
                 def _push(evt):
-                    try: q.put_nowait(evt)
-                    except: pass
+                    try:
+                        q.put_nowait(evt)
+                    except asyncio.QueueFull:  # 消费循环在下一段统一排空，满时丢弃即可
+                        pass
                 async def _run():
                     await _run_step_with_subgraph(layer[0], _build_context(steps), on_event=_push, search_params=state.get("trip_state", {}).get("search_params"))
                 task = asyncio.ensure_future(_run())

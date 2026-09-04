@@ -672,4 +672,53 @@ describe('Atlas page integration', () => {
     click.mockRestore()
     vi.unstubAllGlobals()
   })
+
+  it('follow-up "去广州一天" on a stale Tokyo session updates every display field (串线截图回归)', async () => {
+    const user = userEvent.setup()
+    // 复刻截图现场：一个已完成、表单已被上一轮规划标记 touched 的东京会话
+    const session = createJourneySession({
+      id: 'stale-tokyo',
+      title: '东京 · 5天',
+      phase: 'ready',
+      formTouched: true,
+      form: { ...createJourneySession().form, destination: '东京' },
+      finalReply: '# 东京方案\\n旧内容',
+      messages: [
+        { role: 'user', content: '从上海去东京5天' },
+        { role: 'assistant', content: '# 东京方案\\n旧内容' },
+      ],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ sessions: [session], activeId: session.id }))
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+    expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
+
+    // 继续调整 → 输入"去广州一天"
+    await user.click(screen.getByRole('button', { name: /继续调整这份方案/ }))
+    const textarea = screen.getByLabelText('补充或修改旅行需求')
+    await user.type(textarea, '去广州一天')
+    await user.type(textarea, '{Enter}')
+
+    // 发送瞬间：显式目的地/天数无条件生效（不再被 formTouched 挡住）
+    const persisted = () => JSON.parse(sessionStorage.getItem(JOURNEY_STORAGE_KEY) ?? '{}')
+    await waitFor(() => {
+      const active = persisted().sessions.find((x: { id: string }) => x.id === 'stale-tokyo')
+      expect(active.form.destination).toBe('广州')
+      expect(active.form.days).toBe(1)
+      expect(active.title).toBe('广州 · 1天')
+    })
+    // 提示是"已更新"而不是要求二次确认
+    expect(await screen.findByText(/已按你的最新输入把目的地更新为「广州」/)).toBeInTheDocument()
+
+    // done 后：标题/摘要全部为广州，无东京残留
+    act(() => {
+      streamHarness.options?.onEvent({
+        event: 'done',
+        reply: '## 广州1天行程方案\\n\\n| 时段 | 地点 |\\n|---|---|\\n| 上午 | 陈家祠 |',
+        conversationId: null,
+      })
+    })
+    expect(screen.getByRole('heading', { name: '广州 · 行程方案' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '东京 · 行程方案' })).not.toBeInTheDocument()
+    expect(screen.getByText(/出发地待定 → 广州/)).toBeInTheDocument()
+  })
 })

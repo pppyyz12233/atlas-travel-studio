@@ -16,6 +16,7 @@ import {
   deriveDestinationFromReply,
   eventToJourneyActions,
   getWorkerMeta,
+  inferDaysFromBrief,
   inferDestinationFromBrief,
   inferOriginFromBrief,
   journeyProgress,
@@ -301,28 +302,39 @@ export default function AIPage({ auth, theme }: Props) {
 
     const sessionId = activeSession.id
     const effectiveForm = { ...activeSession.form, ...formPatch }
-    // 表单未被用户手动改过时，工厂默认的"上海/东京"必须让位于任务文本：
-    // 文本里有显式目的地/出发地就用它，没有就清空（显示"待定"），绝不静默沿用默认值。
+    // 任务文本是用户最新意图：显式写了目的地/出发地/天数就无条件生效
+    //（此前只在"表单未被手动改过"时生效，导致"去广州一天"的追问仍显示旧东京
+    //  ——标题/路线/地图城市/编辑部交通指南全部跟着旧 form 走，即串线截图的根因）。
+    // 工厂默认的"上海/东京"同样在未提及时清空（显示"待定"），绝不静默沿用。
     const textOrigin = inferOriginFromBrief(text)
     const textDestination = inferDestinationFromBrief(text)
+    const textDays = inferDaysFromBrief(text)
     const formUntouched = !activeSession.formTouched
     const currentOriginLabel = originLabel(effectiveForm)
     const originOverride: OriginPlace | undefined = formPatch.origin
-      ?? (formUntouched
-        ? (textOrigin !== null
-            ? manualOrigin(textOrigin)
-            : (currentOriginLabel === FACTORY_FORM_DEFAULTS.origin ? manualOrigin('') : undefined))
-        : undefined)
+      ?? (textOrigin !== null
+        ? manualOrigin(textOrigin)
+        // 工厂默认"上海"从不是用户输入——消息没提供出发地就清空（显示"待定"），
+        // 不因 formTouched（可能只是改过别的字段）而保留
+        : (currentOriginLabel === FACTORY_FORM_DEFAULTS.origin ? manualOrigin('') : undefined))
     const destinationOverride = formPatch.destination
-      ?? (formUntouched
-        ? (textDestination ?? (effectiveForm.destination.trim() === FACTORY_FORM_DEFAULTS.destination ? '' : undefined))
-        : undefined)
+      ?? (textDestination !== null
+        ? textDestination
+        : (formUntouched && effectiveForm.destination.trim() === FACTORY_FORM_DEFAULTS.destination ? '' : undefined))
+    const daysOverride = formPatch.days ?? textDays ?? undefined
+    const days = daysOverride ?? effectiveForm.days
     const destination = (destinationOverride ?? effectiveForm.destination).trim()
     const currentConversationId = activeSession.conversationId
-    // 目的地未知时保留"未命名旅程"，done 后由方案本体回填（见 done 处理）
-    const nextTitle = activeSession.title === '未命名旅程' && destination
-      ? `${destination} · ${effectiveForm.days}天`
+    // 目的地/天数变化时同步升级派生型标题（"东京 · 5天" → "广州 · 1天"），自定义标题不动
+    const derivedTitlePattern = /^[^·]+ · \d+天$|行程方案$/
+    const nextTitle = destination && (activeSession.title === '未命名旅程' || derivedTitlePattern.test(activeSession.title))
+      ? `${destination} · ${days}天`
       : activeSession.title
+    // 显式改了目的地时给出明确提示（不是静默切换，也不是要求二次确认）
+    const destinationChanged = textDestination !== null && textDestination !== effectiveForm.destination.trim()
+    if (destinationChanged) {
+      notify('info', `已按你的最新输入把目的地更新为「${textDestination}」`)
+    }
 
     // 游客（无云端会话）的"继续调整"：后端拿不到上一版方案，
     // 把当前方案随请求带上（只进后端 payload，对话航迹仍显示用户原话）。
@@ -338,13 +350,14 @@ export default function AIPage({ auth, theme }: Props) {
     if (Object.keys(formPatch).length > 0) {
       dispatch({ type: 'patchForm', id: sessionId, patch: formPatch })
     }
-    if (originOverride !== undefined || destinationOverride !== undefined) {
+    if (originOverride !== undefined || destinationOverride !== undefined || daysOverride !== undefined) {
       dispatch({
         type: 'patchForm',
         id: sessionId,
         patch: {
           ...(originOverride !== undefined ? { origin: originOverride } : {}),
           ...(destinationOverride !== undefined ? { destination: destinationOverride } : {}),
+          ...(daysOverride !== undefined ? { days: daysOverride } : {}),
         },
       })
     }

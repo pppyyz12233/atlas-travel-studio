@@ -15,6 +15,7 @@ import { buildItineraryViewModel, routeLabel } from '../features/journey'
 import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
 import { getWorkerMeta } from '../features/journey'
 import { getTransportGuide, hasTripTransport } from '../content/transportGuides'
+import { destinations } from '../content/destinations'
 
 export default function TripDetailPage({ sessionId }: { sessionId: string }) {
   const { state, dispatch } = useJourney()
@@ -24,9 +25,15 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
   const session = state.sessions.find(item => item.id === sessionId)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({})
   const [activeDay, setActiveDay] = useState<number | null>(0)
+  // hooks 必须在下面的早退 return 之前（此前 pdfExporting 声明在早退之后，属条件调用 hook）
+  const [pdfExporting, setPdfExporting] = useState(false)
   useEffect(() => {
     document.querySelector('.mag-main')?.scrollTo({ top: 0, behavior: 'auto' })
   }, [sessionId])
+
+  const searchMap = useCallback((keyword: string, city: string) => {
+    mapRef.current?.searchAndMark(keyword, city, keyword, getWorkerMeta('itinerary').markerColor)
+  }, [])
 
   const viewModel = useMemo(
     () => buildItineraryViewModel(session?.finalReply ?? '', session?.tripState),
@@ -64,7 +71,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
       window.setTimeout(focus, 500)
     } else focus()
     return true
-  }, [visibleRouted, session?.form.destination, notify])
+  }, [visibleRouted, session?.form.destination, notify, searchMap])
 
   if (!session) {
     return (
@@ -90,10 +97,6 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
     )
   }
 
-  const searchMap = (keyword: string, city: string) => {
-    mapRef.current?.searchAndMark(keyword, city, keyword, getWorkerMeta('itinerary').markerColor)
-  }
-
   const copyPlan = async () => {
     try {
       await navigator.clipboard.writeText(viewModel.markdown)
@@ -117,8 +120,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
     notify('success', 'Markdown 已下载')
   }
 
-  const [pdfExporting, setPdfExporting] = useState(false)
-  // PDF 走后端下载；游客不自动打开打印窗口
+  // PDF 走后端下载；游客不自动打开打印窗口（pdfExporting 状态已上移到 hooks 区）
   const exportPdf = async () => {
     const token = localStorage.getItem('travel_token')
     const endpoint = session.conversationId ? `/api/export/${session.conversationId}?format=pdf` : '/api/export/guest'
@@ -183,6 +185,24 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       </header>
+
+      {/* 目的地攻略条：只使用编辑部已策展的真实内容（blurb/最佳季节/建议天数），
+          未收录目的地不渲染——不生成占位假攻略 */}
+      {(() => {
+        const guide = destinations.find(item => item.name === session.form.destination.trim())
+        if (!guide) return null
+        return (
+          <aside className="mag-destination-strip" aria-label="目的地攻略（Atlas 编辑部）">
+            <span className="mag-kicker">Atlas 编辑部 · {guide.region}</span>
+            <p>{guide.blurb}</p>
+            <dl>
+              <div><dt>最佳季节</dt><dd>{guide.bestSeason}</dd></div>
+              <div><dt>建议时长</dt><dd>{guide.suggestDays}</dd></div>
+              <div><dt>旅行风格</dt><dd>{guide.styles.join(' / ')}</dd></div>
+            </dl>
+          </aside>
+        )
+      })()}
 
       {viewModel.budgetItems.length > 0 && (
         <section className="mag-detail-budget" aria-label="预算结构">
