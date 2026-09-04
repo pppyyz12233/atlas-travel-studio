@@ -2,15 +2,33 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel, Field
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.database import get_db
 from app.auth.dependencies import get_current_user
 from app.crud import message
-from app.utils.pdf_export import build_markdown, markdown_to_html, html_to_pdf
+from app.utils.pdf_export import attachment_header, build_markdown, render_plan_pdf
 
 router = APIRouter(prefix="/export", tags=["导出"])
+
+class GuestExportRequest(BaseModel):
+    destination: str = Field(default="旅行方案", max_length=80)
+    dates: str = Field(default="", max_length=80)
+    content: str = Field(min_length=1, max_length=120_000)
+
+@router.post("/guest")
+async def export_guest_trip(payload: GuestExportRequest):
+    """游客 PDF 导出：只在内存中处理，不认证、不落库。"""
+    md = build_markdown(payload.content, payload.destination, payload.dates)
+    # 渲染丢线程池：matplotlib/weasyprint 都是同步 CPU 操作，不能阻塞事件循环（SSE 会被卡住）
+    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": attachment_header(payload.destination, payload.dates)},
+    )
 
 
 @router.get("/{conversation_id}")
@@ -37,15 +55,10 @@ async def export_trip(
         )
 
     md = build_markdown(reply)
-    html = markdown_to_html(md)
-    try:
-        # WeasyPrint 是同步 CPU 密集操作，丢进线程池执行，
-        # 避免导出期间阻塞事件循环（SSE 推流会被一起卡住）
-        pdf_bytes = await asyncio.to_thread(html_to_pdf, html)
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=trip_plan_{conversation_id}.pdf"},
-        )
-    except ImportError:
-        raise HTTPException(500, "PDF 导出需要安装 weasyprint: pip install weasyprint")
+    # PDF 渲染丢线程池：同步 CPU 密集操作不能阻塞事件循环（SSE 推流会被一起卡住）
+    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": attachment_header(f"trip-{conversation_id}")},
+    )

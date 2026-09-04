@@ -1,6 +1,8 @@
 
 import json
 import asyncio
+import re
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +28,30 @@ from app.utils.rate_limiter import RateLimiter
 
 router = APIRouter(prefix="/chat", tags=["对话"])
 limiter = RateLimiter(max_per_minute=20)
+
+# ── 今天日期上下文：只进 LLM state，不落库、不回显给用户 ──────────────
+# 历史里上一轮注入的旧日期块先剥掉，避免多轮对话出现两个互相矛盾的"今天"。
+_DATE_CTX_MARK = "【系统上下文】今天是"
+_DATE_CTX_RE = re.compile(
+    r"\n*" + re.escape(_DATE_CTX_MARK) + r" \d{4}-\d{2}-\d{2}。"
+    r"用户未指定出发日期时，默认从今天开始安排。不要使用示例日期。"
+)
+
+
+def _today_cn() -> str:
+    """Asia/Shanghai 当前日期（UTC+8），与服务器本地时区无关。"""
+    return datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+
+
+def _with_date_context(message: str) -> str:
+    return (
+        f"{message}\n\n{_DATE_CTX_MARK} {_today_cn()}。"
+        "用户未指定出发日期时，默认从今天开始安排。不要使用示例日期。"
+    )
+
+
+def _strip_date_context(message: str) -> str:
+    return _DATE_CTX_RE.sub("", message)
 
 
 def _client_key(request: Request) -> str:
@@ -61,7 +87,8 @@ async def chat(
     # 未登录 → 无状态调用
     if user is None:
         state = {
-            "messages": [{"role": "user", "content": req.message}],
+            # 日期上下文只给 LLM，不落库
+            "messages": [{"role": "user", "content": _with_date_context(req.message)}],
             "plan_steps": [], "current_step_index": 0,
             "final_answer": "", "guard_blocked": False, "guard_reason": "",
             "intent": "full_trip", "active_workers": [], "trip_state": {},
@@ -184,11 +211,14 @@ async def chat_stream(
             pass
 
         # 历史瘦身：去掉上一轮注入的 system 偏好（memory_reader 每轮会重新注入一份），
-        # 并只保留最近 20 条，控制逐轮增长的 token 成本
-        prev_msgs = [m for m in prev_msgs if m.get("role") != "system"][-20:]
+        # 剥掉上一轮注入的旧日期块（本轮会追加今天的日期），并只保留最近 20 条
+        prev_msgs = [
+            {**m, "content": _strip_date_context(m.get("content", ""))} if isinstance(m.get("content"), str) else m
+            for m in prev_msgs if m.get("role") != "system"
+        ][-20:]
 
         state: AgentState = {
-            "messages": prev_msgs + [{"role": "user", "content": msg}],
+            "messages": prev_msgs + [{"role": "user", "content": _with_date_context(msg)}],
             "plan_steps": [], "current_step_index": 0,
             "final_answer": "", "guard_blocked": False, "guard_reason": "",
             "intent": "full_trip", "active_workers": [], "trip_state": {},
