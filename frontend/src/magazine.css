@@ -287,6 +287,31 @@
 }
 .mag-page-head p { margin: 0; color: var(--atlas-ink-soft); font-size: 14.5px; line-height: 1.8; }
 
+.travel-quote-panel {
+  position: relative;
+  min-height: 190px;
+  margin: 0 0 30px;
+  padding: 28px clamp(20px, 5vw, 64px) 24px;
+  overflow: hidden;
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-card);
+  text-align: center;
+}
+.mag-brand-mark svg { width: 22px; height: 22px; }
+.travel-quote-panel::after { content: ''; position: absolute; width: 220px; height: 220px; right: -72px; bottom: -150px; border: 1px solid var(--atlas-line-strong); border-radius: 50%; pointer-events: none; }
+.travel-quote-panel__quote { max-width: 760px; margin: 18px auto 10px; color: var(--atlas-ink); font-family: var(--atlas-display); font-size: clamp(22px, 3.2vw, 36px); line-height: 1.45; }
+.travel-quote-panel__author { margin: 0; color: var(--atlas-ink-soft); font-size: 13px; }
+.travel-quote-panel__author span { margin-left: 10px; color: var(--atlas-ink-muted); font-size: 11px; }
+.travel-quote-panel__quote { animation: quote-fade .7s var(--atlas-ease) both; }
+.travel-quote-panel__next { margin-top: 14px; padding: 5px 10px; color: var(--atlas-ink-muted); background: transparent; border: 1px solid var(--atlas-line); border-radius: 999px; font-size: 11px; cursor: pointer; }
+.travel-quote-panel__next:hover { color: var(--atlas-ink); background: var(--atlas-paper-soft); }
+.mag-hero-visual .travel-quote-panel { width: 100%; min-height: 0; margin: auto 0 0; padding: 0; background: transparent; border: 0; text-align: right; }
+.mag-hero-visual .travel-quote-panel::after { display: none; }
+.mag-hero-visual .travel-quote-panel .mag-kicker { display: none; }
+.mag-hero-visual .travel-quote-panel__quote { margin: 0 0 10px; font-size: clamp(24px, 3vw, 38px); }
+.mag-hero-visual .travel-quote-panel__author { font-size: 13px; }
+
 .mag-section { margin-top: clamp(40px, 6vw, 72px); }
 
 .mag-section-head {
@@ -413,6 +438,7 @@
   text-decoration: none;
 }
 .mag-hero-explore-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.mag-hero-explore-cta { min-height: 40px; padding: 0 14px; border: 1px solid var(--atlas-line-strong); border-radius: var(--atlas-r-btn); background: var(--atlas-paper); }
 
 .mag-hero-facts {
   display: grid;
@@ -563,13 +589,21 @@
   cursor: pointer;
   background: var(--atlas-paper-soft);
 }
-.mag-destination-card.is-feature .mag-destination-cover { aspect-ratio: 4 / 4.6; flex: 1; }
+.mag-destination-card.is-feature .mag-destination-cover { aspect-ratio: 4 / 5; flex: 1; }
 .mag-cover-art {
   width: 100%;
   height: 100%;
   display: block;
   transition: transform var(--atlas-normal) var(--atlas-ease);
 }
+.mag-cover-stack { position: relative; width: 100%; height: 100%; }
+.mag-cover-art { animation: cover-fade 1.2s var(--atlas-ease) both; }
+.mag-quote-card { position: absolute; left: 16px; right: 16px; bottom: 16px; padding: 12px 14px; color: #fff; background: rgb(25 35 31 / 78%); border-radius: 8px; }
+.mag-quote-card span { font-size: 10px; letter-spacing: .12em; opacity: .75; }
+.mag-quote-card p { margin: 5px 0; font-family: var(--atlas-display); font-size: 14px; line-height: 1.45; }
+.mag-quote-card small { opacity: .8; }
+.mag-destination-cover .mag-cover-art { object-fit: cover; }
+.mag-destination-detail .mag-detail-head > img { display: block; width: 100%; max-height: 360px; aspect-ratio: 16 / 7; object-fit: cover; margin-bottom: 24px; border-radius: var(--atlas-r-card); }
 .mag-destination-card:hover .mag-cover-art { transform: scale(1.025); }
 
 .mag-destination-region {
@@ -660,6 +694,9 @@
   transition: background var(--atlas-fast);
 }
 .mag-destination-plan:hover { background: var(--atlas-cta-deep); }
+.mag-destination-body footer .mag-destination-plan { min-width: 92px; justify-content: center; }
+.mag-destination-body footer .mag-destination-plan + .mag-destination-plan { color: var(--atlas-ink); background: transparent; border: 1px solid var(--atlas-line-strong); }
+.mag-destination-body footer .mag-destination-plan + .mag-destination-plan:hover { background: var(--atlas-paper-soft); }
 
 .mag-destination-grid {
   display: grid;
@@ -850,7 +887,7 @@
 
 .mag-trip-detail { animation: mag-rise .45s var(--atlas-ease) both; }
 
-.mag-detail-back { margin-bottom: 18px; }
+.mag-detail-back { margin-bottom: 18px; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 6px; color: var(--atlas-ink-soft); background: transparent; border: 0; font-size: 13px; font-weight: 650; cursor: pointer; }
 .mag-detail-back button {
   display: inline-flex;
   align-items: center;
@@ -867,11 +904,28 @@
 }
 .mag-detail-back button:hover { color: var(--atlas-ink); background: var(--atlas-paper); }
 
-.mag-detail-head { max-width: 820px; padding-bottom: clamp(24px, 4vw, 40px); border-bottom: 1px solid var(--atlas-line); }
+.mag-detail-head { max-width: none; padding: 0 0 24px; border-bottom: 1px solid var(--atlas-line); }
+/* 命名区域布局：此前 facts 与 actions 被放进同一个网格单元（grid-column:2 + grid-row:1/span3）
+   导致两块内容物理重叠。现在各自占独立区域，操作按钮有独立安全行，长路线文字在左列收缩换行。 */
+.mag-detail-head--compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
+  column-gap: 28px;
+  grid-template-areas:
+    "kicker facts"
+    "title  facts"
+    "route  facts"
+    "actions actions";
+}
+.mag-detail-head--compact .mag-kicker { grid-area: kicker; }
+.mag-detail-head--compact h1 { grid-area: title; }
+.mag-detail-head--compact .mag-detail-route { grid-area: route; min-width: 0; flex-wrap: wrap; }
+.mag-detail-head--compact .mag-detail-facts { grid-area: facts; margin: 0; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 12px 20px; align-self: center; }
+.mag-detail-head--compact .mag-detail-actions { grid-area: actions; margin-top: 18px; justify-self: start; align-self: end; flex-wrap: wrap; }
 .mag-detail-head h1 {
-  margin: 12px 0 10px;
+  margin: 8px 0 8px;
   font-family: var(--atlas-display);
-  font-size: clamp(34px, 5vw, 56px);
+  font-size: clamp(30px, 4vw, 46px);
   font-weight: 700;
   line-height: 1.15;
 }
@@ -924,9 +978,9 @@
 
 .mag-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
-  gap: clamp(24px, 4vw, 48px);
-  margin-top: clamp(28px, 4vw, 44px);
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+  gap: clamp(32px, 4vw, 48px);
+  margin-top: 28px;
   align-items: start;
 }
 
@@ -960,8 +1014,8 @@
 .mag-timeline-day:last-child .mag-timeline-rail i { display: none; }
 
 .mag-timeline-body {
-  padding: 4px 0 18px 16px;
-  border-left: 1px solid var(--atlas-line);
+  padding: 0 0 22px 18px;
+  border-left: 1px solid var(--atlas-line-strong);
 }
 .mag-timeline-day:last-child .mag-timeline-body { padding-bottom: 4px; }
 /* R2 手风琴日标题（阅读态） */
@@ -996,9 +1050,11 @@
   grid-template-columns: 52px minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
-  padding: 9px 0;
-  border-top: 1px dashed var(--atlas-line);
+  padding: 12px 12px 12px 0;
+  border-top: 1px solid var(--atlas-line);
+  transition: background var(--atlas-fast), padding-left var(--atlas-fast);
 }
+.mag-timeline-items li:hover { padding-left: 8px; background: color-mix(in srgb, var(--atlas-paper-soft) 70%, transparent); }
 .mag-timeline-items time {
   color: var(--atlas-amber);
   font-family: var(--atlas-mono);
@@ -1006,7 +1062,8 @@
   font-variant-numeric: tabular-nums;
   padding-top: 2px;
 }
-.mag-timeline-items span { color: var(--atlas-ink-soft); font-size: 13px; line-height: 1.65; }
+.mag-timeline-item-content { display: grid; gap: 2px; min-width: 0; }
+.mag-timeline-item-content strong { color: var(--atlas-ink); font-size: 14px; font-weight: 650; line-height: 1.55; }
 .mag-timeline-items button {
   width: 32px;
   height: 32px;
@@ -1021,20 +1078,72 @@
   transition: background var(--atlas-fast), opacity var(--atlas-fast);
 }
 .mag-timeline-items button:hover { background: var(--atlas-sky-soft); opacity: 1; }
+.mag-detail-timeline .mag-timeline-items button { display: none; }
 
 .mag-timeline-note { margin: 0; color: var(--atlas-ink-muted); font-size: 12.5px; line-height: 1.7; }
 
+/* 地图容器高度链：stack 必须从有确定高度的父级（atlas-map-frame 的 grid 行 / mag-map-frame 的 clamp）
+   拿到确定高度，再由 minmax(0,1fr) 行把高度交给 map-surface —— 否则 height:100% 对内容自适应
+   网格循环解析为 0，地图容器高度归零（瓦片/marker 全部不可见）。 */
+.map-view-stack {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+.map-view-stack .map-surface { min-height: 0; }
+.mag-detail-map .map-view-stack .map-legend { position: static; max-width: none; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.mag-detail-map .map-view-stack .map-legend summary { min-height: 34px; padding: 0; color: var(--atlas-ink-soft); font-size: 11.5px; }
+.mag-detail-map .map-view-stack .map-legend[open] summary { border-bottom: 0; }
+.mag-detail-map .map-view-stack .map-legend-body { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 0; }
+.mag-detail-map .map-view-stack .map-legend-chip { padding: 5px 8px; background: var(--atlas-paper-soft); border: 1px solid var(--atlas-line); border-radius: 999px; font-size: 11px; }
+.mag-detail-map .map-view-stack .map-legend-note { width: 100%; }
+.mag-detail-map .map-view-stack .map-empty-note { position: static; inset: auto; min-height: 72px; padding: 16px; background: var(--atlas-paper-soft); border: 1px dashed var(--atlas-line-strong); border-radius: var(--atlas-r-card); text-align: center; }
+
 .mag-map-frame {
   position: relative;
-  height: 380px;
+  height: clamp(340px, 34vw, 390px);
   overflow: hidden;
   background: var(--atlas-paper);
   border: 1px solid var(--atlas-line);
   border-radius: var(--atlas-r-card);
 }
 .mag-map-note { margin: 10px 2px 0; color: var(--atlas-ink-muted); font-size: 11.5px; }
+.mag-timeline-note--solo { margin: 18px 2px 24px; padding: 14px 16px; background: var(--atlas-paper-soft); border: 1px dashed var(--atlas-line-strong); border-radius: var(--atlas-r-card); }
+.mag-detail-map--solo { margin-top: 8px; }
+.mag-detail-transit { margin-top: clamp(28px, 4vw, 44px); }
 
+.destination-detail-toc { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 22px; padding: 12px 0; background: var(--atlas-canvas); border-bottom: 1px solid var(--atlas-line); }
+.destination-detail-toc span { color: var(--atlas-ink-muted); font-size: 11px; font-weight: 700; }
+.destination-detail-toc a { color: var(--atlas-ink-soft); font-size: 12px; text-decoration: none; }
+.destination-detail-toc a:hover { color: var(--atlas-ink); text-decoration: underline; text-underline-offset: 3px; }
+.destination-detail-toc button { min-height: 32px; padding: 0 11px; color: var(--atlas-ink-soft); background: var(--atlas-paper); border: 1px solid var(--atlas-line); border-radius: 999px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.destination-detail-toc button:hover { color: var(--atlas-ink); border-color: var(--atlas-ink-muted); }
+.mag-detail-document > section { scroll-margin-top: 96px; }
 .mag-detail-document { margin-top: clamp(28px, 4vw, 44px); }
+.today-execution, .trip-checklist { margin-top: clamp(28px, 4vw, 44px); padding: 22px; background: var(--atlas-paper); border: 1px solid var(--atlas-line); border-radius: var(--atlas-r-card); }
+.trip-day-switcher { display: flex; align-items: stretch; gap: 8px; margin: 22px 0 0; padding: 12px 0 14px; border-bottom: 1px solid var(--atlas-line); overflow-x: auto; scrollbar-width: none; }
+.trip-day-switcher::-webkit-scrollbar { display: none; }
+.trip-day-switcher > span { align-self: center; flex: 0 0 auto; margin-right: 4px; color: var(--atlas-ink-muted); font-size: 11px; font-weight: 700; }
+.trip-day-switcher button { min-width: 132px; min-height: 52px; display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: 1fr 1fr; column-gap: 8px; align-items: center; padding: 7px 12px; color: var(--atlas-ink-soft); background: var(--atlas-paper); border: 1px solid var(--atlas-line); border-radius: 10px; font-size: 12px; text-align: left; cursor: pointer; }
+.trip-day-switcher button b { grid-row: 1 / span 2; color: var(--atlas-amber); font-family: var(--atlas-mono); font-size: 15px; }
+.trip-day-switcher button span { font-weight: 700; }
+.trip-day-switcher button small { color: var(--atlas-ink-muted); font-size: 10.5px; }
+.trip-day-switcher button.is-active { color: var(--atlas-cta-ink); background: var(--atlas-cta); border-color: var(--atlas-cta); }
+.trip-day-switcher button.is-active b,
+.trip-day-switcher button.is-active small { color: inherit; opacity: .72; }
+.today-execution h2, .trip-checklist h2 { display: flex; align-items: center; gap: 8px; margin: 4px 0 4px; font-family: var(--atlas-display); font-size: 24px; }
+.today-execution p { margin: 0; color: var(--atlas-ink-muted); font-size: 13px; }
+.today-execution ol { display: grid; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.today-execution li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px dashed var(--atlas-line); }
+.today-execution time { color: var(--atlas-amber); font-family: var(--atlas-mono); font-size: 12px; }
+.today-execution li > span { color: var(--atlas-ink); font-size: 14px; font-weight: 650; }
+.trip-checklist h2 { margin-bottom: 16px; }
+.trip-checklist__items { display: grid; gap: 10px; }
+.trip-checklist__items label { display: flex; align-items: center; gap: 10px; color: var(--atlas-ink-soft); font-size: 13px; cursor: pointer; }
+.trip-checklist__items input { width: 18px; height: 18px; accent-color: var(--atlas-route); }
 .mag-document-paper {
   padding: clamp(22px, 4vw, 44px);
   background: var(--atlas-paper);
@@ -1172,6 +1281,17 @@
   from { opacity: 0; transform: translateY(8px) scale(.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+.destination-detail-facts { display: flex; flex-wrap: wrap; gap: 24px; margin: 22px 0 0; }
+.destination-detail-facts div { min-width: 120px; }
+.destination-detail-facts dt { color: var(--atlas-ink-muted); font-size: 11px; }
+.destination-detail-facts dd { margin: 5px 0 0; color: var(--atlas-ink); font-size: 13px; font-weight: 650; }
+.destination-itinerary { display: grid; gap: 10px; margin-top: 14px; }
+.destination-itinerary article { padding: 14px 16px; background: var(--atlas-paper-soft); border-left: 3px solid var(--atlas-amber); border-radius: 8px; }
+.destination-itinerary strong { color: var(--atlas-ink); font-size: 14px; }
+.destination-itinerary p { margin: 6px 0 3px; color: var(--atlas-ink-soft); font-size: 13px; }
+.destination-itinerary small { color: var(--atlas-ink-muted); font-size: 12px; line-height: 1.6; }
+@keyframes quote-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cover-fade { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: scale(1); } }
 
 /* ---------- 响应式 ---------- */
 
@@ -1182,6 +1302,12 @@
   .mag-feature-grid { grid-template-columns: 1fr; }
   .mag-feature-side { grid-template-rows: none; }
   .mag-detail-grid { grid-template-columns: 1fr; }
+  .mag-detail-head--compact {
+    grid-template-columns: 1fr;
+    grid-template-areas: "kicker" "title" "route" "facts" "actions";
+  }
+  .mag-detail-head--compact .mag-detail-facts { margin-top: 18px; }
+  .mag-detail-head--compact .mag-detail-actions { justify-self: start; }
 }
 
 @media (max-width: 767px) {
@@ -1199,11 +1325,14 @@
   .mag-hero-actions .mag-cta { flex: 1; }
   .mag-how-steps { grid-template-columns: 1fr; gap: 16px; }
   .mag-page { padding-bottom: 40px; }
+  /* 触屏点击安全区：详情页操作按钮（继续调整/复制/Markdown/PDF）至少 44px 高 */
+  .mag-detail-actions button { min-height: 44px; }
   .mag-destination-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   .mag-trip-grid { grid-template-columns: 1fr; }
   .mag-trip-remove { opacity: 1; }
   .mag-toast-viewport { right: 12px; bottom: calc(66px + env(safe-area-inset-bottom)); }
   .mag-timeline-items li { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .trip-day-switcher { margin-inline: -2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -17,6 +17,8 @@ interface ItineraryWorkspaceProps {
   onSearchMap: (keyword: string, city: string) => void
   onExport?: (format: 'md' | 'pdf') => void
   notice?: { tone: 'success' | 'error'; message: string } | null
+  /** 导出请求进行中：禁用导出按钮，防止重复下载 */
+  exportBusy?: boolean
   /** 主流程：完成后去行程详情阅读视图 */
   onOpenTrip?: () => void
   /** 保存状态徽标：cloud = 已落库；local = 游客本地草稿 */
@@ -74,6 +76,7 @@ export default function ItineraryWorkspace({
   onSearchMap,
   onExport,
   notice = null,
+  exportBusy = false,
   onOpenTrip,
   saveState,
   onLogin,
@@ -167,9 +170,10 @@ export default function ItineraryWorkspace({
                 aria-haspopup="menu"
                 aria-expanded={exportOpen}
                 aria-controls={EXPORT_MENU_ID}
+                disabled={exportBusy}
                 onClick={() => setExportOpen(value => !value)}
               >
-                <FileDown size={15} aria-hidden="true" /> 导出
+                <FileDown size={15} aria-hidden="true" /> {exportBusy ? '导出中…' : '导出'}
                 <ChevronDown size={14} aria-hidden="true" />
               </button>
               {exportOpen && (
@@ -180,10 +184,10 @@ export default function ItineraryWorkspace({
                   </button>
                   {onExport && (
                     <>
-                      <button type="button" role="menuitem" onClick={() => runExport('md')}>
+                      <button type="button" role="menuitem" disabled={exportBusy} onClick={() => runExport('md')}>
                         <FileText size={15} aria-hidden="true" /> 导出 Markdown
                       </button>
-                      <button type="button" role="menuitem" onClick={() => runExport('pdf')}>
+                      <button type="button" role="menuitem" disabled={exportBusy} onClick={() => runExport('pdf')}>
                         <FileDown size={15} aria-hidden="true" /> 导出 PDF
                       </button>
                     </>
@@ -219,6 +223,35 @@ export default function ItineraryWorkspace({
         ) : (
           <p className="atlas-reading-note">本次方案为自由叙述式，未解析出结构化日程；完整内容见下方方案全文。</p>
         )}
+      </section>
+
+      {/* 交通与住宿：内容全部来自本次方案的"交通/住宿/酒店"章节原文（不编造酒店与价格）。
+          与每日行程的主次关系：位于每日安排之后、折叠区之前，不压过主线。 */}
+      <section className="atlas-reading-transit" aria-label="交通与住宿">
+        <h3>交通与住宿</h3>
+        <div className="atlas-transit-grid">
+          <div className="atlas-transit-card">
+            <h4>交通</h4>
+            {viewModel.transportMarkdown.trim()
+              ? <SafeMarkdown content={viewModel.transportMarkdown} />
+              : <p className="atlas-reading-note">本次方案未生成交通内容，可继续追问「如何到达」「市内怎么坐车」。</p>}
+          </div>
+          <div className="atlas-transit-card">
+            <h4>住宿</h4>
+            {viewModel.lodgingMarkdown.trim()
+              ? <SafeMarkdown content={viewModel.lodgingMarkdown} />
+              : <p className="atlas-reading-note">本次方案未生成住宿内容，可继续追问「推荐住哪个区域」。</p>}
+          </div>
+        </div>
+        <details className="atlas-transit-editorial">
+          <summary>Atlas 编辑部通用建议（与本次生成内容相互独立）</summary>
+          <ul>
+            <li>机场 / 高铁站到市区，优先查轨道交通直达线，其次机场大巴，深夜到达再考虑打车。</li>
+            <li>住宿优先选地铁沿线 500 米内、换乘线路多的区域，连续多日行程能显著省时。</li>
+            <li>跨城段尽量把长途交通安排在早晨，给目的地留出完整一天。</li>
+            <li>预订前以平台实时价格为准；本页面不展示任何编辑部报价。</li>
+          </ul>
+        </details>
       </section>
 
       <div className="atlas-reading-folds">

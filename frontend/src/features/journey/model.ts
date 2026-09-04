@@ -3,13 +3,32 @@ import type { Location } from '../../types'
 export type JourneyPhase = 'idle' | 'planning' | 'ready' | 'error' | 'cancelled'
 export type JourneyStepStatus = 'pending' | 'running' | 'done' | 'failed'
 
+/** 出发地：结构化对象。source 标记来源——
+ *  - 'manual'  用户手填或一句话推断（只有文字）
+ *  - 'browser' 「使用我的当前位置」按钮经 Geolocation API 取得（带坐标） */
+export interface OriginPlace {
+  label: string | null
+  latitude: number | null
+  longitude: number | null
+  source: 'manual' | 'browser'
+}
+
 export interface TripForm {
-  origin: string
+  origin: OriginPlace
   destination: string
   date: string
   days: number
   people: number
   budget: number
+}
+
+export function manualOrigin(label: string): OriginPlace {
+  return { label: label.trim() || null, latitude: null, longitude: null, source: 'manual' }
+}
+
+/** 出发地显示文本：没有 label 时为空串（UI 层显示"出发地待定"，不编造城市） */
+export function originLabel(form: Pick<TripForm, 'origin'>): string {
+  return form.origin.label?.trim() ?? ''
 }
 
 export interface JourneyMessage {
@@ -53,6 +72,8 @@ export interface JourneySession {
   statusMessage: string
   form: TripForm
   tripState?: TripState
+  /** 用户是否在 MissionBrief 里手动改过表单：未改过时允许从任务文本回填目的地 */
+  formTouched?: boolean
 }
 
 export interface JourneyState {
@@ -83,13 +104,22 @@ function createId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function defaultDate(): string {
-  const date = new Date()
-  date.setDate(date.getDate() + 14)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+/** 出发日期默认值：Asia/Shanghai 的"今天"（UTC+8，与设备本地时区无关）。
+ *  不再使用"今天+14"或任何固定测试日期——用户没填日期时就是今天，
+ *  LLM 侧由后端注入同样的日期上下文（app/routers/chat_router.py）。 */
+export function defaultDate(): string {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+/** 工厂默认表单值：仅作为 MissionBrief 的可编辑初始建议。
+ *  用户用一句话开始规划时绝不能静默沿用（行程串线源头），见 AIPage#send。 */
+export const FACTORY_FORM_DEFAULTS = {
+  origin: '上海',
+  destination: '东京',
+} as const
+
+function factoryOrigin(): OriginPlace {
+  return { label: FACTORY_FORM_DEFAULTS.origin, latitude: null, longitude: null, source: 'manual' }
 }
 
 export function createJourneySession(overrides: Partial<JourneySession> = {}): JourneySession {
@@ -105,8 +135,8 @@ export function createJourneySession(overrides: Partial<JourneySession> = {}): J
     graphNode: '',
     statusMessage: '',
     form: {
-      origin: '上海',
-      destination: '东京',
+      origin: factoryOrigin(),
+      destination: FACTORY_FORM_DEFAULTS.destination,
       date: defaultDate(),
       days: 5,
       people: 2,
@@ -114,6 +144,57 @@ export function createJourneySession(overrides: Partial<JourneySession> = {}): J
     },
     ...overrides,
   }
+}
+
+/** 从首页一句话中提取显式目的地，避免沿用默认东京造成行程串线。 */
+export function inferDestinationFromBrief(brief: string): string | null {
+  const match = brief.match(/(?:想去|要去|去|到|前往|目的地(?:是|为)?)\s*([\u4e00-\u9fffA-Za-z][\u4e00-\u9fffA-Za-z·\-]{1,19}?)(?=旅游|旅行|玩|看看|看|，|,|。|！|!|\s|$)/)
+  const destination = match?.[1]?.trim()
+  return destination && destination.length >= 2 ? destination : null
+}
+
+/** 从一句话中提取显式出发地（"从上海去广州"→上海）；没有则返回 null，避免静默显示默认上海。 */
+export function inferOriginFromBrief(brief: string): string | null {
+  const match = brief.match(/(?:从|由)\s*([一-鿿A-Za-z][一-鿿A-Za-z·\-]{1,11}?)(?=出发|去|到|飞|坐|乘|，|,|。|\s|$)/)
+  const origin = match?.[1]?.trim()
+  return origin && origin.length >= 2 && !/出发|如何|这里/.test(origin) ? origin : null
+}
+
+/**
+ * 从最终方案的 Markdown 里派生目的地（标题行优先）。
+ * 用户没写目的地时回填；与用户显式输入冲突时用于提示确认，不静默覆盖。
+ * 算法：找第一个含行程词（行程/方案/之旅/…）的标题行，取行程词前的片段，
+ * 依次剥掉"4天3晚"类数字块、常见旅行后缀词、分隔符、出发地前缀（从/由/去/到）、
+ * 常见修饰前缀（最终/完整/…），剩下 2-10 字视为目的地。
+ */
+const TRIP_WORD = /行程|方案|之旅|旅游|旅行|自由行/
+const DERIVE_PREFIX_WORDS = /^(?:最终|最新|完整|详细|新版|旧版|定制|专属|我的|一份|这份|超值|精品|第[一二三四五六七八九十\d]+版?)+/
+
+export function deriveDestinationFromReply(reply: string): string | null {
+  if (!reply) return null
+  const lines = reply
+    .split('\n')
+    .map(line => line.replace(/^#{1,6}\s*/, '').replace(/\*+/g, '').trim())
+    .filter(Boolean)
+  const titleLine = lines.slice(0, 5).find(line => TRIP_WORD.test(line))
+  if (!titleLine) return null
+  const wordIndex = titleLine.search(TRIP_WORD)
+  let name = titleLine.slice(0, wordIndex)
+    .replace(/[\d０-９]+\s*(?:天|日|晚)\S*/g, '')
+    .replace(/(?:天|日|晚|人|往返|游|美食|深度|休闲|亲子|蜜月|度假)+$/g, '')
+    .replace(/[\s·•，,、()（）\-—:：/]+/g, '')
+  const cut = Math.max(
+    name.lastIndexOf('从'), name.lastIndexOf('由'), name.lastIndexOf('去'),
+    name.lastIndexOf('到'),
+  )
+  if (cut >= 0) name = name.slice(cut + 1)
+  name = name.replace(DERIVE_PREFIX_WORDS, '')
+  return name.length >= 2 && name.length <= 10 ? name : null
+}
+
+/** 路线展示：出发地/目的地缺失时用待定占位，绝不静默显示默认"上海 → 东京"。 */
+export function routeLabel(form: TripForm): string {
+  return `${originLabel(form) || '出发地待定'} → ${form.destination.trim() || '目的地待定'}`
 }
 
 // ---------- 会话持久化：刷新恢复 + URL 锚点 ----------
@@ -124,6 +205,15 @@ const phases: ReadonlySet<JourneyPhase> = new Set(['idle', 'planning', 'ready', 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isValidOrigin(value: unknown): boolean {
+  // 兼容旧版字符串 origin（升级前的 sessionStorage 残留）
+  if (typeof value === 'string') return true
+  return isRecord(value) && (value.label === null || typeof value.label === 'string')
+    && (value.latitude === null || typeof value.latitude === 'number')
+    && (value.longitude === null || typeof value.longitude === 'number')
+    && (value.source === 'manual' || value.source === 'browser')
 }
 
 // 恢复前逐会话校验结构：sessionStorage 里的脏数据宁可丢弃也不能让渲染崩溃
@@ -138,9 +228,18 @@ function isValidSession(value: unknown): value is JourneySession {
   if (typeof value.graphNode !== 'string' || typeof value.statusMessage !== 'string') return false
   const form = value.form
   if (!isRecord(form)) return false
-  return typeof form.origin === 'string' && typeof form.destination === 'string'
+  return isValidOrigin(form.origin) && typeof form.destination === 'string'
     && typeof form.date === 'string' && typeof form.days === 'number'
     && typeof form.people === 'number' && typeof form.budget === 'number'
+}
+
+/** 旧版（字符串 origin）会话升级为结构化 OriginPlace；已是对象则原样返回 */
+function normalizeOrigin(session: JourneySession): JourneySession {
+  const origin = session.form.origin as unknown
+  if (typeof origin === 'string') {
+    return { ...session, form: { ...session.form, origin: manualOrigin(origin) } }
+  }
+  return session
 }
 
 export function serializeJourneyState(state: JourneyState): string | null {
@@ -157,12 +256,13 @@ export function restoreJourneyState(raw: string | null): JourneyState | null {
     const parsed = JSON.parse(raw) as { sessions?: unknown; activeId?: unknown }
     if (!Array.isArray(parsed.sessions) || parsed.sessions.length === 0) return null
     if (!parsed.sessions.every(isValidSession)) return null
-    // 刷新时仍在生成的会话标记为已取消，避免恢复后永远卡在"规划中"
+    // 刷新时仍在生成的会话标记为已取消，避免恢复后永远卡在"规划中"；
+    // 历史行程的日期等字段原样保留（不被今天的默认值覆盖）
     const sessions = (parsed.sessions as JourneySession[]).map(session => (
       session.phase === 'planning'
         ? { ...session, phase: 'cancelled' as const, graphNode: '', statusMessage: '页面刷新，生成已中断；已完成的步骤仍然保留。' }
         : session
-    ))
+    )).map(normalizeOrigin)
     const activeId = typeof parsed.activeId === 'string' && sessions.some(session => session.id === parsed.activeId)
       ? parsed.activeId
       : sessions[0].id
@@ -226,6 +326,15 @@ export function activeJourneySession(state: JourneyState): JourneySession {
   return state.sessions.find(session => session.id === state.activeId) ?? state.sessions[0]
 }
 
+// 一次性空草稿：没有任何用户内容也没落库的会话。
+// 新建规划时清掉它们，避免"未命名旅程 · 上海 → 东京"僵尸草稿越积越多。
+function isDisposableDraft(session: JourneySession): boolean {
+  return session.conversationId === null
+    && session.messages.length === 0
+    && session.steps.length === 0
+    && !session.finalReply
+}
+
 export function journeyReducer(state: JourneyState, action: JourneyAction): JourneyState {
   const updateSession = (id: string, update: (session: JourneySession) => JourneySession): JourneyState => ({
     ...state,
@@ -235,7 +344,8 @@ export function journeyReducer(state: JourneyState, action: JourneyAction): Jour
   switch (action.type) {
     case 'add': {
       const session = action.session ?? createJourneySession()
-      return { sessions: [...state.sessions, session], activeId: session.id }
+      const kept = state.sessions.filter(existing => !isDisposableDraft(existing))
+      return { sessions: [...kept, session], activeId: session.id }
     }
     case 'remove': {
       const remaining = state.sessions.filter(session => session.id !== action.id)
@@ -257,6 +367,7 @@ export function journeyReducer(state: JourneyState, action: JourneyAction): Jour
     case 'patchForm':
       return updateSession(action.id, session => ({
         ...session,
+        formTouched: true,
         form: { ...session.form, ...action.patch },
       }))
     case 'appendMessage':

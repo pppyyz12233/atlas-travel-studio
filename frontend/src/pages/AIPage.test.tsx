@@ -7,6 +7,7 @@ import type { useAuth } from '../hooks/useAuth'
 import type { StreamError } from '../hooks/useSSE'
 import type { useTheme } from '../hooks/useTheme'
 import AIPage from './AIPage'
+import HomePage from './HomePage'
 import { JourneyProvider } from '../app/JourneyProvider'
 import { RouterProvider } from '../app/router'
 import { ToastProvider } from '../app/Toast'
@@ -174,12 +175,16 @@ describe('Atlas page integration', () => {
     await user.type(textarea, '第二天少一个景点')
     await user.type(textarea, '{Enter}')
 
-    expect(streamHarness.startStream).toHaveBeenCalledWith(
-      '第二天少一个景点',
-      null,
-      null,
-      expect.any(Object),
-    )
+    // 游客继续调整：后端没有云端上下文，请求需附带上一版方案（对话航迹仍显示原话）
+    expect(streamHarness.startStream).toHaveBeenCalledTimes(1)
+    const [sentMessage] = streamHarness.startStream.mock.calls[0]
+    expect(sentMessage).toContain('第二天少一个景点')
+    expect(sentMessage).toContain('【上一版方案参考，请在此基础上修改】')
+    expect(sentMessage).toContain('# 东京方案')
+    // 首句之后才是上下文块：用户原话不被改写
+    expect(sentMessage.startsWith('第二天少一个景点')).toBe(true)
+    // UI 对话航迹保持用户原话
+    expect(within(screen.getByLabelText('对话记录')).getByText('第二天少一个景点')).toBeInTheDocument()
   })
 
   it('auto-starts planning from a home page brief exactly once', async () => {
@@ -513,5 +518,158 @@ describe('Atlas page integration', () => {
 
     await waitFor(() => expect(setShowAuthModal).toHaveBeenCalledWith(true))
     expect(logout).toHaveBeenCalledOnce()
+  })
+
+  it('keeps title, route and guest export payload on the destination the user asked for (想去广州)', async () => {
+    const user = userEvent.setup()
+    // 首页一句话 handoff：pendingBrief 由规划页 mount 时消费
+    sessionStorage.setItem('atlas_pending_brief', '想去广州')
+    const createObjectURL = vi.fn().mockReturnValue('blob:atlas-plan')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const pdfBody = new Blob(['%PDF-1.4 test'], { type: 'application/pdf' })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(pdfBody, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    // 自动发送的就是用户的一句话，不带任何旧 conversationId
+    await waitFor(() => {
+      expect(streamHarness.startStream).toHaveBeenCalledWith('想去广州', null, null, expect.any(Object))
+    })
+
+    act(() => {
+      streamHarness.options?.onEvent({
+        event: 'done',
+        reply: '## 广州4天3晚旅行方案（2人）\\n\\n### 日程\\n| 时段 | 地点 |\\n|---|---|\\n| 下午 | 陈家祠 |',
+        conversationId: null,
+      })
+    })
+
+    // 标题 / 摘要 / 任务全部来自同一份 canonical 方案——都是广州，且不再显示默认"上海"
+    expect(screen.getByRole('heading', { name: '广州 · 行程方案' })).toBeInTheDocument()
+    expect(screen.getByText(/出发地待定 → 广州/)).toBeInTheDocument()
+    // 阅读态对话轨迹默认折叠：展开后可见任务原文
+    await user.click(screen.getByRole('button', { name: /对话过程 \(\d+\)/ }))
+    expect(within(screen.getByLabelText('对话记录')).getByText('想去广州')).toBeInTheDocument()
+
+    // 游客 PDF 导出的 payload 也来自同一会话
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 PDF' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/export/guest', expect.objectContaining({ method: 'POST' })))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.destination).toBe('广州')
+    expect(body.content).toContain('广州4天3晚旅行方案')
+    expect(screen.getByText(/PDF 已下载到本地/)).toBeInTheDocument()
+
+    click.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  it('warns instead of silently switching when the reply destination conflicts with the brief', async () => {
+    const user = userEvent.setup()
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    // 默认会话（表单未被手动改过）在 composer 里输入"想去广州"
+    await user.type(screen.getByLabelText('补充或修改旅行需求'), '想去广州')
+    await user.click(screen.getByRole('button', { name: '发送旅行要求' }))
+    expect(streamHarness.startStream).toHaveBeenCalledWith('想去广州', null, null, expect.any(Object))
+
+    // 模型却生成了东京方案：显示层保持用户输入的广州，并明确提示冲突（不静默覆盖）
+    act(() => {
+      streamHarness.options?.onEvent({ event: 'done', reply: '# 最终东京方案\\n行程内容。', conversationId: null })
+    })
+
+    expect(screen.getByRole('heading', { name: '广州 · 行程方案' })).toBeInTheDocument()
+    expect(screen.getByText(/目的地是「东京」/)).toBeInTheDocument()
+  })
+
+  it('does not leak a previous Tokyo trip into a second Guangzhou plan', async () => {
+    const user = userEvent.setup()
+    // Provider 常驻，页面在首页/规划页之间真实切换（HomePage 负责新建会话 + pendingBrief handoff）
+    const Probe = ({ page }: { page: 'home' | 'plan' }) => (
+      page === 'plan' ? <AIPage auth={guestAuth()} theme={lightTheme()} /> : <HomePage />
+    )
+    const { rerender } = render(<AllProviders><Probe page="plan" /></AllProviders>)
+    await user.click(screen.getByRole('button', { name: '开始规划旅程' }))
+    act(() => {
+      streamHarness.options?.onEvent({ event: 'done', reply: '# 东京方案\\n内容', conversationId: null })
+    })
+    expect(screen.getByRole('heading', { name: '东京 · 行程方案' })).toBeInTheDocument()
+
+    // 第二次：回首页输入"想去广州"开始新规划
+    rerender(<AllProviders><Probe page="home" /></AllProviders>)
+    const briefBox = screen.getByRole('textbox', { name: '输入你的旅行想法' })
+    await user.type(briefBox, '想去广州')
+    await user.click(within(briefBox.closest('.mag-hero-input') as HTMLElement).getByRole('button', { name: /开始规划/ }))
+    rerender(<AllProviders><Probe page="plan" /></AllProviders>)
+
+    await waitFor(() => {
+      expect(streamHarness.startStream).toHaveBeenLastCalledWith('想去广州', null, null, expect.any(Object))
+    })
+    act(() => {
+      streamHarness.options?.onEvent({
+        event: 'done',
+        reply: '## 广州4天3晚旅行方案\\n\\n| 时段 | 地点 |\\n|---|---|\\n| 下午 | 陈家祠 |',
+        conversationId: null,
+      })
+    })
+
+    expect(screen.getByRole('heading', { name: '广州 · 行程方案' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '东京 · 行程方案' })).not.toBeInTheDocument()
+    expect(screen.getByText(/出发地待定 → 广州/)).toBeInTheDocument()
+    // 旧的东京会话仍然保留（可回看），只是不再是被展示的那个
+    const persisted = JSON.parse(sessionStorage.getItem(JOURNEY_STORAGE_KEY) ?? '{}')
+    const destinations = (persisted.sessions ?? []).map((session: { form?: { destination?: string } }) => session.form?.destination)
+    expect(destinations).toContain('东京')
+    expect(persisted.activeId).not.toBeNull()
+  })
+
+  it('keeps page summary, map context and PDF payload on the same date', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'dated-trip',
+      title: '十月上海行程',
+      phase: 'ready',
+      form: { ...createJourneySession().form, destination: '上海', date: '2026-10-01' },
+      finalReply: '# 上海行程方案\n内容',
+      messages: [
+        { role: 'user', content: '去上海' },
+        { role: 'assistant', content: '# 上海行程方案\n内容' },
+      ],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ sessions: [session], activeId: session.id }))
+    const createObjectURL = vi.fn().mockReturnValue('blob:atlas-plan')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['%PDF-1.4'], { type: 'application/pdf' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    // 1) 页面摘要日期（命令条 + 阅读态摘要都会显示）
+    expect(screen.getAllByText('2026-10-01').length).toBeGreaterThan(0)
+
+    // 2) 地图上下文面板（右栏）显示同一日期
+    act(() => {
+      document.querySelector('.atlas-context-tab')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    const manifest = document.querySelector('.atlas-manifest-metrics')
+    expect(manifest?.textContent).toContain('2026-10-01')
+
+    // 3) PDF payload 日期一致
+    await user.click(screen.getByRole('button', { name: /导出/ }))
+    await user.click(screen.getByRole('menuitem', { name: '导出 PDF' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/export/guest', expect.objectContaining({ method: 'POST' })))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.dates).toBe('2026-10-01')
+    expect(body.destination).toBe('上海')
+
+    click.mockRestore()
+    vi.unstubAllGlobals()
   })
 })

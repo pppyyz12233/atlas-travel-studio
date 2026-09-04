@@ -8,14 +8,23 @@ export { default as MissionBrief } from './MissionBrief'
 export { default as OrchestrationTimeline } from './OrchestrationTimeline'
 export { default as SessionRail } from './SessionRail'
 export {
+  FACTORY_FORM_DEFAULTS,
   JOURNEY_STORAGE_KEY,
   activeJourneySession,
   createJourneySession,
+  defaultDate,
+  deriveDestinationFromReply,
+  inferDestinationFromBrief,
+  inferOriginFromBrief,
   journeyProgress,
   journeyReducer,
   loadInitialJourneyState,
+  manualOrigin,
+  originLabel,
+  routeLabel,
   saveJourneyState,
 } from './model'
+export type { OriginPlace } from './model'
 export {
   fallbackWorkerMeta,
   getWorkerMeta,

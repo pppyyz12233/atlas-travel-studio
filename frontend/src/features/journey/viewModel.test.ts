@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildItineraryViewModel } from './viewModel'
+import { buildItineraryViewModel, parseDays } from './viewModel'
 
 describe('itinerary markdown view model', () => {
   it('parses Chinese budget tables and daily schedules', () => {
@@ -68,5 +68,35 @@ describe('itinerary markdown view model', () => {
 
     expect(view.tripState).toBe(tripState)
     expect(view.tripState?.hotels).toBeUndefined()
+  })
+
+  it('parses bold-markdown day headers that the backend commonly emits', () => {
+    const md = [
+      '## 上海4天3晚旅行方案',
+      '',
+      '### 日程',
+      '',
+      '**Day1 经典地标日**',
+      '| 时段 | 地点 | 交通 | 备注 |',
+      '|------|------|------|------|',
+      '| 上午 | 豫园 | 地铁10号线 | 9:00开园 |',
+      '| 晚上 | 外滩夜景 | 步行 | 免费 |',
+      '',
+      '- **Day2 文化日**',
+      '| 上午 | 上海博物馆 | 地铁1号线 | 需预约 |',
+    ].join('\n')
+
+    const days = parseDays(md)
+    expect(days.map(day => day.day)).toEqual(['Day 1', 'Day 2'])
+    expect(days[0].items).toEqual([
+      { time: '上午', description: '豫园' },
+      { time: '晚上', description: '外滩夜景' },
+    ])
+    expect(days[1].items).toEqual([{ time: '上午', description: '上海博物馆' }])
+  })
+
+  it('keeps free-form replies without day markers unstructured (no fabricated days)', () => {
+    const days = parseDays('## 交通\n- 建议地铁出行\n- 机场进城坐2号线')
+    expect(days).toEqual([])
   })
 })

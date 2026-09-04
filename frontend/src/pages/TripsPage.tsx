@@ -9,7 +9,7 @@ import DestinationCard from '../components/DestinationCard'
 import TripCard from '../components/TripCard'
 import type { TripCardData } from '../components/TripCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/states'
-import { createJourneySession } from '../features/journey'
+import { createJourneySession, routeLabel } from '../features/journey'
 import { destinationById, destinations } from '../content/destinations'
 import type { Conversation } from '../types'
 
@@ -55,7 +55,7 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
     .map(session => ({
       id: session.id,
       title: session.title,
-      route: `${session.form.origin} → ${session.form.destination}`,
+      route: routeLabel(session.form),
       date: session.form.date,
       days: session.form.days,
       phase: session.phase,
@@ -193,8 +193,8 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
         </header>
         {drafts.length === 0 ? (
           <EmptyState
-            title="还没有草稿"
-            description="从一句话开始，让 Atlas 先出一版方案。"
+            title="还没有下一段旅程"
+            description="去探索目的地，或直接告诉 Atlas 你想去哪里。"
             action={<Link to="/plan" className="mag-cta is-ghost">去规划</Link>}
           />
         ) : (

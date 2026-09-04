@@ -49,7 +49,7 @@ export default function JourneyCommandStrip({ form, phase, progress, graphNode =
     <section className={`atlas-command-strip is-${phase}`} aria-label="当前旅程任务">
       <div className="atlas-command-summary">
         <div className="atlas-command-route">
-          <strong>{form.origin || '出发地'}</strong>
+          <strong>{form.origin.label || '出发地'}</strong>
           <ArrowRight size={15} aria-hidden="true" />
           <strong>{form.destination || '目的地'}</strong>
         </div>

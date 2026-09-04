@@ -184,3 +184,25 @@ describe('timeline focus resolution', () => {
     expect(findLocationKeyByText(routed, '晚上自由活动')).toBeNull()
   })
 })
+
+describe('map routing with a day-filtered subset (detail page)', () => {
+  // 详情页按天切换地图：locations 是按天过滤后的子集，days 必须仍传完整列表。
+  // 若误传过滤后的 days，重新派生会把"第2天"压缩成 day=0（标签 D1·x、颜色错位）。
+  it('keeps true day numbers when re-deriving with a location subset over full days', () => {
+    const locations = [
+      loc('羽田机场', 139.78, 35.55, 'airport'),
+      loc('新宿酒店', 139.70, 35.69, 'hotel'),
+      loc('浅草寺', 139.79, 35.71),
+      loc('明治神宫', 139.70, 35.68),
+    ]
+    const full = buildRoutedLocations(locations, days)
+    const day2Subset = full.routed.filter(item => item.day === 1)
+
+    const reDerived = buildRoutedLocations(day2Subset, days)
+    expect(reDerived.routed.map(item => item.name)).toEqual(['浅草寺', '明治神宫'])
+    expect(reDerived.routed.map(item => item.day)).toEqual([1, 1])
+    expect(reDerived.routed.map(item => item.orderInDay)).toEqual([0, 1])
+    expect(reDerived.plan.polylines.map(p => p.day)).toEqual([1])
+    expect(reDerived.plan.polylines[0].color).toBe(DAY_COLOR_PALETTE[1])
+  })
+})

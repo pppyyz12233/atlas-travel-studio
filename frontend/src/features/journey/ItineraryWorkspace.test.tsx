@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import ItineraryWorkspace from './ItineraryWorkspace'
@@ -85,8 +85,10 @@ describe('ItineraryWorkspace reading mode (R1 结构)', () => {
     }
 
     await user.click(budget)
-    expect(screen.getByText('交通')).toBeVisible()
-    expect(screen.getByText('¥500')).toBeVisible()
+    const budgetPanel = document.getElementById('atlas-fold-budget-panel')
+    expect(budgetPanel).not.toBeNull()
+    expect(within(budgetPanel as HTMLElement).getByText('交通')).toBeVisible()
+    expect(within(budgetPanel as HTMLElement).getByText('¥500')).toBeVisible()
 
     await user.click(execution)
     expect(screen.getByText('推荐航班')).toBeInTheDocument()

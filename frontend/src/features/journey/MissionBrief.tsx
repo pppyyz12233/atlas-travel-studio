@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import {
-  ArrowUpRight, BedDouble, CalendarDays, ChevronDown, Clock3, Compass, MapPin,
+  ArrowUpRight, BedDouble, CalendarDays, ChevronDown, Clock3, Compass, LocateFixed, MapPin,
   Plane, Route, Sparkles, Users, Wallet,
 } from 'lucide-react'
-import type { TripForm } from './model'
+import type { OriginPlace, TripForm } from './model'
+import { manualOrigin, originLabel } from './model'
 
 export interface MissionSuggestion {
   title: string
@@ -19,21 +20,21 @@ export const missionSuggestions: MissionSuggestion[] = [
     title: '城市深度漫游',
     detail: '建筑、咖啡与街区观察',
     prompt: '从上海去东京5天，偏爱建筑、咖啡和城市散步，人均8000元',
-    formPatch: { origin: '上海', destination: '东京', days: 5, people: 2, budget: 8000 },
+    formPatch: { origin: manualOrigin('上海'), destination: '东京', days: 5, people: 2, budget: 8000 },
   },
   {
     icon: BedDouble,
     title: '周末松弛之旅',
     detail: '低密度路线与设计酒店',
     prompt: '规划杭州周末两天一夜，不赶景点，想住有设计感的酒店',
-    formPatch: { origin: '上海', destination: '杭州', days: 2, people: 2, budget: 3000 },
+    formPatch: { origin: manualOrigin('上海'), destination: '杭州', days: 2, people: 2, budget: 3000 },
   },
   {
     icon: Plane,
     title: '海外家庭旅行',
     detail: '儿童友好与轻松节奏',
     prompt: '北京出发去新加坡6天，2位成人1位儿童，需要轻松的亲子安排',
-    formPatch: { origin: '北京', destination: '新加坡', days: 6, people: 3 },
+    formPatch: { origin: manualOrigin('北京'), destination: '新加坡', days: 6, people: 3 },
   },
 ]
 
@@ -46,7 +47,56 @@ interface MissionBriefProps {
 }
 
 function buildTravelBrief(form: TripForm): string {
-  return `从${form.origin.trim()}去${form.destination.trim()}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
+  const origin = originLabel(form)
+  const destination = form.destination.trim() || '目的地'
+  const head = origin ? `从${origin}去${destination}` : `去${destination}`
+  return `${head}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
+}
+
+type GeoStatus = 'idle' | 'locating' | 'success' | 'denied' | 'error' | 'unsupported'
+
+// 「使用我的当前位置」：仅手动触发，绝不自动读取位置。
+// 成功保存结构化 origin（坐标 + source:'browser'）；拒绝/失败给出明确状态与重试。
+function useBrowserOrigin(onChange: (patch: Partial<TripForm>) => void) {
+  const [status, setStatus] = useState<GeoStatus>('idle')
+  const [message, setMessage] = useState('')
+
+  const locate = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setStatus('unsupported')
+      setMessage('当前浏览器不支持定位')
+      return
+    }
+    setStatus('locating')
+    setMessage('')
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords
+        const place: OriginPlace = {
+          label: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+          latitude,
+          longitude,
+          source: 'browser',
+        }
+        onChange({ origin: place })
+        setStatus('success')
+        setMessage('已定位当前位置')
+      },
+      error => {
+        // PERMISSION_DENIED = 1（实例上不一定带常量属性，按标准值判断）
+        if (error.code === 1 || error.code === error.PERMISSION_DENIED) {
+          setStatus('denied')
+          setMessage('已拒绝定位授权，可在浏览器地址栏重新允许后重试')
+        } else {
+          setStatus('error')
+          setMessage(`定位失败（${error.message || '未知错误'}），请重试或手动填写出发地`)
+        }
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    )
+  }
+
+  return { status, message, locate }
 }
 
 // R3 主流程收敛：一句话优先，结构化字段折叠为「详细条件（可选）」。
@@ -60,8 +110,9 @@ export default function MissionBrief({
 }: MissionBriefProps) {
   const [freeText, setFreeText] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const geo = useBrowserOrigin(onChange)
   const trimmedText = freeText.trim()
-  const formReady = Boolean(form.origin.trim() && form.destination.trim() && form.date)
+  const formReady = Boolean(originLabel(form) && form.destination.trim() && form.date)
   const canSubmit = (trimmedText.length > 0 || formReady) && !disabled
 
   const submit = () => {
@@ -117,7 +168,32 @@ export default function MissionBrief({
               <div className="atlas-route-editor">
                 <label>
                   <span>出发地</span>
-                  <div><Route size={16} aria-hidden="true" /><input value={form.origin} onChange={event => onChange({ origin: event.target.value })} autoComplete="address-level2" /></div>
+                  <div>
+                    <Route size={16} aria-hidden="true" />
+                    <input
+                      value={originLabel(form)}
+                      onChange={event => onChange({ origin: manualOrigin(event.target.value) })}
+                      autoComplete="address-level2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={`atlas-locate-action ${geo.status === 'success' ? 'is-done' : ''}`}
+                    onClick={geo.locate}
+                    disabled={geo.status === 'locating' || disabled}
+                    aria-label="使用我的当前位置"
+                  >
+                    <LocateFixed size={14} aria-hidden="true" />
+                    {geo.status === 'locating' ? '定位中…' : '使用我的当前位置'}
+                  </button>
+                  {geo.message && (
+                    <small
+                      className={`atlas-locate-status is-${geo.status}`}
+                      role={geo.status === 'success' ? 'status' : 'alert'}
+                    >
+                      {geo.message}
+                    </small>
+                  )}
                 </label>
                 <span className="atlas-route-vector" aria-hidden="true"><i /><Plane size={18} /><i /></span>
                 <label>

@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   JOURNEY_STORAGE_KEY,
+  manualOrigin,
   activeJourneySession,
   createJourneySession,
+  defaultDate,
+  deriveDestinationFromReply,
+  inferDestinationFromBrief,
+  inferOriginFromBrief,
   journeyProgress,
   journeyReducer,
   loadInitialJourneyState,
   restoreJourneyState,
+  routeLabel,
   serializeJourneyState,
 } from './model'
 
@@ -25,11 +31,22 @@ describe('journey session model', () => {
     vi.useRealTimers()
   })
 
-  it('builds the default date from local calendar fields', () => {
+  it('defaults the departure date to today in Asia/Shanghai (no offset, no fixture date)', () => {
     vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 7, 25, 0, 30, 0))
+    // UTC 2026-08-24 20:00 = 北京时间 2026-08-25 04:00 → 默认日期必须是 2026-08-25
+    vi.setSystemTime(new Date(Date.UTC(2026, 7, 24, 20, 0, 0)))
 
-    expect(createJourneySession().form.date).toBe('2026-09-08')
+    expect(createJourneySession().form.date).toBe('2026-08-25')
+    // 与设备本地时区无关：再取一次仍然等于"上海今天"
+    expect(createJourneySession().form.date).toBe(defaultDate())
+    // 不是任何固定测试日期
+    expect(['2026-09-18', '2026-09-08']).not.toContain(createJourneySession().form.date)
+  })
+
+  it('infers an explicit destination from a home-page brief', () => {
+    expect(inferDestinationFromBrief('想去广州旅游，三天两个人')).toBe('广州')
+    expect(inferDestinationFromBrief('十一月去京都看红叶')).toBe('京都')
+    expect(inferDestinationFromBrief('想吃火锅，预算五千')).toBeNull()
   })
 
   it('moves idle to planning to ready without inventing metrics', () => {
@@ -130,8 +147,9 @@ describe('journey session model', () => {
   })
 
   it('adds, activates and removes local journeys with a fallback session', () => {
-    const first = createJourneySession({ id: 'first' })
-    const second = createJourneySession({ id: 'second', title: '杭州周末' })
+    // 带用户内容的会话：add 不会清理它们（新建规划不吞掉已有行程）
+    const first = createJourneySession({ id: 'first', messages: [{ role: 'user', content: '去北京' }] })
+    const second = createJourneySession({ id: 'second', title: '杭州周末', messages: [{ role: 'user', content: '去杭州' }] })
     let state = { sessions: [first], activeId: first.id }
 
     state = journeyReducer(state, { type: 'add', session: second })
@@ -142,6 +160,22 @@ describe('journey session model', () => {
     state = journeyReducer(state, { type: 'remove', id: 'second' })
     expect(state.sessions).toHaveLength(1)
     expect(activeJourneySession(state).phase).toBe('idle')
+  })
+
+  it('prunes untouched empty drafts when creating a new journey', () => {
+    // 新建规划时清理旧的未完成草稿（无消息、无步骤、无结果、未落库），
+    // 但保留有内容/已保存的会话——恢复历史与继续调整不受影响
+    const emptyDraft = createJourneySession({ id: 'draft-1' })
+    const savedCloud = createJourneySession({ id: 'cloud-1', conversationId: 42 })
+    const withContent = createJourneySession({
+      id: 'content-1',
+      messages: [{ role: 'user', content: '想去广州' }],
+    })
+    let state = { sessions: [emptyDraft, savedCloud, withContent], activeId: emptyDraft.id }
+
+    state = journeyReducer(state, { type: 'add', session: createJourneySession({ id: 'new' }) })
+    expect(state.sessions.map(session => session.id)).toEqual(['cloud-1', 'content-1', 'new'])
+    expect(state.activeId).toBe('new')
   })
 
   it('hydrates history and updates form and worker detail immutably', () => {
@@ -216,5 +250,90 @@ describe('journey state persistence', () => {
     )
 
     expect(loadInitialJourneyState().activeId).toBe('stored-first')
+  })
+})
+
+describe('destination inference（首页串线修复）', () => {
+  it('infers explicit destinations from briefs', () => {
+    expect(inferDestinationFromBrief('想去广州')).toBe('广州')
+    expect(inferDestinationFromBrief('十一月去广州玩，两个人')).toBe('广州')
+    expect(inferDestinationFromBrief('计划去京都看红叶')).toBe('京都')
+    expect(inferDestinationFromBrief('随便走走')).toBeNull()
+  })
+
+  it('infers explicit origins and leaves them null when absent', () => {
+    expect(inferOriginFromBrief('从上海去广州玩')).toBe('上海')
+    expect(inferOriginFromBrief('由北京出发去成都')).toBe('北京')
+    expect(inferOriginFromBrief('想去广州')).toBeNull()
+  })
+
+  it('derives the destination from the reply title', () => {
+    // 真实 aggregator 输出形态
+    expect(deriveDestinationFromReply('## 广州4天3晚旅行方案（2人）\n\n### 航班\n…')).toBe('广州')
+    expect(deriveDestinationFromReply('# 最终东京方案\n旅行建议已生成。')).toBe('东京')
+    expect(deriveDestinationFromReply('# 东京 · 5天行程')).toBe('东京')
+    expect(deriveDestinationFromReply('# 从上海出发去广州5天行程总览')).toBe('广州')
+    expect(deriveDestinationFromReply('## 交通\n- 地铁')).toBeNull()
+    expect(deriveDestinationFromReply('')).toBeNull()
+  })
+
+  it('never renders factory defaults silently in route labels', () => {
+    expect(routeLabel(createJourneySession().form)).toBe('上海 → 东京') // 工厂默认仅在可编辑表单里出现
+    const cleared = { ...createJourneySession().form, origin: manualOrigin(''), destination: '广州' }
+    expect(routeLabel(cleared)).toBe('出发地待定 → 广州')
+    expect(routeLabel({ ...cleared, destination: '' })).toBe('出发地待定 → 目的地待定')
+  })
+})
+
+describe('departure date rules（默认日期修复）', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    sessionStorage.clear()
+  })
+
+  it('keeps an explicitly set date through submit and complete (never reset to today)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 8, 4, 2, 0, 0))) // 上海 2026-09-04
+    const session = createJourneySession({ id: 'dated' })
+    let state = { sessions: [session], activeId: session.id }
+
+    state = journeyReducer(state, { type: 'patchForm', id: 'dated', patch: { date: '2026-10-01' } })
+    state = journeyReducer(state, { type: 'submit', id: 'dated', message: '去上海' })
+    expect(activeJourneySession(state).form.date).toBe('2026-10-01')
+
+    state = journeyReducer(state, {
+      type: 'complete', id: 'dated', reply: '## 上海行程方案', conversationId: null,
+    })
+    expect(activeJourneySession(state).form.date).toBe('2026-10-01')
+  })
+
+  it('restores a historical session with its original date instead of today', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 8, 4, 2, 0, 0))) // 今天=2026-09-04
+    const trip = createJourneySession({
+      id: 'history-date',
+      phase: 'ready',
+      form: { ...createJourneySession().form, date: '2026-05-20' },
+      finalReply: '# 五月行程',
+      messages: [{ role: 'user', content: '五月出行' }, { role: 'assistant', content: '# 五月行程' }],
+    })
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ sessions: [trip], activeId: trip.id }))
+
+    const restored = loadInitialJourneyState()
+    const restoredSession = restored.sessions.find(s => s.id === 'history-date')
+    expect(restoredSession?.form.date).toBe('2026-05-20')
+  })
+
+  it('upgrades legacy string origins from old persisted sessions', () => {
+    const legacy = createJourneySession({ id: 'legacy-origin', phase: 'ready' })
+    const raw = JSON.stringify({ sessions: [legacy], activeId: legacy.id })
+    // 模拟旧版本（origin 是字符串）的持久化数据
+    const oldShape = JSON.parse(raw)
+    oldShape.sessions[0].form.origin = '杭州'
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(oldShape))
+
+    const restored = loadInitialJourneyState()
+    const origin = restored.sessions[0].form.origin
+    expect(origin).toEqual({ label: '杭州', latitude: null, longitude: null, source: 'manual' })
   })
 })

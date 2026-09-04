@@ -13,10 +13,18 @@ import {
   SessionRail,
   buildItineraryViewModel,
   createJourneySession,
+  deriveDestinationFromReply,
   eventToJourneyActions,
   getWorkerMeta,
+  inferDestinationFromBrief,
+  inferOriginFromBrief,
   journeyProgress,
+  manualOrigin,
+  originLabel,
+  routeLabel,
 } from '../features/journey'
+import { FACTORY_FORM_DEFAULTS } from '../features/journey/model'
+import type { OriginPlace } from '../features/journey/model'
 import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
 import type { JourneyMessage, TripForm } from '../features/journey'
 import type { NormalizedSSEEvent } from '../features/journey/sseContract'
@@ -48,7 +56,10 @@ function errorStatus(error: unknown): number | undefined {
 }
 
 function fallbackBrief(form: TripForm): string {
-  return `从${form.origin.trim()}去${form.destination.trim()}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
+  const origin = originLabel(form)
+  const destination = form.destination.trim() || '目的地'
+  const head = origin ? `从${origin}去${destination}` : `去${destination}`
+  return `${head}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
 }
 
 export default function AIPage({ auth, theme }: Props) {
@@ -169,6 +180,8 @@ export default function AIPage({ auth, theme }: Props) {
     const session = createJourneySession({
       title: conversation.title,
       conversationId: conversation.id,
+      // 恢复的历史会话不带默认"上海 → 东京"：目的地在 hydrate 后从方案本体派生
+      form: { ...createJourneySession().form, origin: manualOrigin(''), destination: '' },
     })
     dispatch({ type: 'add', session })
     setRailOpen(false)
@@ -187,6 +200,10 @@ export default function AIPage({ auth, theme }: Props) {
         .reverse()
         .find(item => item.role === 'assistant')?.content ?? ''
       dispatch({ type: 'hydrate', id: session.id, messages: normalized, finalReply })
+      const restoredDestination = deriveDestinationFromReply(finalReply)
+      if (restoredDestination) {
+        dispatch({ type: 'patchForm', id: session.id, patch: { destination: restoredDestination } })
+      }
     } catch (error: unknown) {
       if (errorStatus(error) === 401) {
         dispatch({ type: 'remove', id: session.id })
@@ -198,12 +215,17 @@ export default function AIPage({ auth, theme }: Props) {
     }
   }, [journeyState.activeId, journeyState.sessions, requestLoginForExpiredSession])
 
+  // 导出进行中标记：下载期间禁用导出按钮，防止重复点击
+  const [exportingFormat, setExportingFormat] = useState<'md' | 'pdf' | null>(null)
+
   const exportPlan = useCallback(async (format: 'md' | 'pdf') => {
+    if (exportingFormat) return
     setResultNotice(null)
     if (!activeSession.finalReply.trim()) {
       setResultNotice({ tone: 'error', message: '当前没有可导出的完整方案。' })
       return
     }
+    setExportingFormat(format)
 
     if (format === 'md') {
       const blob = new Blob([activeSession.finalReply], { type: 'text/markdown;charset=utf-8' })
@@ -217,12 +239,23 @@ export default function AIPage({ auth, theme }: Props) {
       link.remove()
       URL.revokeObjectURL(url)
       setResultNotice({ tone: 'success', message: 'Markdown 已下载到本地。' })
+      setExportingFormat(null)
       return
     }
 
     if (!auth.token || !activeSession.conversationId) {
-      window.print()
-      setResultNotice({ tone: 'success', message: '已打开系统打印窗口，可选择“另存为 PDF”。' })
+      try {
+        const response = await fetch('/api/export/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ destination: activeSession.form.destination, dates: activeSession.form.date, content: activeSession.finalReply }) })
+        if (!response.ok) throw new Error('guest export failed')
+        const url = URL.createObjectURL(await response.blob())
+        const link = document.createElement('a')
+        const stem = `${activeSession.form.destination.trim() || 'trip-plan'}-${activeSession.form.date || ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/-+$/, '')
+        link.href = url
+        link.download = `${stem}-travel-plan.pdf`
+        document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+        setResultNotice({ tone: 'success', message: 'PDF 已下载到本地。' })
+      } catch { setResultNotice({ tone: 'error', message: 'PDF 导出失败，请稍后重试。' }) }
+      setExportingFormat(null)
       return
     }
 
@@ -234,6 +267,7 @@ export default function AIPage({ auth, theme }: Props) {
       if (response.status === 401) {
         auth.setShowAuthModal(true)
         setResultNotice({ tone: 'error', message: '登录状态已过期，请重新登录后再导出 PDF。' })
+        setExportingFormat(null)
         return
       }
       if (!response.ok) throw new Error('导出失败')
@@ -242,13 +276,17 @@ export default function AIPage({ auth, theme }: Props) {
       const link = document.createElement('a')
       link.href = url
       link.download = `trip-plan-${activeSession.conversationId}.${format}`
+      document.body.appendChild(link)
       link.click()
+      link.remove()
       URL.revokeObjectURL(url)
       setResultNotice({ tone: 'success', message: 'PDF 导出已开始。' })
     } catch {
       setResultNotice({ tone: 'error', message: '导出失败，请稍后重试；当前行程仍可继续查看。' })
+    } finally {
+      setExportingFormat(null)
     }
-  }, [activeSession.conversationId, activeSession.finalReply, activeSession.form.destination, auth])
+  }, [exportingFormat, activeSession.conversationId, activeSession.finalReply, activeSession.form.destination, activeSession.form.date, auth])
 
   const send = useCallback((rawText: string, formPatch: Partial<TripForm> = {}) => {
     const text = rawText.trim()
@@ -256,11 +294,35 @@ export default function AIPage({ auth, theme }: Props) {
 
     const sessionId = activeSession.id
     const effectiveForm = { ...activeSession.form, ...formPatch }
-    const destination = effectiveForm.destination.trim()
+    // 表单未被用户手动改过时，工厂默认的"上海/东京"必须让位于任务文本：
+    // 文本里有显式目的地/出发地就用它，没有就清空（显示"待定"），绝不静默沿用默认值。
+    const textOrigin = inferOriginFromBrief(text)
+    const textDestination = inferDestinationFromBrief(text)
+    const formUntouched = !activeSession.formTouched
+    const currentOriginLabel = originLabel(effectiveForm)
+    const originOverride: OriginPlace | undefined = formPatch.origin
+      ?? (formUntouched
+        ? (textOrigin !== null
+            ? manualOrigin(textOrigin)
+            : (currentOriginLabel === FACTORY_FORM_DEFAULTS.origin ? manualOrigin('') : undefined))
+        : undefined)
+    const destinationOverride = formPatch.destination
+      ?? (formUntouched
+        ? (textDestination ?? (effectiveForm.destination.trim() === FACTORY_FORM_DEFAULTS.destination ? '' : undefined))
+        : undefined)
+    const destination = (destinationOverride ?? effectiveForm.destination).trim()
     const currentConversationId = activeSession.conversationId
-    const nextTitle = activeSession.title === '未命名旅程'
-      ? `${destination || '目的地'} · ${effectiveForm.days}天`
+    // 目的地未知时保留"未命名旅程"，done 后由方案本体回填（见 done 处理）
+    const nextTitle = activeSession.title === '未命名旅程' && destination
+      ? `${destination} · ${effectiveForm.days}天`
       : activeSession.title
+
+    // 游客（无云端会话）的"继续调整"：后端拿不到上一版方案，
+    // 把当前方案摘要随请求带上（只进后端 payload，对话航迹仍显示用户原话）
+    const isGuestAdjustment = currentConversationId === null && activeSession.finalReply.trim().length > 0
+    const backendMessage = isGuestAdjustment
+      ? `${text}\n\n【上一版方案参考，请在此基础上修改】\n${activeSession.finalReply.slice(0, 1600)}`
+      : text
 
     setInput('')
     streamingSessionIdRef.current = sessionId
@@ -268,10 +330,20 @@ export default function AIPage({ auth, theme }: Props) {
     if (Object.keys(formPatch).length > 0) {
       dispatch({ type: 'patchForm', id: sessionId, patch: formPatch })
     }
+    if (originOverride !== undefined || destinationOverride !== undefined) {
+      dispatch({
+        type: 'patchForm',
+        id: sessionId,
+        patch: {
+          ...(originOverride !== undefined ? { origin: originOverride } : {}),
+          ...(destinationOverride !== undefined ? { destination: destinationOverride } : {}),
+        },
+      })
+    }
     dispatch({ type: 'patch', id: sessionId, patch: { title: nextTitle } })
     dispatch({ type: 'submit', id: sessionId, message: text })
 
-    void startStream(text, currentConversationId, auth.token, {
+    void startStream(backendMessage, currentConversationId, auth.token, {
       onEvent(event: NormalizedSSEEvent) {
         for (const action of eventToJourneyActions(event, sessionId)) dispatch(action)
 
@@ -317,7 +389,20 @@ export default function AIPage({ auth, theme }: Props) {
           void refreshConversations()
         }
 
-        if (event.event === 'done') {
+        if (event.event === 'done' && typeof event.reply === 'string') {
+          // 目的地收敛：标题/摘要/地图城市/导出全部读 form.destination，
+          // 它必须与本次方案（canonical 回复）一致——缺失则回填，冲突则显式提示，不静默覆盖。
+          const replyDestination = deriveDestinationFromReply(event.reply)
+          if (replyDestination) {
+            if (!destination) {
+              dispatch({ type: 'patchForm', id: sessionId, patch: { destination: replyDestination } })
+              if (activeSession.title === '未命名旅程') {
+                dispatch({ type: 'patch', id: sessionId, patch: { title: `${replyDestination} · 行程方案` } })
+              }
+            } else if (replyDestination !== destination) {
+              notify('info', `智能体本次方案的目的地是「${replyDestination}」，与你填写的「${destination}」不一致，请确认后修改目的地或重新生成。`)
+            }
+          }
           notify('success', event.conversationId ? '方案已生成，已保存到云端' : '方案已生成，已存为本地草稿')
         }
       },
@@ -472,10 +557,11 @@ export default function AIPage({ auth, theme }: Props) {
             }}
             onExport={format => void exportPlan(format)}
             notice={resultNotice}
+            exportBusy={exportingFormat !== null}
             onOpenTrip={() => navigate(`/trip/${activeSession.id}`)}
             saveState={activeSession.conversationId ? 'cloud' : 'local'}
             onLogin={auth.isLoggedIn ? undefined : () => auth.setShowAuthModal(true)}
-            route={`${activeSession.form.origin} → ${activeSession.form.destination}`}
+            route={routeLabel(activeSession.form)}
             date={activeSession.form.date}
             people={activeSession.form.people}
             onOpenMap={() => setContextOpen(true)}

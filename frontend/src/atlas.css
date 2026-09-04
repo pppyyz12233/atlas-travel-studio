@@ -1640,7 +1640,7 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 12px 72px 12px 16px;
   border-bottom: 1px solid var(--atlas-line);
 }
 
@@ -2125,6 +2125,63 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   font-weight: 700;
 }
 .atlas-reading-note { margin: 0; color: var(--atlas-ink-muted); font-size: 13px; }
+
+/* ---------- 交通与住宿（内容来自方案正文章节，编辑部建议独立折叠） ---------- */
+.atlas-reading-transit { margin-top: 24px; }
+.atlas-reading-transit > h3 {
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--atlas-line);
+  font-family: var(--atlas-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+.atlas-transit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.atlas-transit-card {
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--atlas-paper);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-r-card);
+}
+.atlas-transit-card > h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; color: var(--atlas-ink); }
+.atlas-transit-card .markdown-body { font-size: 13px; }
+.atlas-transit-card .markdown-body h2,
+.atlas-transit-card .markdown-body h3 { margin: 0 0 8px; font-size: 13.5px; }
+.atlas-transit-editorial { margin-top: 10px; font-size: 12.5px; }
+.atlas-transit-editorial summary {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--atlas-ink-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.atlas-transit-editorial ul { margin: 0 0 6px; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.7; }
+
+/* ---------- 「使用我的当前位置」（手动定位出发地） ---------- */
+.atlas-locate-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin-top: 8px;
+  padding: 0 12px;
+  color: var(--atlas-ink-soft);
+  background: var(--atlas-paper-soft);
+  border: 1px solid var(--atlas-line-strong);
+  border-radius: var(--atlas-r-btn);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.atlas-locate-action:hover:not(:disabled) { color: var(--atlas-ink); border-color: var(--atlas-ink-muted); }
+.atlas-locate-action:disabled { opacity: .7; cursor: wait; }
+.atlas-locate-action.is-done { color: var(--atlas-route); border-color: var(--atlas-route); }
+.atlas-locate-status { display: block; margin-top: 4px; font-size: 11.5px; color: var(--atlas-ink-muted); }
+.atlas-locate-status.is-denied,
+.atlas-locate-status.is-error { color: #a3402f; }
+.atlas-locate-status.is-success { color: var(--atlas-route); }
 
 /* ---------- R2 次级折叠 ---------- */
 .atlas-reading-folds { display: grid; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--atlas-line); }

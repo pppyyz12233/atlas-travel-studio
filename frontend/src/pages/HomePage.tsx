@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { ArrowRight, Compass, CornerDownLeft, MapPin, Navigation, SendHorizontal } from 'lucide-react'
+import { ArrowRight, Compass, MapPin, Navigation, SendHorizontal } from 'lucide-react'
 import { Link, useRouter } from '../app/router'
 import { useJourney } from '../app/JourneyProvider'
 import { setPendingBrief } from '../app/pendingBrief'
 import DestinationCard from '../components/DestinationCard'
 import TripCard from '../components/TripCard'
+import TravelQuotePanel from '../components/TravelQuotePanel'
 import type { TripCardData } from '../components/TripCard'
 import { destinations } from '../content/destinations'
-import { createJourneySession } from '../features/journey'
+import { createJourneySession, inferDestinationFromBrief, inferOriginFromBrief, manualOrigin, routeLabel } from '../features/journey'
 
 const featuredIds = ['tokyo', 'hangzhou', 'dali']
 
@@ -23,7 +24,7 @@ export default function HomePage() {
     .map(session => ({
       id: session.id,
       title: session.title,
-      route: `${session.form.origin} → ${session.form.destination}`,
+      route: routeLabel(session.form),
       date: session.form.date,
       days: session.form.days,
       phase: session.phase,
@@ -37,12 +38,24 @@ export default function HomePage() {
   const trimmedBrief = brief.trim()
   const canStart = trimmedBrief.length > 0
 
-  // 一句话即开规划：建会话 → 一次性 handoff → 规划页自动发送
+  // 一句话即开规划：建会话 → 一次性 handoff → 规划页自动发送。
+  // 目的地/出发地只从用户文本推断；推不出就留空（显示"待定"），
+  // 绝不携带 createJourneySession 的默认"上海 → 东京"——那是行程串线的源头。
   const startFromBrief = () => {
     if (!canStart) return
+    const inferredDestination = inferDestinationFromBrief(trimmedBrief)
+    const inferredOrigin = inferOriginFromBrief(trimmedBrief)
+    const baseForm = createJourneySession().form
     dispatch({
       type: 'add',
-      session: createJourneySession({ title: trimmedBrief.slice(0, 24) }),
+      session: createJourneySession({
+        title: trimmedBrief.slice(0, 24),
+        form: {
+          ...baseForm,
+          origin: manualOrigin(inferredOrigin ?? ''),
+          destination: inferredDestination ?? '',
+        },
+      }),
     })
     setPendingBrief(trimmedBrief)
     navigate('/plan')
@@ -90,22 +103,17 @@ export default function HomePage() {
               <SendHorizontal size={16} aria-hidden="true" /> 开始规划
             </button>
           </div>
-          <p className="mag-hero-assist">
-            一句话就够 —— Atlas 会自动理解目的地与预算。<CornerDownLeft size={12} aria-hidden="true" /> 回车直接开始
-          </p>
+          <p className="mag-hero-assist">一句话就够，Atlas 会自动理解目的地、同行人和预算。</p>
 
-          <Link to="/explore" className="mag-hero-explore-link">
+          <Link to="/explore" className="mag-hero-explore-link mag-hero-explore-cta">
             <MapPin size={13} aria-hidden="true" /> 还没想好？浏览编辑部精选目的地
           </Link>
         </div>
-        <figure className="mag-hero-visual" aria-hidden="true">
+        <figure className="mag-hero-visual">
           <span className="mag-hero-arc mag-hero-arc-a" />
           <span className="mag-hero-arc mag-hero-arc-b" />
           <span className="mag-hero-coordinate">35.68°N — 139.69°E</span>
-          <blockquote>
-            “旅行的方法论，<br />是先有一个想去的地方，<br />再让细节自己长出来。”
-          </blockquote>
-          <figcaption>— Atlas 编辑部</figcaption>
+          <TravelQuotePanel />
         </figure>
       </section>
 

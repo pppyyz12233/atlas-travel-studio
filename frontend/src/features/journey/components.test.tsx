@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import AppShell from './AppShell'
@@ -14,7 +14,7 @@ import { createJourneySession } from './model'
 import { buildItineraryViewModel } from './viewModel'
 
 const tripForm = {
-  origin: '上海',
+  origin: { label: '上海', latitude: null, longitude: null, source: 'manual' as const },
   destination: '东京',
   date: '2026-09-08',
   days: 5,
@@ -41,7 +41,7 @@ describe('Atlas journey interface', () => {
     )
 
     await user.click(screen.getByRole('button', { name: '关闭旅程列表' }))
-    await user.click(screen.getByRole('button', { name: '关闭地图与执行详情' }))
+    await user.click(screen.getByRole('button', { name: '关闭地图面板' }))
     expect(closeRail).toHaveBeenCalledOnce()
     expect(closeContext).toHaveBeenCalledOnce()
   })
@@ -355,5 +355,89 @@ describe('Atlas journey interface', () => {
     rerender(<TripTimeline days={days} city="东京" onSearchMap={fallback} onFocusLocation={miss} />)
     await user.click(screen.getByRole('button', { name: /在地图查看 浅草寺/ }))
     expect(fallback).toHaveBeenCalledWith(expect.stringContaining('浅草寺'), '东京')
+  })
+})
+
+describe('MissionBrief 使用我的当前位置（手动定位）', () => {
+  type GeoSuccess = (pos: { coords: { latitude: number; longitude: number } }) => void
+  type GeoError = (err: { code: number; message: string }) => void
+
+  function installGeolocation() {
+    const handlers = { success: null as GeoSuccess | null, error: null as GeoError | null }
+    const getCurrentPosition = vi.fn((_success: GeoSuccess, _error: GeoError) => {
+      handlers.success = _success
+      handlers.error = _error
+    })
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition },
+    })
+    return { handlers, getCurrentPosition }
+  }
+
+  const openDetails = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: /详细条件（可选）/ }))
+  }
+
+  it('saves a structured browser origin on success and shows the success state', async () => {
+    const user = userEvent.setup()
+    const { handlers } = installGeolocation()
+    const onChange = vi.fn()
+    render(
+      <MissionBrief form={tripForm} onChange={onChange} onSubmit={() => undefined} onUseSuggestion={() => undefined} disabled={false} />,
+    )
+    await openDetails(user)
+
+    await user.click(screen.getByRole('button', { name: '使用我的当前位置' }))
+    expect(screen.getByText('定位中…')).toBeInTheDocument()
+
+    await act(async () => { handlers.success?.({ coords: { latitude: 31.2304, longitude: 121.4737 } }) })
+    expect(onChange).toHaveBeenCalledWith({
+      origin: { label: '31.230, 121.474', latitude: 31.2304, longitude: 121.4737, source: 'browser' },
+    })
+    expect(screen.getByText('已定位当前位置')).toBeInTheDocument()
+  })
+
+  it('shows a clear denied message without touching the form', async () => {
+    const user = userEvent.setup()
+    const { handlers } = installGeolocation()
+    const onChange = vi.fn()
+    render(
+      <MissionBrief form={tripForm} onChange={onChange} onSubmit={() => undefined} onUseSuggestion={() => undefined} disabled={false} />,
+    )
+    await openDetails(user)
+
+    await user.click(screen.getByRole('button', { name: '使用我的当前位置' }))
+    await act(async () => { handlers.error?.({ code: 1, message: 'User denied Geolocation' }) })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('已拒绝定位授权')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('reports other failures with the error message', async () => {
+    const user = userEvent.setup()
+    const { handlers } = installGeolocation()
+    render(
+      <MissionBrief form={tripForm} onChange={() => undefined} onSubmit={() => undefined} onUseSuggestion={() => undefined} disabled={false} />,
+    )
+    await openDetails(user)
+
+    await user.click(screen.getByRole('button', { name: '使用我的当前位置' }))
+    await act(async () => { handlers.error?.({ code: 3, message: 'Timeout expired' }) })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('定位失败')
+    expect(screen.getByRole('alert')).toHaveTextContent('Timeout expired')
+  })
+
+  it('degrades gracefully when geolocation is unsupported', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined })
+    render(
+      <MissionBrief form={tripForm} onChange={() => undefined} onSubmit={() => undefined} onUseSuggestion={() => undefined} disabled={false} />,
+    )
+    await openDetails(user)
+
+    await user.click(screen.getByRole('button', { name: '使用我的当前位置' }))
+    expect(screen.getByText('当前浏览器不支持定位')).toBeInTheDocument()
   })
 })

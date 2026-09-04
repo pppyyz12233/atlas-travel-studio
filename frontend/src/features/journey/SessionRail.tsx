@@ -31,9 +31,11 @@ const phaseLabels: Record<JourneyPhase, string> = {
 }
 
 function sessionSubtitle(session: JourneySession): string {
-  if (session.form.origin && session.form.destination) {
-    return `${session.form.origin} → ${session.form.destination}`
-  }
+  const origin = session.form.origin.label?.trim() ?? ''
+  const destination = session.form.destination.trim()
+  if (origin && destination) return `${origin} → ${destination}`
+  if (destination) return destination
+  if (origin) return `${origin} → 目的地待定`
   return phaseLabels[session.phase]
 }
 

@@ -20,6 +20,10 @@ export interface ItineraryViewModel {
   days: DayPlan[]
   hasStructuredOverview: boolean
   markdown: string
+  /** 方案正文中"交通"章节原文（无则空串）——只展示真实生成内容，不编造 */
+  transportMarkdown: string
+  /** 方案正文中"住宿/酒店"章节原文（无则空串） */
+  lodgingMarkdown: string
   tripState?: TripState
 }
 
@@ -72,7 +76,9 @@ export function parseDays(markdown: string): DayPlan[] {
   let current: DayPlan | null = null
 
   for (const line of lines) {
-    const dayMatch = line.match(/(?:^|\s)(?:###?\s*)?(?:Day\s*(\d+)|第\s*(\d+)\s*天|第\s*([一二三四五六七八九十]+)\s*天)/i)
+    // 前缀放宽：除行首/空白外，允许 markdown 装饰符（#/粗体星号）紧贴 Day 标题——
+    // 后端常见 "**Day1 城市地标**\n| 时段 | 地点 |…" 格式此前匹配不上，被误判为自由叙述
+    const dayMatch = line.match(/(?:^|\s|#|\*)(?:###?\s*)?\**\s*(?:Day\s*(\d+)|第\s*(\d+)\s*天|第\s*([一二三四五六七八九十]+)\s*天)/i)
     if (dayMatch) {
       if (current?.items.length) days.push(current)
       const chineseDays = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
@@ -120,6 +126,8 @@ export function buildItineraryViewModel(markdown: string, tripState?: TripState)
     days,
     hasStructuredOverview: budget.items.length > 0 || days.length > 0,
     markdown,
+    transportMarkdown: findSection(markdown, '交通'),
+    lodgingMarkdown: findSection(markdown, '住宿') || findSection(markdown, '酒店'),
     tripState,
   }
 }

@@ -53,7 +53,7 @@ export default function JourneyContextPanel({
         <section className="atlas-route-manifest" aria-label="路线清单">
           <span className="atlas-kicker">路线概览</span>
           <div className="atlas-manifest-route">
-            <strong>{form.origin || '出发地'}</strong>
+            <strong>{form.origin.label || '出发地'}</strong>
             <span aria-hidden="true"><i /><ArrowRight size={15} /><i /></span>
             <strong>{form.destination || '目的地'}</strong>
           </div>
