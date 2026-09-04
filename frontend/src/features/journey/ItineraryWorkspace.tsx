@@ -5,9 +5,26 @@ import SafeMarkdown from '../../components/SafeMarkdown'
 import TripTimeline from '../../components/TripTimeline'
 import OrchestrationTimeline from './OrchestrationTimeline'
 import type { JourneyStep } from './model'
+import { getTransportGuide, hasTripTransport } from '../../content/transportGuides'
+import type { TransportGuide } from '../../content/transportGuides'
 import type { ItineraryViewModel } from './viewModel'
 
+
+
 const EXPORT_MENU_ID = 'atlas-export-menu'
+
+// 编辑部交通指南展示块：summary + tips + 必须原样出现的免责声明
+function TransportGuideBlock({ guide }: { guide: TransportGuide }) {
+  return (
+    <div className='atlas-transport-guide'>
+      <p className='atlas-transport-guide-summary'>{guide.summary}</p>
+      <ul>
+        {guide.tips.map(tip => <li key={tip.slice(0, 24)}>{tip}</li>)}
+      </ul>
+      <p className='atlas-transport-guide-disclaimer'>{guide.disclaimer}</p>
+    </div>
+  )
+}
 
 interface ItineraryWorkspaceProps {
   viewModel: ItineraryViewModel
@@ -190,6 +207,7 @@ export default function ItineraryWorkspace({
                       <button type="button" role="menuitem" disabled={exportBusy} onClick={() => runExport('pdf')}>
                         <FileDown size={15} aria-hidden="true" /> 导出 PDF
                       </button>
+                      <p className="atlas-export-note">两种格式内容同源。PDF 为 A4 固定版式（含页码），Markdown 保留原始语法更适合编辑；极旧环境下 PDF 会退化为不可复制的纯文本版式。</p>
                     </>
                   )}
                 </div>
@@ -225,33 +243,40 @@ export default function ItineraryWorkspace({
         )}
       </section>
 
-      {/* 交通与住宿：内容全部来自本次方案的"交通/住宿/酒店"章节原文（不编造酒店与价格）。
-          与每日行程的主次关系：位于每日安排之后、折叠区之前，不压过主线。 */}
+      {/* 交通与住宿 —— 双来源结构，不因缺数据而空白：
+          A. 本次行程生成内容：方案正文"交通"章节原文（优先展示，标注来源）；
+          B. Atlas 编辑部目的地交通指南：精选城市策展 + 通用兜底，必须带免责声明。
+          住宿只展示正文原文；无数据时给出可追问的提示，不编造酒店与价格。 */}
       <section className="atlas-reading-transit" aria-label="交通与住宿">
         <h3>交通与住宿</h3>
         <div className="atlas-transit-grid">
           <div className="atlas-transit-card">
-            <h4>交通</h4>
-            {viewModel.transportMarkdown.trim()
-              ? <SafeMarkdown content={viewModel.transportMarkdown} />
-              : <p className="atlas-reading-note">本次方案未生成交通内容，可继续追问「如何到达」「市内怎么坐车」。</p>}
+            <h4>交通 {hasTripTransport(viewModel.transportMarkdown)
+              ? <span className="atlas-source-tag">本次行程生成内容</span>
+              : <span className="atlas-source-tag is-editorial">Atlas 编辑部指南</span>}
+            </h4>
+            {hasTripTransport(viewModel.transportMarkdown) ? (
+              <>
+                <SafeMarkdown content={viewModel.transportMarkdown} />
+                <details className="atlas-transit-editorial">
+                  <summary>目的地通用交通建议（编辑部）</summary>
+                  <TransportGuideBlock guide={getTransportGuide(city)} />
+                </details>
+              </>
+            ) : (
+              <TransportGuideBlock guide={getTransportGuide(city)} />
+            )}
           </div>
           <div className="atlas-transit-card">
-            <h4>住宿</h4>
+            <h4>住宿 <span className="atlas-source-tag">本次行程生成内容</span></h4>
             {viewModel.lodgingMarkdown.trim()
-              ? <SafeMarkdown content={viewModel.lodgingMarkdown} />
+              ? <>
+                <SafeMarkdown content={viewModel.lodgingMarkdown} />
+                <p className="atlas-data-note">酒店与价格为方案生成时的建议，非实时数据；预订前请以平台实时信息为准。</p>
+              </>
               : <p className="atlas-reading-note">本次方案未生成住宿内容，可继续追问「推荐住哪个区域」。</p>}
           </div>
         </div>
-        <details className="atlas-transit-editorial">
-          <summary>Atlas 编辑部通用建议（与本次生成内容相互独立）</summary>
-          <ul>
-            <li>机场 / 高铁站到市区，优先查轨道交通直达线，其次机场大巴，深夜到达再考虑打车。</li>
-            <li>住宿优先选地铁沿线 500 米内、换乘线路多的区域，连续多日行程能显著省时。</li>
-            <li>跨城段尽量把长途交通安排在早晨，给目的地留出完整一天。</li>
-            <li>预订前以平台实时价格为准；本页面不展示任何编辑部报价。</li>
-          </ul>
-        </details>
       </section>
 
       <div className="atlas-reading-folds">

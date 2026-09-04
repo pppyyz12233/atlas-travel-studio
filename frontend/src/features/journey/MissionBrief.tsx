@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { OriginPlace, TripForm } from './model'
 import { manualOrigin, originLabel } from './model'
+import { reverseGeocodeLabel } from './geoLabel'
 
 export interface MissionSuggestion {
   title: string
@@ -72,15 +73,23 @@ function useBrowserOrigin(onChange: (patch: Partial<TripForm>) => void) {
     navigator.geolocation.getCurrentPosition(
       position => {
         const { latitude, longitude } = position.coords
+        const coordsLabel = `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`
         const place: OriginPlace = {
-          label: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+          label: coordsLabel,
           latitude,
           longitude,
           source: 'browser',
         }
         onChange({ origin: place })
         setStatus('success')
-        setMessage('已定位当前位置')
+        setMessage(`已定位当前位置（${coordsLabel}）`)
+        // 逆地理升级显示名：成功后把坐标串替换为省/市/区地名；失败保留坐标串，绝不猜城市
+        void reverseGeocodeLabel(latitude, longitude).then(placeName => {
+          if (placeName) {
+            onChange({ origin: { ...place, label: placeName } })
+            setMessage(`已定位：${placeName}`)
+          }
+        })
       },
       error => {
         // PERMISSION_DENIED = 1（实例上不一定带常量属性，按标准值判断）

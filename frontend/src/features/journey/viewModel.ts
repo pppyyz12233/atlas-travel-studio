@@ -77,8 +77,11 @@ export function parseDays(markdown: string): DayPlan[] {
 
   for (const line of lines) {
     // 前缀放宽：除行首/空白外，允许 markdown 装饰符（#/粗体星号）紧贴 Day 标题——
-    // 后端常见 "**Day1 城市地标**\n| 时段 | 地点 |…" 格式此前匹配不上，被误判为自由叙述
+    // 后端常见 "**Day1 城市地标**\n| 时段 | 地点 |…" 格式此前匹配不上，被误判为自由叙述。
+    // 日序格式兼容：Day 1 / DAY 1 / Day1 / 第1天 / 第 1 天 / 第一天（/i 已覆盖大小写）。
+    // 短格式 D1 只认行首/装饰符开头——句中 "乘 D1 路公交" 不构成新的一天。
     const dayMatch = line.match(/(?:^|\s|#|\*)(?:###?\s*)?\**\s*(?:Day\s*(\d+)|第\s*(\d+)\s*天|第\s*([一二三四五六七八九十]+)\s*天)/i)
+      ?? line.match(/^(?:#|\*)*\s*D\s*(\d+)(?=\s|$|[：:，,（(])/i)
     if (dayMatch) {
       if (current?.items.length) days.push(current)
       const chineseDays = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']

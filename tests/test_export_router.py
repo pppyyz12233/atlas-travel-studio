@@ -91,7 +91,14 @@ class TestGuestExport:
             )
         assert response.status_code == 200
         assert response.content.startswith(b"%PDF-")
-        assert len(response.content) > 10_000
+        # 长内容必须完整分页（不截断尾部），页数 > 1
+        import io
+
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(response.content))
+        assert len(reader.pages) > 1
+        tail_text = "\n".join(page.extract_text() for page in reader.pages)
+        assert "超长正文行测试" in tail_text
 
 
 class TestLogged_inExport:
@@ -161,3 +168,69 @@ class TestPdfHelpers:
         header = attachment_header("广州", "2026-09-18")
         header.encode("latin-1")  # 不抛 UnicodeEncodeError 即通过
         assert "UTF-8''" in header
+
+
+class TestMarkdownPdfConsistency:
+    """Markdown 与 PDF 同源一致性（同一 finalReply，PDF 仅加抬头/页脚）。"""
+
+    REPLY = (
+        "## 巴黎4天3晚行程方案（2人）\n\n"
+        "### 日程\n"
+        "#### Day 1 经典轴线\n"
+        "| 时段 | 地点 | 交通 | 备注 |\n|---|---|---|---|\n"
+        "| 上午 | 卢浮宫 | 地铁1号线 | 需预约 |\n| 下午 | 塞纳河游船 | 步行 | 黄昏最佳 |\n\n"
+        "#### Day 2 博物馆日\n- 奥赛博物馆\n- 橘园美术馆\n\n"
+        "### 交通\n- RER B 进城，Navigo Easy 交通卡\n\n"
+        "### 住宿\n- 建议 1-7 区沿塞纳河住宿\n\n"
+        "> 备注与限制：以上为估算，非实时数据。\n"
+    )
+
+    def _pdf_text(self, pdf_bytes: bytes) -> str:
+        from pypdf import PdfReader
+        import io
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        return "\n".join(page.extract_text() for page in reader.pages)
+
+    def test_pdf_and_markdown_come_from_same_reply(self):
+        # PDF 正文 = build_markdown 包装（抬头+正文）；剥掉抬头后必须逐字等于 finalReply
+        from app.utils.pdf_export import build_markdown
+        md = build_markdown(self.REPLY, "巴黎", "2026-09-04")
+        # 抬头 = "# 旅行方案 — 巴黎\n\n**日期:** 2026-09-04\n\n---\n\n"
+        stripped = md.removeprefix("# 旅行方案 — 巴黎\n\n**日期:** 2026-09-04\n\n---\n\n")
+        assert stripped == self.REPLY
+
+    def test_both_formats_cover_transport_and_daily_plan_with_same_dest_and_date(self):
+        from app.utils.pdf_export import build_markdown, render_plan_pdf
+        md = build_markdown(self.REPLY, "巴黎", "2026-09-04")
+        pdf_bytes = render_plan_pdf(md, "巴黎")
+        assert pdf_bytes.startswith(b"%PDF-")
+        text = self._pdf_text(pdf_bytes)
+        # 同目的地 + 同日期
+        assert "巴黎" in md and "巴黎" in text
+        assert "2026-09-04" in md and "2026-09-04" in text
+        # 都含交通与每日安排
+        for needle in ("交通", "RER B", "Day 1", "Day 2", "卢浮宫"):
+            assert needle in md, needle
+            assert needle in text, needle
+
+    def test_pdf_chinese_visible_and_no_isolated_dashes(self):
+        import re
+        from app.utils.pdf_export import build_markdown, render_plan_pdf
+        md = build_markdown(self.REPLY, "巴黎", "2026-09-04")
+        for name, content in (("markdown", md.encode("utf-8").decode("utf-8")),):
+            assert not re.search(r"^\s*-\s*$", content, re.M)
+        pdf_bytes = render_plan_pdf(md, "巴黎")
+        text = self._pdf_text(pdf_bytes)
+        for c in ("旅行方案", "卢浮宫", "塞纳河", "备注与限制"):
+            assert c in text, c
+        assert not re.search(r"^\s*-\s*$", text, re.M)
+
+    def test_pdf_pages_not_truncated_for_long_content(self):
+        from app.utils.pdf_export import build_markdown, render_plan_pdf
+        long_reply = self.REPLY + ("很长的一段补充说明，用于验证多页分页不截断正文内容。\n\n" * 120)
+        md = build_markdown(long_reply, "巴黎", "2026-09-04")
+        pdf_bytes = render_plan_pdf(md, "巴黎")
+        text = self._pdf_text(pdf_bytes)
+        assert pdf_bytes.startswith(b"%PDF-")
+        # 尾部内容仍在（未被页数截断）
+        assert "多页分页不截断正文内容" in text

@@ -22,8 +22,8 @@ class GuestExportRequest(BaseModel):
 async def export_guest_trip(payload: GuestExportRequest):
     """游客 PDF 导出：只在内存中处理，不认证、不落库。"""
     md = build_markdown(payload.content, payload.destination, payload.dates)
-    # 渲染丢线程池：matplotlib/weasyprint 都是同步 CPU 操作，不能阻塞事件循环（SSE 会被卡住）
-    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md)
+    # 渲染丢线程池：xhtml2pdf/weasyprint 都是同步 CPU 操作，不能阻塞事件循环（SSE 会被卡住）
+    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md, payload.destination)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -56,7 +56,7 @@ async def export_trip(
 
     md = build_markdown(reply)
     # PDF 渲染丢线程池：同步 CPU 密集操作不能阻塞事件循环（SSE 推流会被一起卡住）
-    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md)
+    pdf_bytes = await asyncio.to_thread(render_plan_pdf, md, f"trip-{conversation_id}")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

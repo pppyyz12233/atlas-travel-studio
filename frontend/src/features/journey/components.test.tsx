@@ -395,7 +395,7 @@ describe('MissionBrief 使用我的当前位置（手动定位）', () => {
     expect(onChange).toHaveBeenCalledWith({
       origin: { label: '31.230, 121.474', latitude: 31.2304, longitude: 121.4737, source: 'browser' },
     })
-    expect(screen.getByText('已定位当前位置')).toBeInTheDocument()
+    expect(screen.getByText(/已定位当前位置（31.230, 121.474）/)).toBeInTheDocument()
   })
 
   it('shows a clear denied message without touching the form', async () => {
@@ -439,5 +439,40 @@ describe('MissionBrief 使用我的当前位置（手动定位）', () => {
 
     await user.click(screen.getByRole('button', { name: '使用我的当前位置' }))
     expect(screen.getByText('当前浏览器不支持定位')).toBeInTheDocument()
+  })
+})
+
+describe('交通与住宿双来源（A 本次行程 / B 编辑部指南）', () => {
+  it('falls back to the editorial guide with disclaimer when the reply has no transport section', () => {
+    render(
+      <ItineraryWorkspace
+        viewModel={buildItineraryViewModel('## 住宿\n- 建议住 1-7 区')}
+        city="巴黎"
+        steps={[]}
+        locations={[]}
+        onSearchMap={() => undefined}
+      />,
+    )
+    // 编辑部指南接管，不再是大面积空白/只有提示语
+    expect(screen.getByText('Atlas 编辑部指南')).toBeInTheDocument()
+    expect(screen.getByText('以下为目的地通用建议，不代表实时航班、票价或路线。')).toBeInTheDocument()
+    expect(screen.getAllByText(/戴高乐/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Navigo Easy 卡或 Bonjour RATP/)).toBeInTheDocument()
+  })
+
+  it('prefers the trip transport content and labels both sources', () => {
+    render(
+      <ItineraryWorkspace
+        viewModel={buildItineraryViewModel('## 交通\n- RER B 进城\n\n## 住宿\n- 河左岸')}
+        city="巴黎"
+        steps={[]}
+        locations={[]}
+        onSearchMap={() => undefined}
+      />,
+    )
+    expect(screen.getAllByText('本次行程生成内容').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('RER B 进城')).toBeInTheDocument()
+    // 编辑部内容收进补充折叠
+    expect(screen.getByText('目的地通用交通建议（编辑部）')).toBeInTheDocument()
   })
 })

@@ -40,6 +40,22 @@ declare namespace AMap {
       poiList?: { pois?: Array<{ location: { lng: number; lat: number }; name: string; address: string }> }
     }) => void): void
   }
+  class Geocoder {
+    constructor(opts?: Record<string, unknown>)
+    getAddress(
+      location: [number, number],
+      callback: (status: string, result: {
+        regeocode?: {
+          formattedAddress?: string
+          addressComponent?: {
+            province?: string | Array<string>
+            city?: string | Array<string> | ''
+            district?: string | Array<string>
+          }
+        }
+      }) => void,
+    ): void
+  }
 }
 
 declare global {
@@ -74,7 +90,8 @@ const typeColors: Record<string, string> = {
 
 let scriptPromise: Promise<void> | null = null
 
-function loadAMap(): Promise<void> {
+/** 加载高德 SDK（PlaceSearch + Geocoder 插件）。导出供 geoLabel 逆地理复用，全局只注入一次。 */
+export function loadAMap(): Promise<void> {
   if (window.AMap?.Map) return Promise.resolve()
   if (scriptPromise) return scriptPromise
 
@@ -87,7 +104,7 @@ function loadAMap(): Promise<void> {
     window._AMapSecurityConfig = { securityJsCode: config.securityCode }
 
     const script = document.createElement('script')
-    script.src = `https://webapi.amap.com/maps?v=1.4.15&key=${encodeURIComponent(config.key)}&plugin=AMap.PlaceSearch`
+    script.src = `https://webapi.amap.com/maps?v=1.4.15&key=${encodeURIComponent(config.key)}&plugin=AMap.PlaceSearch,AMap.Geocoder`
     script.async = true
     script.onload = () => {
       if (window.AMap?.Map) resolve()
@@ -144,12 +161,16 @@ export default function MapView({ locations, days, onMapReady, className = '' }:
     infoWindowRef.current?.open(map, marker.getPosition())
   }, [])
 
-  // 编号 marker：颜色随天，数字为行程顺序（内容全部由内部整数/色板生成，安全）
+  // 编号 marker：颜色随天，数字为行程顺序（内容全部由内部整数/色板生成，安全）。
+  // title 提供悬停/读屏语义：D1·3 = 第 1 天第 3 站（点开信息窗可见完整说明）
   const addRoutedMarker = useCallback((spec: MapRenderPlan['markers'][number]) => {
     const map = mapRef.current
     if (!map || !window.AMap) return
     const label = spec.location.day === null ? `·${spec.number}` : `D${spec.location.day + 1}·${(spec.location.orderInDay ?? 0) + 1}`
-    const badge = `<div class="amap-num-marker" style="background:${spec.color}"><span>${label}</span></div>`
+    const hoverTitle = spec.location.day === null
+      ? `${escapeHtml(spec.location.name)}（未排期）`
+      : `${escapeHtml(spec.location.name)} · 第 ${spec.location.day + 1} 天第 ${(spec.location.orderInDay ?? 0) + 1} 站`
+    const badge = `<div class="amap-num-marker" title="${hoverTitle}" aria-label="${hoverTitle}" style="background:${spec.color}"><span>${label}</span></div>`
     const marker = new window.AMap.Marker({
       position: [spec.location.lng, spec.location.lat],
       content: badge,

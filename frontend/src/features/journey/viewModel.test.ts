@@ -99,4 +99,33 @@ describe('itinerary markdown view model', () => {
     const days = parseDays('## 交通\n- 建议地铁出行\n- 机场进城坐2号线')
     expect(days).toEqual([])
   })
+
+  it('parses every documented day-header format', () => {
+    const formats = [
+      ['Day 1 轴线', 1],
+      ['DAY 1 轴线', 1],
+      ['Day1 轴线', 1],
+      ['D1 轴线', 1],
+      ['第1天 轴线', 1],
+      ['第 1 天 轴线', 1],
+      ['第一天 轴线', 1],
+      ['**Day 2 粗体**', 2],
+      ['#### DAY 4 主题日', 4],
+    ]
+    for (const [line, expected] of formats as Array<[string, number]>) {
+      const days = parseDays(`### 日程
+${line}
+- 09:00: 卢浮宫
+`)
+      expect(days, `${line}`).toHaveLength(1)
+      expect(days[0].day, `${line}`).toBe(`Day ${expected}`)
+      expect(days[0].items, `${line}`).toEqual([{ time: '09:00', description: '卢浮宫' }])
+    }
+  })
+
+  it('does not treat transport lines like bus route D1 as a day when inside body text', () => {
+    // 无日程章节时全文扫描：句中(非行首/装饰后)的 D1 不构成新的一天
+    const days = parseDays('### 交通\n- 乘 D1 路公交进城\n- 步行 10 分钟')
+    expect(days).toEqual([])
+  })
 })

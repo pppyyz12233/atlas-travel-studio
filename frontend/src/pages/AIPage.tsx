@@ -62,6 +62,13 @@ function fallbackBrief(form: TripForm): string {
   return `${head}，${form.date}出发，${form.days}天，${form.people}人，人均预算${form.budget}元。请给出兼顾体验、节奏和预算的完整方案。`
 }
 
+/** 游客继续调整的上一版方案压缩：≤2400 字全量；超长取头 2000 + 尾 400（保住日程主体与预算/注意事项）。 */
+export function condensePlanContext(reply: string, head = 2000, tail = 400): string {
+  const text = reply.trim()
+  if (text.length <= head + tail) return text
+  return `${text.slice(0, head)}\n…（中间部分省略）…\n${text.slice(-tail)}`
+}
+
 export default function AIPage({ auth, theme }: Props) {
   // 会话状态来自 App 级 JourneyProvider：首页/详情页/我的行程与规划页共享同一份
   const { state: journeyState, dispatch, activeSession } = useJourney()
@@ -318,10 +325,11 @@ export default function AIPage({ auth, theme }: Props) {
       : activeSession.title
 
     // 游客（无云端会话）的"继续调整"：后端拿不到上一版方案，
-    // 把当前方案摘要随请求带上（只进后端 payload，对话航迹仍显示用户原话）
+    // 把当前方案随请求带上（只进后端 payload，对话航迹仍显示用户原话）。
+    // 长方案取"头 + 尾"：头部通常是日程主体，尾部是预算与注意事项——中段截断标记衔接。
     const isGuestAdjustment = currentConversationId === null && activeSession.finalReply.trim().length > 0
     const backendMessage = isGuestAdjustment
-      ? `${text}\n\n【上一版方案参考，请在此基础上修改】\n${activeSession.finalReply.slice(0, 1600)}`
+      ? `${text}\n\n【上一版方案参考，请在此基础上修改】\n${condensePlanContext(activeSession.finalReply)}`
       : text
 
     setInput('')
