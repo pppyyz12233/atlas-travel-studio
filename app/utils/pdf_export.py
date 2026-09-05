@@ -232,10 +232,15 @@ def cjk_text_pdf(md_text: str, destination: str = "") -> bytes:
     return buf.getvalue()
 
 
+def _pdf_escape(s: str) -> str:
+    """转义 PDF 字符串中的反斜杠与括号（避免 f-string 里出现反斜杠字面量，兼容 Python 3.11）"""
+    return s.replace(chr(92), chr(92) * 2).replace("(", "\\(").replace(")", "\\)")
+
+
 def plain_text_pdf(text: str) -> bytes:
     """最后一级保底（无 matplotlib 时的 ASCII PDF），确保永远返回可下载文件。"""
     lines = [''.join(ch if 32 <= ord(ch) < 127 else '?' for ch in line)[:110] for line in text.splitlines()[:45]] or ['Travel plan']
-    content = 'BT /F1 10 Tf 40 790 Td ' + ' '.join(f'({line.replace(chr(92), chr(92)*2).replace("(", "\\(").replace(")", "\\)")}) Tj 0 -14 Td' for line in lines) + ' ET'
+    content = 'BT /F1 10 Tf 40 790 Td ' + ' '.join(f'({_pdf_escape(line)}) Tj 0 -14 Td' for line in lines) + ' ET'
     objs = [b'<< /Type /Catalog /Pages 2 0 R >>', b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>', b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>', b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', f'<< /Length {len(content.encode())} >>\nstream\n{content}\nendstream'.encode()]
     out = bytearray(b'%PDF-1.4\n'); offsets = [0]
     for i, obj in enumerate(objs, 1): offsets.append(len(out)); out.extend(f'{i} 0 obj\n'.encode()); out.extend(obj); out.extend(b'\nendobj\n')
