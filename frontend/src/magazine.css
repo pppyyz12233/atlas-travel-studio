@@ -1119,11 +1119,8 @@
 .mag-timeline-note--solo { margin: 18px 2px 24px; padding: 14px 16px; background: var(--atlas-paper-soft); border: 1px dashed var(--atlas-line-strong); border-radius: var(--atlas-r-card); }
 .mag-detail-map--solo { margin-top: 8px; }
 .mag-detail-transit { margin-top: clamp(28px, 4vw, 44px); }
-
-/* 落地与住下：卡片按自身内容高度显示（不等高拉扯），桌面双列移动单列 */
-.mag-detail-transit .atlas-transit-grid { align-items: start; }
-.mag-detail-transit h2 { display: inline-flex; align-items: baseline; gap: 10px; }
-.mag-detail-transit h2 small { color: var(--atlas-ink-muted); font-size: 12px; font-weight: 500; }
+/* 落地与住下模块复用 arrive-stay 样式；详情页标题与小节间距微调 */
+.mag-detail-transit .arrive-stay > h2 { font-size: 20px; }
 
 /* 目的地攻略条（编辑部策展内容，详情页头部下方） */
 .mag-destination-strip {

@@ -135,3 +135,65 @@ export function buildItineraryViewModel(markdown: string, tripState?: TripState)
   }
 }
 import type { TripState } from './model'
+
+
+// ────────────────────────────────────────────────────────────
+// 住宿结果解析：把方案正文住宿章节的 Markdown 表格转成紧凑列表数据。
+// 只有表格里真实存在的字段才会出现在行对象上——缺失字段直接 undefined，
+// 渲染层隐藏该字段，绝不生成 "—"/0 分/0 元占位。
+// ────────────────────────────────────────────────────────────
+
+export interface HotelRow {
+  name: string
+  area?: string
+  price?: string
+  rating?: string
+}
+
+function isSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every(cell => /^:?-{2,}:?$/.test(cell) || cell === '')
+}
+
+function isHeaderRow(cells: string[]): boolean {
+  const first = cells[0] ?? ''
+  return /名称|酒店名|位置|区域|name|航班号|航司|出发/i.test(first)
+}
+
+export function parseHotelRows(lodgingMarkdown: string): HotelRow[] {
+  if (!lodgingMarkdown.trim()) return []
+  const rows: HotelRow[] = []
+  for (const line of lodgingMarkdown.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('|') || !trimmed.endsWith('|') || trimmed.length < 3) continue
+    const cells = trimmed.slice(1, -1).split('|').map(cell => cell.replace(/\*+/g, '').trim())
+    if (isSeparatorRow(cells) || isHeaderRow(cells)) continue
+    const [name, area, price, rating] = cells
+    // 航班行防御：纯航班号（2 字母+3-4 数字）不是酒店
+    if (/^[A-Z]{2}\d{3,4}$/.test(name)) continue
+    if (!name) continue
+    const isPrice = price && /[¥￥$€]|元|价|\d/.test(price) ? price : undefined
+    const isRating = rating && /^[0-9.]+$/.test(rating) ? rating : undefined
+    rows.push({
+      name,
+      area: area || undefined,
+      price: isPrice,
+      rating: isRating,
+    })
+    if (rows.length >= 8) break
+  }
+  return rows
+}
+
+/** 把住宿章节拆成（表格以外的散文， 表格 Markdown）——两者都是真实行程内容 */
+export function splitLodgingProse(lodgingMarkdown: string): { prose: string; tableMarkdown: string } {
+  const lines = lodgingMarkdown.split('\n')
+  const proseLines = lines.filter(line => {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('|')) return false
+    if (/^#{1,6}\s/.test(trimmed)) return false // 章节标题交给外层
+    if (trimmed.startsWith('>')) return false // 引用（免责类）并入表格侧
+    return true
+  })
+  const tableLines = lines.filter(line => line.trim().startsWith('|'))
+  return { prose: proseLines.join('\n').trim(), tableMarkdown: tableLines.join('\n') }
+}

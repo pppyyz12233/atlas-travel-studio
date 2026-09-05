@@ -2126,9 +2126,10 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 }
 .atlas-reading-note { margin: 0; color: var(--atlas-ink-muted); font-size: 13px; }
 
-/* ---------- 交通与住宿（内容来自方案正文章节，编辑部建议独立折叠） ---------- */
-.atlas-reading-transit { margin-top: 24px; }
-.atlas-reading-transit > h3 {
+/* ---------- 落地与住下（连续模块：到达交通 + 住在哪里 + 编辑部补充折叠） ---------- */
+.arrive-stay { margin-top: 24px; }
+.arrive-stay > h3,
+.arrive-stay > h2 {
   margin: 0 0 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--atlas-line);
@@ -2136,59 +2137,79 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
   font-size: 17px;
   font-weight: 700;
 }
-/* 独立内容区：卡片按自身高度显示，左侧不再因住宿长内容被拉出大片空白 */
-.atlas-transit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
-.atlas-transit-card {
-  min-width: 0;
-  padding: 14px 16px;
-  background: var(--atlas-paper);
-  border: 1px solid var(--atlas-line);
-  border-radius: var(--atlas-r-card);
+.arrive-stay-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  gap: 4px 28px;
+  align-items: start; /* 两栏高度由内容决定，短内容不被拉高，底部不要求对齐 */
 }
-.atlas-transit-card > h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; color: var(--atlas-ink); }
-.atlas-transit-card .markdown-body { font-size: 13px; }
-.atlas-transit-card .markdown-body h2,
-.atlas-transit-card .markdown-body h3 { margin: 0 0 8px; font-size: 13.5px; }
-.atlas-transit-editorial { margin-top: 10px; font-size: 12.5px; }
-.atlas-transit-editorial summary {
-  min-height: 34px;
+.arrive-block { min-width: 0; }
+.arrive-block-title {
+  margin: 0 0 8px;
+  color: var(--atlas-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+.arrive-content { font-size: 13px; color: var(--atlas-ink-soft); }
+.arrive-content .markdown-body { font-size: 13px; }
+.arrive-content .markdown-body h2,
+.arrive-content .markdown-body h3 { margin: 0 0 6px; font-size: 13px; }
+.arrive-guide-summary { margin: 0 0 6px; color: var(--atlas-ink); font-weight: 600; }
+.arrive-guide-tips { margin: 0; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.7; font-size: 12.5px; }
+.arrive-source {
+  margin: 6px 0 0;
+  color: var(--atlas-ink-muted);
+  font-size: 11px;
+  opacity: .85;
+}
+.arrive-empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--atlas-ink-muted);
+  border: 1px dashed var(--atlas-line-strong);
+  border-radius: var(--atlas-r-chip);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.arrive-hotel-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.arrive-hotel-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 7px 10px;
+  background: var(--atlas-paper-soft);
+  border-radius: var(--atlas-r-chip);
+  font-size: 13px;
+}
+.arrive-hotel-name { color: var(--atlas-ink); font-weight: 650; }
+.arrive-hotel-area { color: var(--atlas-ink-muted); font-size: 12px; }
+.arrive-hotel-facts { margin-left: auto; display: inline-flex; gap: 8px; font-style: normal; font-variant-numeric: tabular-nums; }
+.arrive-hotel-price { color: var(--atlas-route); font-weight: 700; font-size: 12.5px; }
+.arrive-hotel-rating { color: var(--atlas-ink-muted); font-size: 12px; }
+.arrive-editorial { margin-top: 8px; font-size: 12.5px; }
+.arrive-editorial summary {
+  min-height: 44px; /* 触控安全区 */
   display: inline-flex;
   align-items: center;
   color: var(--atlas-ink-muted);
+  font-size: 12.5px;
   cursor: pointer;
   user-select: none;
 }
-.atlas-transit-editorial ul { margin: 0 0 6px; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.7; }
+.arrive-editorial summary:hover { color: var(--atlas-ink-soft); }
+.arrive-editorial-body { padding: 8px 0 4px 6px; }
+.arrive-editorial-sub { margin: 8px 0 4px; color: var(--atlas-ink-soft); font-weight: 650; font-size: 12px; }
+.arrive-editorial-body ul { margin: 0 0 6px; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.7; }
+.arrive-source--last { margin: 10px 0 0; }
 
-/* ---------- 交通/住宿来源标注与编辑部指南 ---------- */
-.atlas-source-tag {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  color: var(--atlas-ink-muted);
-  background: var(--atlas-paper-soft);
-  border: 1px solid var(--atlas-line);
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-  vertical-align: middle;
+@media (max-width: 900px) {
+  .arrive-stay-flow { grid-template-columns: minmax(0, 1fr); } /* 单栏：到达交通在前，住宿在后 */
+  .arrive-hotel-facts { margin-left: 0; width: 100%; }      /* 窄屏字段纵向排列 */
+  .arrive-hotel-row { align-items: flex-start; flex-direction: column; gap: 2px; }
 }
-.atlas-source-tag.is-editorial { color: #6b5a2c; border-color: #d8cba8; background: #f7f3e8; }
-.atlas-transport-guide-summary { margin: 0 0 8px; color: var(--atlas-ink); font-weight: 600; }
-.atlas-transport-guide ul { margin: 0 0 8px; padding-left: 18px; color: var(--atlas-ink-soft); line-height: 1.75; }
-/* 桌面宽卡内编辑部建议双栏排布，压缩纵向占用（移动端单栏不变） */
-@media (min-width: 900px) {
-  .atlas-transit-card .atlas-transport-guide ul { columns: 2; column-gap: 20px; }
-}
-.atlas-transport-guide-disclaimer {
-  margin: 8px 0 0;
-  padding: 6px 10px;
-  color: var(--atlas-ink-muted);
-  background: var(--atlas-paper-soft);
-  border-left: 3px solid var(--atlas-line-strong);
-  font-size: 11.5px;
-}
-.atlas-data-note { margin: 10px 0 0; color: var(--atlas-ink-muted); font-size: 11.5px; }
 
 .atlas-export-note {
   margin: 6px 2px 2px;

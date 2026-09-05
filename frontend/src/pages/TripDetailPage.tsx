@@ -14,7 +14,7 @@ import { EmptyState } from '../components/states'
 import { buildItineraryViewModel, routeLabel } from '../features/journey'
 import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
 import { getWorkerMeta } from '../features/journey'
-import { getTransportGuide, hasTripTransport } from '../content/transportGuides'
+import ArriveStay from '../features/journey/ArriveStay'
 import { destinations } from '../content/destinations'
 
 export default function TripDetailPage({ sessionId }: { sessionId: string }) {
@@ -265,49 +265,12 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
         </>
       )}
 
-      {/* 交通与住宿 —— 与规划页阅读态同构的双来源结构：
-          A. 本次行程生成内容（正文原文，优先）；B. Atlas 编辑部交通指南（带免责声明）。
-          无本次交通数据时展示编辑部指南，绝不留大面积空白，也不编造实时数据。 */}
-      <section className="mag-detail-transit" aria-label="交通与住宿">
-        <h2>交通与住宿</h2>
-        <div className="atlas-transit-grid">
-          <div className="atlas-transit-card">
-            <h3>交通 {hasTripTransport(viewModel.transportMarkdown)
-              ? <span className="atlas-source-tag">本次行程生成内容</span>
-              : <span className="atlas-source-tag is-editorial">Atlas 编辑部指南</span>}
-            </h3>
-            {hasTripTransport(viewModel.transportMarkdown)
-              ? <>
-                <SafeMarkdown content={viewModel.transportMarkdown} />
-                <details className="atlas-transit-editorial">
-                  <summary>目的地通用交通建议（编辑部）</summary>
-                  <ul>
-                    {getTransportGuide(session.form.destination).tips.map(tip => <li key={tip.slice(0, 24)}>{tip}</li>)}
-                  </ul>
-                  <p className="atlas-transport-guide-disclaimer">{getTransportGuide(session.form.destination).disclaimer}</p>
-                </details>
-              </>
-              : (
-                <div className="atlas-transport-guide">
-                  <p className="atlas-transport-guide-summary">{getTransportGuide(session.form.destination).summary}</p>
-                  <ul>
-                    {getTransportGuide(session.form.destination).tips.map(tip => <li key={tip.slice(0, 24)}>{tip}</li>)}
-                  </ul>
-                  <p className="atlas-transport-guide-disclaimer">{getTransportGuide(session.form.destination).disclaimer}</p>
-                </div>
-              )}
-          </div>
-          <div className="atlas-transit-card">
-            <h3>住宿 <span className="atlas-source-tag">本次行程生成内容</span></h3>
-            {viewModel.lodgingMarkdown.trim()
-              ? <>
-                <SafeMarkdown content={viewModel.lodgingMarkdown} />
-                <p className="atlas-data-note">酒店与价格为方案生成时的建议，非实时数据；预订前请以平台实时信息为准。</p>
-              </>
-              : <p className="mag-timeline-note">本次方案未生成住宿内容，可回到规划页继续追问「推荐住哪个区域」。</p>}
-          </div>
-        </div>
-      </section>
+      <ArriveStay
+        transportMarkdown={viewModel.transportMarkdown}
+        lodgingMarkdown={viewModel.lodgingMarkdown}
+        city={session.form.destination}
+        headingLevel="h2"
+      />
 
       {visibleDays[0] && (
         <section className="today-execution" aria-labelledby="today-execution-title">

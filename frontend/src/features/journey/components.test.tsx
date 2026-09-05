@@ -442,37 +442,78 @@ describe('MissionBrief 使用我的当前位置（手动定位）', () => {
   })
 })
 
-describe('交通与住宿双来源（A 本次行程 / B 编辑部指南）', () => {
-  it('falls back to the editorial guide with disclaimer when the reply has no transport section', () => {
-    render(
-      <ItineraryWorkspace
-        viewModel={buildItineraryViewModel('## 住宿\n- 建议住 1-7 区')}
-        city="巴黎"
-        steps={[]}
-        locations={[]}
-        onSearchMap={() => undefined}
-      />,
-    )
-    // 编辑部指南接管，不再是大面积空白/只有提示语
-    expect(screen.getByText('Atlas 编辑部指南')).toBeInTheDocument()
-    expect(screen.getByText('以下为目的地通用建议，不代表实时航班、票价或路线。')).toBeInTheDocument()
-    expect(screen.getAllByText(/戴高乐/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Navigo Easy 卡或 Bonjour RATP/)).toBeInTheDocument()
+describe('落地与住下（连续模块，无等高卡片）', () => {
+  const renderWs = (markdown: string, city = '巴黎') => render(
+    <ItineraryWorkspace
+      viewModel={buildItineraryViewModel(markdown)}
+      city={city}
+      steps={[]}
+      locations={[]}
+      onSearchMap={() => undefined}
+    />,
+  )
+
+  it('A 有交通无酒店：交通正常显示 + 紧凑酒店空态，无假酒店行', () => {
+    renderWs('## 交通\n- RER B 进城\n\n## 日程\n- 走走') // 无住宿章节 → 紧凑空态
+    expect(screen.getByText('落地与住下')).toBeInTheDocument()
+    expect(screen.getByText('到达交通')).toBeInTheDocument()
+    expect(screen.getByText('RER B 进城')).toBeInTheDocument()
+    expect(screen.getByText('本次方案未返回酒店结果，可继续追问住宿区域或预算。')).toBeInTheDocument()
+    // 没有酒店表格行，也没有 "—" 占位
+    expect(document.querySelectorAll('.arrive-hotel-row')).toHaveLength(0)
+    expect(document.body.textContent).not.toContain('—')
   })
 
-  it('prefers the trip transport content and labels both sources', () => {
-    render(
-      <ItineraryWorkspace
-        viewModel={buildItineraryViewModel('## 交通\n- RER B 进城\n\n## 住宿\n- 河左岸')}
-        city="巴黎"
-        steps={[]}
-        locations={[]}
-        onSearchMap={() => undefined}
-      />,
-    )
-    expect(screen.getAllByText('本次行程生成内容').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('RER B 进城')).toBeInTheDocument()
-    // 编辑部内容收进补充折叠
-    expect(screen.getByText('目的地通用交通建议（编辑部）')).toBeInTheDocument()
+  it('B 无交通无酒店：编辑部指南接管交通 + 两侧都是紧凑提示，不出现巨大空卡片', () => {
+    renderWs('## 日程\n- Day1 走走')
+    expect(screen.getAllByText(/戴高乐/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/编辑部指南/)).toBeInTheDocument()
+    expect(screen.getByText('本次方案未返回酒店结果，可继续追问住宿区域或预算。')).toBeInTheDocument()
+    // 两个内容块高度由内容决定（无 stretch），等高卡片类名已移除
+    expect(document.querySelector('.atlas-transit-grid')).toBeNull()
+    expect(document.querySelector('.atlas-transit-card')).toBeNull()
+  })
+
+  it('C 有真实酒店表格：紧凑列表只渲染真实字段，缺失字段直接隐藏', () => {
+    renderWs('## 住宿\n| 名称 | 位置 | 价格/晚 | 评分 |\n|---|---|---|---|\n| 涩谷艾美酒店 | 涩谷区 | ¥880 | 4.6 |\n| 经济型旅馆 | 新宿 |  |  |')
+    const rows = document.querySelectorAll('.arrive-hotel-row')
+    expect(rows).toHaveLength(2)
+    expect(screen.getByText('涩谷艾美酒店')).toBeInTheDocument()
+    expect(screen.getAllByText('¥880').length).toBeGreaterThan(0)
+    expect(screen.getByText(/4\.6/)).toBeInTheDocument()
+    // 缺价格/评分的行不渲染空占位
+    const second = rows[1].textContent ?? ''
+    expect(second).not.toContain('¥')
+    expect(second).not.toContain('—')
+    expect(screen.getByText(/非实时/)).toBeInTheDocument()
+  })
+
+  it('编辑部补充建议默认折叠，不占首屏', () => {
+    renderWs('## 交通\n- RER B 进城')
+    const details = document.querySelector('details.arrive-editorial')
+    expect(details).not.toBeNull()
+    expect(details).not.toHaveAttribute('open') // 默认收起
+    const summary = details?.querySelector('summary')
+    expect(summary?.textContent).toContain('编辑部补充建议')
+    // 折叠时 tips 不在可见文档流（DOM 里也在 details 内，未 open 即不渲染于视觉流）
+    expect(details?.textContent).toContain('交通卡')
+  })
+
+  it('来源标注弱化为小字（不再是大徽章）', () => {
+    renderWs('## 交通\n- RER B 进城\n\n## 住宿\n建议住河左岸。')
+    const source = document.querySelector('.arrive-source')
+    expect(source?.textContent).toContain('本次行程生成')
+    expect(document.querySelectorAll('.atlas-source-tag')).toHaveLength(0)
+  })
+
+  it('每日安排仍在「落地与住下」之前（阅读主线性）', () => {
+    renderWs('## 日程\n### Day 1\n- 09:00: 卢浮宫\n\n## 交通\n- RER B')
+    const order = []
+    for (const el of document.querySelectorAll('.atlas-reading-days h3, .arrive-stay > h3, .arrive-block-title')) {
+      order.push(el.textContent?.trim())
+    }
+    expect(order.indexOf('每日安排')).toBeLessThan(order.indexOf('落地与住下'))
+    expect(order).toContain('到达交通')
+    expect(order).toContain('住在哪里')
   })
 })

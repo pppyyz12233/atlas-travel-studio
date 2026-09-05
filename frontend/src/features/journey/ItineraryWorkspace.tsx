@@ -5,28 +5,14 @@ import SafeMarkdown from '../../components/SafeMarkdown'
 import TripTimeline from '../../components/TripTimeline'
 import OrchestrationTimeline from './OrchestrationTimeline'
 import type { JourneyStep } from './model'
-import { getTransportGuide, hasTripTransport } from '../../content/transportGuides'
 import FlightCards from './FlightCards'
 import type { FlightQueryConditions, FlightRow } from './FlightCards'
-import type { TransportGuide } from '../../content/transportGuides'
+import ArriveStay from './ArriveStay'
 import type { ItineraryViewModel } from './viewModel'
 
 
 
 const EXPORT_MENU_ID = 'atlas-export-menu'
-
-// 编辑部交通指南展示块：summary + tips + 必须原样出现的免责声明
-function TransportGuideBlock({ guide }: { guide: TransportGuide }) {
-  return (
-    <div className='atlas-transport-guide'>
-      <p className='atlas-transport-guide-summary'>{guide.summary}</p>
-      <ul>
-        {guide.tips.map(tip => <li key={tip.slice(0, 24)}>{tip}</li>)}
-      </ul>
-      <p className='atlas-transport-guide-disclaimer'>{guide.disclaimer}</p>
-    </div>
-  )
-}
 
 interface ItineraryWorkspaceProps {
   viewModel: ItineraryViewModel
@@ -277,41 +263,11 @@ export default function ItineraryWorkspace({
         )}
       </section>
 
-      {/* 交通与住宿 —— 双来源结构，不因缺数据而空白：
-          A. 本次行程生成内容：方案正文"交通"章节原文（优先展示，标注来源）；
-          B. Atlas 编辑部目的地交通指南：精选城市策展 + 通用兜底，必须带免责声明。
-          住宿只展示正文原文；无数据时给出可追问的提示，不编造酒店与价格。 */}
-      <section className="atlas-reading-transit" aria-label="交通与住宿">
-        <h3>交通与住宿</h3>
-        <div className="atlas-transit-grid">
-          <div className="atlas-transit-card">
-            <h4>交通 {hasTripTransport(viewModel.transportMarkdown)
-              ? <span className="atlas-source-tag">本次行程生成内容</span>
-              : <span className="atlas-source-tag is-editorial">Atlas 编辑部指南</span>}
-            </h4>
-            {hasTripTransport(viewModel.transportMarkdown) ? (
-              <>
-                <SafeMarkdown content={viewModel.transportMarkdown} />
-                <details className="atlas-transit-editorial">
-                  <summary>目的地通用交通建议（编辑部）</summary>
-                  <TransportGuideBlock guide={getTransportGuide(city)} />
-                </details>
-              </>
-            ) : (
-              <TransportGuideBlock guide={getTransportGuide(city)} />
-            )}
-          </div>
-          <div className="atlas-transit-card">
-            <h4>住宿 <span className="atlas-source-tag">本次行程生成内容</span></h4>
-            {viewModel.lodgingMarkdown.trim()
-              ? <>
-                <SafeMarkdown content={viewModel.lodgingMarkdown} />
-                <p className="atlas-data-note">酒店与价格为方案生成时的建议，非实时数据；预订前请以平台实时信息为准。</p>
-              </>
-              : <p className="atlas-reading-note">本次方案未生成住宿内容，可继续追问「推荐住哪个区域」。</p>}
-          </div>
-        </div>
-      </section>
+      <ArriveStay
+        transportMarkdown={viewModel.transportMarkdown}
+        lodgingMarkdown={viewModel.lodgingMarkdown}
+        city={city}
+      />
 
       <div className="atlas-reading-folds">
         {viewModel.budgetItems.length > 0 && (
