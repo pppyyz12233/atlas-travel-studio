@@ -93,16 +93,20 @@ cp .env.example .env
 ### 2. 启动
 
 ```bash
-# 方式一：单服务（前端已构建进 dist，推荐）
+# 方式一（推荐）：模块方式启动，行为与生产部署一致
 cd frontend && npm install && npm run build && cd ..
+python -m uvicorn main:app --host 0.0.0.0 --port 8000   # → http://localhost:8000
+
+# 方式二：脚本直启（同样受支持；运行期资源统一挂 app.state，两种方式等价）
 python main.py            # → http://localhost:8000
 
-# 方式二：前后端分离开发
-python main.py            # 终端 1
-cd frontend && npm run dev  # 终端 2 → http://localhost:5173
+# 方式三：前后端分离开发
+python -m uvicorn main:app --port 8000   # 终端 1
+cd frontend && npm run dev               # 终端 2 → http://localhost:5173
 ```
 
 > SQLite 单写者：同一时刻只能跑一个实例，否则报 `database is locked`。
+> 启动报 locked 时先找残留进程：`netstat -ano | findstr :8000` → `taskkill /F /PID <pid>`。
 
 ---
 

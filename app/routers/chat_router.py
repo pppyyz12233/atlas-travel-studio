@@ -1,9 +1,10 @@
 
 import json
 import asyncio
+import logging
 import re
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,8 @@ from app.agents.supervisor import (
 from app.agents.state import AgentState
 from app.crud import conversation, message
 from app.utils.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["对话"])
 limiter = RateLimiter(max_per_minute=20)
@@ -109,10 +112,11 @@ async def chat(
         conv = await conversation.create_conversation(db, user.id, req.message[:30])
         conv_id = conv.id
 
-    # 获取全局 agent（带 checkpointer/store）
-    from main import get_agent
-    agent = get_agent()
-    assert agent is not None  # lifespan 已初始化；为 None 属启动异常
+    # 运行期 agent 挂在 app.state（lifespan 初始化），路由不做对 main 的反向导入
+    agent = getattr(request.app.state, "agent", None)
+    if agent is None:
+        logger.error("非流式对话：app.state.agent 未初始化（lifespan 未运行？）")
+        raise HTTPException(status_code=503, detail="智能体服务尚未初始化，请稍后重试")
 
     config = {
         "configurable": {
@@ -185,14 +189,19 @@ async def chat_stream(
             uid = str(user.id)
             thread_id = _thread_id(uid, conv_id)
         else:
-            assert guest_session is not None
+            if guest_session is None:
+                logger.error("[SSE] 访客会话解析失败（guest_session 为空）")
+                yield "data: " + json.dumps({'event': 'error', 'message': '会话初始化失败，请稍后重试'}, ensure_ascii=False) + "\n\n"
+                return
             uid = guest_session.user_id
             thread_id = guest_session.thread_id
 
-        # 3. 获取 agent
-        from main import get_agent
-        agent = get_agent()
-        assert agent is not None  # lifespan 已初始化；为 None 属启动异常
+        # 3. 运行期 agent 挂在 app.state（lifespan 初始化），路由不做对 main 的反向导入
+        agent = getattr(request.app.state, "agent", None)
+        if agent is None:
+            logger.error("[SSE] app.state.agent 未初始化（lifespan 未运行？）")
+            yield "data: " + json.dumps({'event': 'error', 'message': '智能体服务尚未初始化，请稍后重试'}, ensure_ascii=False) + "\n\n"
+            return
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -208,7 +217,7 @@ async def chat_stream(
             if prev_state and prev_state.values:
                 prev_msgs = prev_state.values.get("messages", [])
                 if prev_msgs:
-                    print(f"[SSE] 恢复 {len(prev_msgs)} 条历史消息")
+                    logger.info("[SSE] 恢复 %d 条历史消息", len(prev_msgs))
         except Exception:
             pass
 
@@ -227,10 +236,7 @@ async def chat_stream(
         }
 
         # 加载长期记忆（如有）
-        store = None
-        if user is not None:
-            from main import get_store
-            store = get_store()
+        store = getattr(request.app.state, "store", None) if user is not None else None
         yield _gs("memory_reader", "running")
         if store:
             state = await memory_reader_node(state, config, store=store)
@@ -320,12 +326,14 @@ async def chat_stream(
         if user is not None:
             try:
                 async with AsyncSessionLocal() as _s:
-                    assert conv_id is not None  # 登录分支在第 2 步已创建
-                    await message.add_message(_s, conv_id, "user", msg)
-                    await message.add_message(_s, conv_id, "assistant", state["final_answer"])
+                    if conv_id is None:
+                        logger.error("[SSE] conv_id 缺失（登录分支第 2 步未创建会话），跳过消息落库")
+                    else:
+                        await message.add_message(_s, conv_id, "user", msg)
+                        await message.add_message(_s, conv_id, "assistant", state["final_answer"])
                     await _s.commit()
-            except Exception as e:
-                print(f"[SSE] 保存消息失败: {e}")
+            except Exception:
+                logger.exception("[SSE] 保存消息失败")
 
         try:
             reply = state.get("final_answer", "")
@@ -338,15 +346,15 @@ async def chat_stream(
             }, ensure_ascii=False, default=str)
             yield f"data: {payload}\n\n"
         except Exception as e:
-            print(f"[SSE] done 事件构造失败: {e}")
+            logger.exception("[SSE] done 事件构造失败")
             yield f"data: {json.dumps({'event': 'done', 'reply': f'方案生成出错: {str(e)[:200]}', 'conversation_id': conv_id})}\n\n"
 
         # 9. 保存 state 到 checkpointer（在 done 事件后，避免阻塞流式输出）
         try:
             await agent.aupdate_state(config, state, as_node="memory_writer")
-            print(f"[SSE] state 已保存 ({len(state.get('messages',[]))} 条消息)")
-        except Exception as e:
-            print(f"[SSE] state 保存失败: {e}")
+            logger.info("[SSE] state 已保存 (%d 条消息)", len(state.get('messages', [])))
+        except Exception:
+            logger.exception("[SSE] state 保存失败")
 
     async def event_stream():
         """SSE 兜底：任何阶段抛异常都以 error 事件收尾，而不是让连接裸断
@@ -354,9 +362,10 @@ async def chat_stream(
         try:
             async for chunk in _run():
                 yield chunk
-        except Exception as e:
-            print(f"[SSE] 生成中断: {type(e).__name__}: {e}")
-            reason = str(e)[:200] or "生成失败，请重试"
+        except Exception:
+            # 完整 traceback 只进服务端日志；前端只收安全可读的信息
+            logger.exception("[SSE] 生成中断")
+            reason = "生成失败，请重试"
             yield f"data: {json.dumps({'event': 'error', 'message': reason}, ensure_ascii=False)}\n\n"
 
     response = StreamingResponse(

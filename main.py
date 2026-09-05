@@ -21,9 +21,10 @@ STATIC_DIR = BASE_DIR / "static"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 
-# 全局 agent 实例（带 checkpointer + store）
-_agent = None
-_store = None
+# 运行期资源（agent/store）挂在 app.state 上，由 lifespan 初始化：
+# 路由通过 request.app.state 取用——app/ 内部模块绝不反向 import 顶层 main.py。
+#（此前 `from main import get_agent` 在 `python main.py` 启动时会创建 __main__ 与
+#  main 两份模块实例，取到的是未跑过 lifespan 的 _agent=None。）
 
 
 class LogMiddleware(BaseHTTPMiddleware):
@@ -37,7 +38,6 @@ class LogMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _agent, _store
     await init_db()
 
     # 初始化 LangGraph Agent（带 Checkpointer + Memory Store）
@@ -45,10 +45,10 @@ async def lifespan(app: FastAPI):
     try:
         await conn.execute("PRAGMA journal_mode=WAL")
         checkpointer = AsyncSqliteSaver(conn)
-        _store = AsyncSqliteStore(conn)
-        await _store.setup()
-        store = _store
-        _agent = build_graph(checkpointer=checkpointer, store=store)
+        store = AsyncSqliteStore(conn)
+        await store.setup()
+        app.state.store = store
+        app.state.agent = build_graph(checkpointer=checkpointer, store=store)
         print("[Agent] 已初始化 (checkpointer=AsyncSqliteSaver, store=AsyncSqliteStore)")
 
         yield
@@ -58,14 +58,7 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
-def get_agent():
-    """获取全局 agent 实例（供 router 使用）"""
-    return _agent
 
-
-def get_store():
-    """获取全局 store 实例（供 router 手动调用 memory 节点）"""
-    return _store
 
 
 app = FastAPI(title="智能旅行规划师", version="2.0.0", lifespan=lifespan)
