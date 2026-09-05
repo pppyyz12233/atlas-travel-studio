@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 
 
 
-app = FastAPI(title="智能旅行规划师", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Atlas 智能旅行工作室", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(LogMiddleware)
 app.add_middleware(

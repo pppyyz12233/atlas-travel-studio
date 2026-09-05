@@ -1,6 +1,6 @@
 <div align="center">
 
-# ✈️ Atlas · Smart Travel Planner
+# ✈️ Atlas · 智能旅行工作室
 
 ### Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
 
