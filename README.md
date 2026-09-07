@@ -1,23 +1,18 @@
-<div align="center">
-
 # ✈️ Atlas · 智能旅行工作室
 
-### Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
+> Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
+> 一句话搞定航班、酒店、景点、日程、预算，全程 SSE 流式可视
 
-*一句话搞定航班、酒店、景点、日程、预算，全程 SSE 流式可视*
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-7B3FE4?style=flat-square)](https://www.langchain.com/langgraph)
+[![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-536DFE?style=flat-square)](https://platform.deepseek.com/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white&style=flat-square)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vite.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Live](https://img.shields.io/website?url=http%3A%2F%2Fpppyyz12233.top%3A8000&style=flat-square)](http://pppyyz12233.top:8000)
 
-<img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white&style=flat-square" alt="Python"/>
-<img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white&style=flat-square" alt="FastAPI"/>
-<img src="https://img.shields.io/badge/LangGraph-0.2+-7B3FE4?style=flat-square" alt="LangGraph"/>
-<img src="https://img.shields.io/badge/LLM-DeepSeek-536DFE?style=flat-square" alt="DeepSeek"/>
-<img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white&style=flat-square" alt="React"/>
-<img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white&style=flat-square" alt="Vite"/>
-<img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"/>
-[![Live](https://img.shields.io/website?url=http%3A%2F%2Fpppyyz12233.top%3A8000&style=flat-square&label=%E7%BA%BF%E4%B8%8A%E4%BD%93%E9%AA%8C)](http://pppyyz12233.top:8000)
-
-**🌐 [http://pppyyz12233.top:8000](http://pppyyz12233.top:8000)** —— 无需注册，游客打开即用
-
-</div>
+🌐 **线上体验：[http://pppyyz12233.top:8000](http://pppyyz12233.top:8000)** —— 无需注册，游客打开即用
 
 ---
 
