@@ -208,6 +208,35 @@ describe('Atlas page integration', () => {
     expect(sessionStorage.getItem('atlas_pending_brief')).toBeNull()
   })
 
+  it('upgrades the raw-brief handoff title to the derived trip title', async () => {
+    // HomePage#startFromBrief 用 brief 原文当初始标题（截断 24 字），
+    // 首条消息发送后必须升级为"目的地 · N天"，不能一直停留在原文
+    sessionStorage.setItem('atlas_pending_brief', '去广州一天')
+    sessionStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({
+      sessions: [createJourneySession({
+        id: 'seed-handoff',
+        title: '去广州一天',
+        form: {
+          ...createJourneySession().form,
+          origin: { label: '', latitude: null, longitude: null, source: 'manual' as const },
+          destination: '广州',
+          days: 1,
+        },
+      })],
+      activeId: 'seed-handoff',
+    }))
+
+    renderPage(<AIPage auth={guestAuth()} theme={lightTheme()} />)
+
+    await waitFor(() => {
+      expect(streamHarness.startStream).toHaveBeenCalledWith('去广州一天', null, null, expect.any(Object))
+    })
+    await waitFor(() => {
+      // 桌面顶栏与移动顶栏各渲染一份标题
+      expect(screen.getAllByText('广州 · 1天').length).toBeGreaterThan(0)
+    })
+  })
+
   it('marks an in-flight session as cancelled when the planner unmounts', async () => {
     const user = userEvent.setup()
     // 还原真实挂载关系：Provider 常驻，只有规划页卸载（路由切换）

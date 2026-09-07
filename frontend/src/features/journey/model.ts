@@ -350,8 +350,13 @@ export function journeyProgress(steps: JourneyStep[], graphNode = ''): number {
     if (!graphNode) return 0
     return stageProgress[graphNode] ?? 8
   }
-  const finished = steps.filter(step => step.status === 'done' || step.status === 'failed').length
-  return Math.min(94, Math.round(16 + finished / steps.length * 78))
+  // running 步骤给部分权重：并行 worker 的首轮 LLM 思考可达 10s+ 且事件攒批到达，
+  // 只按 done 计数会让进度条在 executor 起步值（16%）钉死半分钟，看起来像卡死
+  const earned = steps.reduce(
+    (sum, step) => sum + (step.status === 'done' || step.status === 'failed' ? 1 : step.status === 'running' ? 0.4 : 0),
+    0,
+  )
+  return Math.min(94, Math.round(16 + earned / steps.length * 78))
 }
 
 export function activeJourneySession(state: JourneyState): JourneySession {

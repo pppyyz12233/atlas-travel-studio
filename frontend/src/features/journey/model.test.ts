@@ -145,7 +145,7 @@ describe('journey session model', () => {
     expect(journeyProgress([
       { name: 'A', worker: 'flight', status: 'done', summary: '', locations: [], iterations: 0, toolCalls: 0 },
       { name: 'B', worker: 'hotel', status: 'running', summary: '', locations: [], iterations: 0, toolCalls: 0 },
-    ])).toBe(55)
+    ])).toBe(71)
   })
 
   it('weights progress across graph stages so early nodes never sit at 0%', () => {
@@ -158,7 +158,12 @@ describe('journey session model', () => {
 
     const planned = [step('推荐航班', 'pending'), step('推荐酒店', 'pending')]
     expect(journeyProgress(planned, 'executor')).toBe(16)
-    expect(journeyProgress([step('推荐航班', 'done'), step('推荐酒店', 'running')], 'executor')).toBe(55)
+    expect(journeyProgress([step('推荐航班', 'done'), step('推荐酒店', 'running')], 'executor')).toBe(71)
+    // 生产实测形态：4 个并行 worker 全部 running 时进度必须离开 16%（首轮 LLM 思考 10s+）
+    const fiveRunning = ['查询航班', '查询酒店', '查询景点', '制定行程', '预算规划'].map(name => step(name, 'running'))
+    expect(journeyProgress(fiveRunning, 'executor')).toBe(47)
+    const fourDone = fiveRunning.map((s, i) => (i < 4 ? step(s.name, 'done') : step(s.name, 'running')))
+    expect(journeyProgress(fourDone, 'executor')).toBe(85)
     expect(journeyProgress(
       [step('推荐航班', 'done'), step('推荐酒店', 'done')],
       'aggregator',

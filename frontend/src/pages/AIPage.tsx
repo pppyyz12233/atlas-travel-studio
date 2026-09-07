@@ -380,9 +380,14 @@ export default function AIPage({ auth, theme }: Props) {
     const days = daysOverride ?? effectiveForm.days
     const destination = (destinationOverride ?? effectiveForm.destination).trim()
     const currentConversationId = activeSession.conversationId
-    // 目的地/天数变化时同步升级派生型标题（"东京 · 5天" → "广州 · 1天"），自定义标题不动
+    // 目的地/天数变化时同步升级派生型标题（"东京 · 5天" → "广州 · 1天"），自定义标题不动。
+    // 标题=本条消息原文（HomePage handoff 用 brief 原文当初始标题）同样视为可升级的派生态，
+    // 否则首条消息后顶栏一直显示"去广州一天"而不是"广州 · 1天"。
     const derivedTitlePattern = /^[^·]+ · \d+天$|行程方案$/
-    const nextTitle = destination && (activeSession.title === '未命名旅程' || derivedTitlePattern.test(activeSession.title))
+    const upgradeableTitle = activeSession.title === '未命名旅程'
+      || derivedTitlePattern.test(activeSession.title)
+      || activeSession.title === text.slice(0, 24)
+    const nextTitle = destination && upgradeableTitle
       ? `${destination} · ${days}天`
       : activeSession.title
     // 显式改了目的地时给出明确提示（不是静默切换，也不是要求二次确认）
