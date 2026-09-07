@@ -7,6 +7,7 @@ python-multipart>=0.0.18
 
 # PDF 导出（HTML→PDF 降级链：weasyprint → xhtml2pdf → matplotlib）
 xhtml2pdf>=0.2.16
+markdown>=3.5
 
 # ============================================================
 # AI / Agent
