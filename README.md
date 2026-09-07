@@ -22,11 +22,11 @@
 | ![首页](docs/screenshots/home.png) | ![移动端](docs/screenshots/mobile.png) |
 
 | 实时执行链 · 高德地图联动 |
-|:---:|:---:|
+|:---:|
 | ![实时执行链](docs/screenshots/planning.png) |
 
 | 规划完成 · 杂志风阅读态 |
-|:---:|:---:|
+|:---:|
 | ![规划完成](docs/screenshots/done.png) |
 
 
