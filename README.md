@@ -17,14 +17,15 @@
 ---
 
 ## 📸 项目预览
-
-| 实时执行链 · 高德地图联动 | 规划完成 · 杂志风阅读态 |
-|:---:|:---:|
-| ![实时执行链](docs/screenshots/planning.png) | ![规划完成](docs/screenshots/done.png) |
-
 | 首页 · 一句话开始 | 移动端适配 |
 |:---:|:---:|
 | ![首页](docs/screenshots/home.png) | ![移动端](docs/screenshots/mobile.png) |
+
+| 实时执行链 · 高德地图联动 | 规划完成 · 杂志风阅读态 |
+|:---:|:---:|
+| ![实时执行链](docs/screenshots/planning.png) |
+| ![规划完成](docs/screenshots/done.png) |
+
 
 提交一句话后，五位智能体并行开工：进度、每轮工具调用、地图标注全部实时可见；完成后自动进入线性阅读态，可继续对话调整或一键导出。
 
