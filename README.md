@@ -1,4 +1,4 @@
-# ✈️ Atlas · 智能旅行工作室
+#  Atlas · 智能旅行工作室
 
  Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
  一句话搞定航班、酒店、景点、日程、预算，全程 SSE 流式可视
@@ -15,7 +15,7 @@
 ---
 
 ## 尝试在线
-🌐 **[快速体验](http://pppyyz12233.top:8000)** —— 无需注册，游客打开即用
+ **[快速体验](http://pppyyz12233.top:8000)** —— 无需注册，游客打开即用
 
 ---
 
@@ -210,11 +210,11 @@ journalctl -u travel-agent -f        # 看日志
 
 | Worker | 工具 | 数据源 |
 |--------|------|--------|
-| ✈️ flight | search_flights / get_flight_price | 模拟 8 条航班 |
-| 🏨 hotel | search_hotels | 模拟酒店库 |
-| 🎯 attraction | 无（纯 LLM 推理） | — |
-| 📅 itinerary | get_weather / get_forecast | wttr.in 真实天气 |
-| 💰 budget | get_exchange_rate | exchangerate-api 真实汇率（失败降级离线汇率表） |
+|  flight | search_flights / get_flight_price | 模拟 8 条航班 |
+|  hotel | search_hotels | 模拟酒店库 |
+|  attraction | 无（纯 LLM 推理） | — |
+|  itinerary | get_weather / get_forecast | wttr.in 真实天气 |
+|  budget | get_exchange_rate | exchangerate-api 真实汇率（失败降级离线汇率表） |
 
 ### MCP 双轨制
 
