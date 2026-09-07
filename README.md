@@ -1,7 +1,7 @@
 # ✈️ Atlas · 智能旅行工作室
 
-> Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
-> 一句话搞定航班、酒店、景点、日程、预算，全程 SSE 流式可视
+ Plan-and-Execute × Worker 子图 Multi-Agent 旅行规划系统
+ 一句话搞定航班、酒店、景点、日程、预算，全程 SSE 流式可视
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square)](https://fastapi.tiangolo.com/)
