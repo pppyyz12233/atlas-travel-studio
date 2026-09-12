@@ -536,80 +536,379 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .map-empty-note p { margin: 0; font-weight: 650; }
 .map-empty-note small { color: var(--atlas-ink-muted); font-size: 11.5px; }
 
-/* ---------- 路线动画（Remotion 行程回放，仅行程详情页使用；规划页仍是 AMap） ---------- */
+/* ---------- 路线动画 v2（Remotion 行程回放 · 夜航风格，仅行程详情页；规划页仍是 AMap） ---------- */
+/* 舞台固定夜航暗色（对齐参考视频）：不随 app 明暗主题切换——它是一段“视频”。 */
 
-.trip-replay-surface { background: var(--atlas-paper-soft); }
-
-.trip-replay-stage {
+.tr-stage {
+  --tr-ground: #0a0f1c;
+  --tr-label-bg: rgba(10, 16, 30, 0.86);
+  --tr-label-text: #f3f7fa;
+  --tr-kicker: #5fe8f7;
+  --tr-title-text: #f6fafd;
   position: relative;
   overflow: hidden;
-  background: var(--atlas-paper-soft);
+  background: var(--tr-ground);
   font-family: var(--atlas-font);
   user-select: none;
+  perspective: 1400px;
+  perspective-origin: 50% 50%;
+  contain: paint;
 }
-.trip-replay-camera { position: absolute; inset: 0; will-change: transform; }
-.trip-replay-basemap { display: block; }
-.dark .trip-replay-basemap {
-  /* 高德静态图只有标准浅色样式：暗色模式用 CSS 反色近似夜航底图（路线色不受影响） */
-  filter: invert(93%) hue-rotate(180deg) saturate(.65) contrast(.95);
-}
-.trip-replay-fallback {
-  background:
-    repeating-linear-gradient(0deg, transparent 0 47px, color-mix(in srgb, var(--atlas-line) 55%, transparent) 47px 48px),
-    repeating-linear-gradient(90deg, transparent 0 47px, color-mix(in srgb, var(--atlas-line) 55%, transparent) 47px 48px),
-    linear-gradient(160deg, var(--atlas-paper-soft), color-mix(in srgb, var(--atlas-sky) 7%, var(--atlas-paper)));
-}
-.trip-replay-routes { position: absolute; inset: 0; }
-
-.trip-replay-title {
+.tr-sky {
   position: absolute;
-  left: 18px;
-  top: 16px;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, #0c1428 0%, rgba(12, 20, 40, 0.62) 22%, rgba(10, 15, 28, 0.2) 40%, transparent 52%);
+  pointer-events: none;
+}
+.tr-world { position: absolute; inset: 0; transform-style: preserve-3d; }
+.tr-plane {
+  position: absolute;
+  left: -480px;
+  top: -300px;
+  width: 1920px;
+  height: 1200px;
+  transform-origin: 50% 50%;
+  background: #0c1424;
+  box-shadow: 0 0 120px rgba(0, 0, 0, 0.55);
+  will-change: transform;
+}
+.tr-basemap {
+  position: absolute;
+  left: 480px;
+  top: 300px;
+  display: block;
+  filter: invert(0.92) hue-rotate(178deg) saturate(0.32) brightness(0.86) contrast(1.06);
+}
+.tr-fallback {
+  position: absolute;
+  left: 480px;
+  top: 300px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 71px, rgba(95, 232, 247, 0.03) 71px 72px),
+    repeating-linear-gradient(90deg, transparent 0 71px, rgba(95, 232, 247, 0.03) 71px 72px),
+    radial-gradient(90% 70% at 50% 55%, #111e36 0%, #0a0f1c 78%);
+}
+.tr-tint {
+  position: absolute;
+  left: 480px;
+  top: 300px;
+  background: linear-gradient(180deg, rgba(10, 15, 28, 0.16), transparent 40%, rgba(10, 15, 28, 0.28));
+  pointer-events: none;
+}
+
+.tr-hud-routes { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.tr-route { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* 夜航光轨：宽泛光 → 中层辉光 → 白热芯（screen 叠加照亮底图） */
+.tr-route--halo { stroke: rgba(95, 232, 247, 0.26); stroke-width: 14; filter: blur(12px); mix-blend-mode: screen; }
+.tr-route--mid { stroke: rgba(95, 232, 247, 0.62); stroke-width: 7.5; filter: blur(4px); mix-blend-mode: screen; }
+.tr-route--core { stroke: #eafdff; stroke-width: 3; }
+.tr-route--tail { stroke: #eafdff; filter: blur(1px); }
+.tr-route--past { stroke: rgba(95, 232, 247, 0.9); stroke-width: 3; }
+.tr-route--ghost { stroke: rgba(95, 232, 247, 0.9); stroke-width: 2.5; }
+.tr-tip-pulse { fill: none; stroke: #5fe8f7; stroke-width: 2; }
+.tr-tip-bloom { fill: rgba(95, 232, 247, 0.32); filter: blur(9px); }
+.tr-tip-core { fill: #f4feff; }
+.tr-tip-light {
+  position: absolute;
+  width: 190px;
+  height: 120px;
+  transform: translate(-50%, -55%);
+  background: radial-gradient(closest-side, rgba(95, 232, 247, 0.2), transparent 72%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.tr-hud-pins { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.tr-pin-anchor {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 0;
+  height: 0;
+}
+.tr-pin-halo {
+  position: absolute;
+  border: 2px solid #5fe8f7;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.tr-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(4, 8, 16, 0.5);
+}
+.tr-pin-anchor.is-passed .tr-pin { border-color: rgba(255, 255, 255, 0.55); opacity: 0.8; }
+.tr-label {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  min-width: 72px;
+  text-align: center;
+  background: var(--tr-label-bg);
+  border: 1px solid rgba(95, 232, 247, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(4, 8, 16, 0.45);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+.tr-label::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.tr-label b { color: var(--tr-label-text); font-size: 12.5px; font-weight: 600; }
+.tr-label small { color: rgba(243, 247, 250, 0.55); font-size: 10.5px; }
+@media (max-width: 767px) {
+  .tr-label { background: rgba(10, 16, 30, 0.94); backdrop-filter: none; }
+}
+
+.tr-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(4, 8, 16, 0.55));
+  pointer-events: none;
+}
+
+.tr-title {
+  position: absolute;
+  left: 20px;
+  top: 18px;
   z-index: 6;
   display: grid;
-  gap: 3px;
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--atlas-paper) 92%, transparent);
-  border: 1px solid var(--atlas-line);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 1px 6px rgba(31, 28, 23, .12);
+  gap: 4px;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgba(4, 8, 16, 0.7);
+}
+.tr-kicker { color: var(--tr-kicker); font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+.tr-title strong { color: var(--tr-title-text); font-size: 21px; line-height: 1.25; font-weight: 700; }
+.tr-sub { color: rgba(246, 250, 253, 0.6); font-size: 12px; }
+.tr-title--outro { left: 50%; top: auto; bottom: 64px; transform: translateX(-50%); text-align: center; }
+
+.tr-day-badge {
+  position: absolute;
+  right: 20px;
+  top: 18px;
+  z-index: 6;
+  padding: 5px 11px;
+  background: rgba(10, 16, 30, 0.42);
+  border: 1px solid rgba(95, 232, 247, 0.3);
+  border-radius: 999px;
+  color: rgba(95, 232, 247, 0.92);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   pointer-events: none;
 }
-.trip-replay-kicker {
-  color: var(--atlas-ink-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-}
-.trip-replay-title strong { color: var(--atlas-ink); font-size: 15px; line-height: 1.35; }
-.trip-replay-sub { color: var(--atlas-ink-soft); font-size: 11.5px; }
-.trip-replay-title--outro { left: 50%; top: auto; bottom: 56px; transform: translateX(-50%); text-align: center; }
-
-.trip-replay-badge {
+.tr-day-badge em { font-style: normal; opacity: 0.55; }
+.tr-note {
   position: absolute;
-  left: 18px;
+  left: 20px;
   bottom: 16px;
   z-index: 6;
-  padding: 5px 12px;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 650;
-  border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(31, 28, 23, .28);
-  pointer-events: none;
-}
-.trip-replay-note {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  z-index: 6;
   padding: 4px 10px;
-  color: var(--atlas-ink-soft);
+  color: rgba(243, 247, 250, 0.6);
   font-size: 11px;
-  background: color-mix(in srgb, var(--atlas-paper) 88%, transparent);
-  border: 1px dashed var(--atlas-line-strong);
+  background: rgba(10, 16, 30, 0.55);
+  border: 1px dashed rgba(95, 232, 247, 0.3);
   border-radius: 999px;
   pointer-events: none;
 }
+
+/* ---------- 卡片外壳 / poster / 剧场 / scrubber（DOM 层，非合成内） ---------- */
+
+.tr-shell { background: #0a0f1c; }
+/* 高度链续传：卡片包装层必须把确定高度交给 .map-view-stack（aspect-ratio frame → region → card → stack → surface） */
+.trip-replay-card { height: 100%; min-height: 0; }
+.trip-replay-card.is-theater .tr-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  border-radius: 0;
+  background: #05080f;
+}
+.trip-replay-card.is-theater .map-view-stack { height: 100%; }
+
+.tr-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: rgba(243, 247, 250, 0.75);
+  font-size: 13px;
+  background: #0a0f1c;
+}
+.tr-loading .map-loader { border-color: rgba(95, 232, 247, 0.35); border-top-color: #5fe8f7; }
+
+.tr-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: rgba(5, 8, 15, 0.18);
+  border: 0;
+  cursor: pointer;
+}
+.tr-poster-btn {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(10, 16, 30, 0.78);
+  border: 1px solid rgba(95, 232, 247, 0.5);
+  color: #5fe8f7;
+  box-shadow: 0 8px 32px rgba(4, 8, 16, 0.6);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.tr-poster:hover .tr-poster-btn { transform: scale(1.08); box-shadow: 0 10px 40px rgba(95, 232, 247, 0.28); }
+.tr-poster-hint { color: rgba(243, 247, 250, 0.8); font-size: 12.5px; letter-spacing: 0.04em; }
+
+.tr-topbar {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+}
+.tr-theater-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(10, 16, 30, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(243, 247, 250, 0.85);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tr-theater-btn:hover { background: rgba(95, 232, 247, 0.16); }
+.tr-rate-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 58px;
+  z-index: 10;
+  width: 44px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(10, 16, 30, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(243, 247, 250, 0.85);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.tr-scrubber {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, transparent, rgba(5, 8, 15, 0.72));
+  border-radius: 10px;
+  /* 跟拍进行时让暗场归还给路线：默认压暗，悬停/拖动/聚焦时展开 */
+  opacity: 0.45;
+  transition: opacity 0.25s ease;
+}
+.tr-scrubber:hover, .tr-scrubber:focus-within { opacity: 1; }
+.tr-track {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  cursor: pointer;
+  touch-action: none;
+}
+.tr-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5.5px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.tr-fill {
+  position: absolute;
+  left: 0;
+  top: 5.5px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #2cc7dc, #5fe8f7);
+}
+.tr-tick {
+  position: absolute;
+  top: 3px;
+  width: 1px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+.tr-playhead {
+  position: absolute;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(95, 232, 247, 0.55);
+  transform: translate(-50%, -50%);
+}
+.tr-scrubber.is-expanded { padding: 10px 16px 8px; }
+.tr-scrubber.is-expanded .tr-track { height: 18px; }
+.tr-scrubber.is-expanded .tr-track::before, .tr-scrubber.is-expanded .tr-fill { top: 7.5px; height: 4px; }
+.tr-play-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(95, 232, 247, 0.14);
+  border: 1px solid rgba(95, 232, 247, 0.45);
+  color: #5fe8f7;
+  cursor: pointer;
+}
+.tr-track-wrap { position: relative; flex: 1; min-width: 0; }
+.tr-chapter-labels { position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none; }
+.tr-chapter-labels span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  color: rgba(243, 247, 250, 0.5);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.tr-track:focus-visible { outline: 2px solid rgba(95, 232, 247, 0.6); outline-offset: 3px; border-radius: 4px; }

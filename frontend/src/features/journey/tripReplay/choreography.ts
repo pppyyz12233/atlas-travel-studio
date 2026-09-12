@@ -2,38 +2,42 @@ import type { MapMarkerSpec, MapPolylineSpec, MapRenderPlan } from '../mapRoutin
 import { clamp } from './mercator'
 import type { MapCanvasSpec } from './basemap'
 import { REPLAY_CANVAS_WIDTH, REPLAY_CANVAS_HEIGHT, projectToCanvas } from './basemap'
+import type { CameraState } from './projection'
+import { easeOutCubic, inOutCubic, lerp, smoothstep } from './projection'
 
 // ============================================================
-// 路线动画编舞（纯逻辑，零 Remotion 依赖）：
-// 把 MapRenderPlan + 画布规格编成逐帧时间线——
-// 段（天）的起止帧、画线时长、停靠点弹出帧、相机关键帧。
-// 合成组件只按帧查表渲染，所有不变量由 choreography.test.ts 钉死。
+// 路线动画编舞 v2（纯逻辑，零 Remotion 依赖）
+// 分镜（30fps，对照设计终稿 3.1）：
+//   S0 开场俯冲 [0,66)：hold 18（全图+标题卡）→ dive 42（先微拉后扎）
+//   S1 每日跟拍：tilt 55°，焦点=笔尖，锚点 (480,348)
+//   S2 日间转场：段首 18 帧 hop（位置 smoothstep + zoom 中段回拉 + tilt 抬升）
+//   S3 收尾拉升：hold 15 → pull 45（inOutCubic 回全图）→ rest 18
+// 所有几何预计算进 segments，相机由 cameraAt 按帧解析。
 // ============================================================
 
 export const REPLAY_FPS = 30
-/** 开场 1.5s：0-15 全览静止（标题卡），15-45 缓动到第 1 天跟拍位 */
-export const INTRO_FRAMES = 45
-export const INTRO_HOLD_FRAMES = 15
-/** 每段画完后的停留 */
-export const DAY_DWELL = 18
-/** 单段画线时长下限/上限（帧） */
+export const INTRO_FRAMES = 66
+export const INTRO_HOLD = 18
+export const INTRO_DIVE = 42
+export const DAY_DWELL = 24
 export const DRAW_MIN = 36
 export const DRAW_MAX = 150
-/** 画线速度（帧/像素）：drawFrames = clamp(round(pathPx·0.12), 36, 150) */
 export const DRAW_PX_PER_FRAME = 0.12
-/** 无折线的段（单点天）的展示时长 */
 export const SINGLE_STOP_DRAW = 24
-/** 收尾 2.5s：0.5s 保持 → 2s 缓动 zoom-to-fit → 末 20 帧静止 */
-export const OUTRO_FRAMES = 75
-export const OUTRO_EASE_FRAMES = 45
-/** 「查看地图」seek 的落定帧偏移（弹出动画之后） */
+export const SEGMENT_TRANSITION = 18
+export const OUTRO_FRAMES = 78
+export const OUTRO_HOLD = 15
+export const OUTRO_EASE = 45
 export const STOP_SETTLE = 4
-/** 总时长上限；超出则等比压缩各段 drawFrames */
 export const MAX_TOTAL_FRAMES = 2700
-/** 段间相机过渡帧数（衔接上一段结尾与下一段画线开头） */
-export const SEGMENT_TRANSITION = 12
 export const FOLLOW_ZOOM_MIN = 1.15
 export const FOLLOW_ZOOM_MAX = 2.2
+
+/** 相机锚点/倾角（与 projection.ts 的 CameraState 配合）——贴地低机位：tilt 陡、锚点偏下 */
+export const ANCHOR_WIDE = { ax: REPLAY_CANVAS_WIDTH / 2, ay: REPLAY_CANVAS_HEIGHT / 2 }
+export const ANCHOR_FOLLOW = { ax: REPLAY_CANVAS_WIDTH / 2, ay: 360 }
+export const TILT_WIDE = 48
+export const TILT_FOLLOW = 63
 
 export interface ReplayStop {
   key: string
@@ -68,26 +72,12 @@ export interface ReplaySegment {
   lastTip: { x: number; y: number }
 }
 
-export interface CameraKeyframe {
-  frame: number
-  cx: number
-  cy: number
-  zoomScale: number
-}
-
-export interface CameraState {
-  cx: number
-  cy: number
-  zoomScale: number
-}
-
 export interface ReplayChoreography {
   fps: number
   totalFrames: number
   introEndFrame: number
   outroStartFrame: number
   segments: ReplaySegment[]
-  cameraKeyframes: CameraKeyframe[]
 }
 
 export interface PolylineGeometry {
@@ -96,7 +86,7 @@ export interface PolylineGeometry {
   totalPx: number
 }
 
-/** 折线投影 + 前缀弧长（strokeDash 与相机共用的几何源） */
+/** 折线投影 + 前缀弧长（描画子折线与相机贴笔尖共用的几何源） */
 export function polylineGeometry(spec: MapCanvasSpec, polyline: MapPolylineSpec): PolylineGeometry {
   const points = polyline.path.map(point => projectToCanvas(spec, point.lng, point.lat))
   const cumulative = [0]
@@ -108,7 +98,7 @@ export function polylineGeometry(spec: MapCanvasSpec, polyline: MapPolylineSpec)
   return { points, cumulative, totalPx: cumulative[cumulative.length - 1] ?? 0 }
 }
 
-/** 弧长参数 t∈[0,1] 处的折线坐标（相机贴笔尖的唯一来源） */
+/** 弧长参数 t∈[0,1] 处的折线坐标（画布坐标系） */
 export function pointAtProgress(geometry: PolylineGeometry, t: number): { x: number; y: number } {
   const points = geometry.points
   if (points.length === 0) return { x: REPLAY_CANVAS_WIDTH / 2, y: REPLAY_CANVAS_HEIGHT / 2 }
@@ -127,10 +117,30 @@ export function pointAtProgress(geometry: PolylineGeometry, t: number): { x: num
   return points[points.length - 1]
 }
 
-/** 平滑缓动（0→1 的 smoothstep；纯模块不引 Remotion Easing） */
-function smoothstep(u: number): number {
-  const c = clamp(u, 0, 1)
-  return c * c * (3 - 2 * c)
+/** 弧长参数 t 处的「描画子折线」（在 t 处插入插值顶点；HUD 屏幕空间描线用） */
+export function partialPolyline(geometry: PolylineGeometry, t: number): Array<{ x: number; y: number }> {
+  const points = geometry.points
+  if (points.length === 0 || geometry.totalPx === 0) return points.length ? [points[0]] : []
+  const target = clamp(t, 0, 1) * geometry.totalPx
+  const result: Array<{ x: number; y: number }> = [points[0]]
+  for (let i = 1; i < points.length; i += 1) {
+    if (geometry.cumulative[i] < target) {
+      result.push(points[i])
+      continue
+    }
+    const span = geometry.cumulative[i] - geometry.cumulative[i - 1]
+    const u = span > 0 ? (target - geometry.cumulative[i - 1]) / span : 0
+    if (u >= 1) {
+      result.push(points[i])
+    } else if (u > 0) {
+      result.push({
+        x: points[i - 1].x + (points[i].x - points[i - 1].x) * u,
+        y: points[i - 1].y + (points[i].y - points[i - 1].y) * u,
+      })
+    }
+    return result
+  }
+  return points
 }
 
 function drawFramesFor(pathPx: number): number {
@@ -256,122 +266,120 @@ export function buildChoreography(plan: MapRenderPlan, spec: MapCanvasSpec): Rep
     cursor += drawFrames + DAY_DWELL
   })
 
-  const outroStartFrame = cursor
-  const totalFrames = outroStartFrame + OUTRO_FRAMES
-  const introEndFrame = INTRO_FRAMES
-
-  // 相机关键帧（边界采样，供测试/调试；运行时用 cameraAt）
-  const cameraKeyframes: CameraKeyframe[] = [{
-    frame: 0, cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: 1,
-  }]
-  for (const segment of segments) {
-    const first = segment.stops[0]
-    const startCam: CameraKeyframe = first
-      ? { frame: segment.startFrame, cx: first.x, cy: first.y, zoomScale: segment.followZoom }
-      : { frame: segment.startFrame, cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: 1 }
-    if (startCam.frame > cameraKeyframes[cameraKeyframes.length - 1].frame) cameraKeyframes.push(startCam)
-    cameraKeyframes.push({
-      frame: segment.endFrame,
-      cx: segment.lastTip.x,
-      cy: segment.lastTip.y,
-      zoomScale: segment.followZoom,
-    })
-  }
-  cameraKeyframes.push({
-    frame: Math.min(outroStartFrame + OUTRO_EASE_FRAMES, totalFrames - 1),
-    cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: 1,
-  })
-  cameraKeyframes.push({
-    frame: totalFrames - 1,
-    cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: 1,
-  })
-
-  return { fps: REPLAY_FPS, totalFrames, introEndFrame, outroStartFrame, segments, cameraKeyframes }
-}
-
-function lerp(a: number, b: number, u: number): number {
-  return a + (b - a) * u
-}
-
-function clampCamera(state: CameraState): CameraState {
-  if (state.zoomScale <= 1) {
-    return { cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: state.zoomScale }
-  }
-  const halfW = REPLAY_CANVAS_WIDTH / 2 / state.zoomScale
-  const halfH = REPLAY_CANVAS_HEIGHT / 2 / state.zoomScale
   return {
-    zoomScale: state.zoomScale,
-    cx: clamp(state.cx, halfW, REPLAY_CANVAS_WIDTH - halfW),
-    cy: clamp(state.cy, halfH, REPLAY_CANVAS_HEIGHT - halfH),
+    fps: REPLAY_FPS,
+    totalFrames: cursor + OUTRO_FRAMES,
+    introEndFrame: INTRO_FRAMES,
+    outroStartFrame: cursor,
+    segments,
   }
 }
 
-/** 帧号 → 相机状态（intro 全览 → 贴笔尖跟拍 → 段间过渡 → outro 拉远） */
+function segmentGeometry(segment: ReplaySegment): PolylineGeometry {
+  return { points: segment.tipPoints, cumulative: segment.cumulativePx, totalPx: segment.pathPx }
+}
+
+function wideCamera(): CameraState {
+  return { cx: ANCHOR_WIDE.ax, cy: ANCHOR_WIDE.ay, zoom: 1, tilt: TILT_WIDE, ...ANCHOR_WIDE }
+}
+
+/** 帧 → 相机（v2 分镜：俯冲 / 跟拍 / hop 转场 / Ken Burns / 拉升） */
 export function cameraAt(choreo: ReplayChoreography, frame: number): CameraState {
-  const full: CameraState = { cx: REPLAY_CANVAS_WIDTH / 2, cy: REPLAY_CANVAS_HEIGHT / 2, zoomScale: 1 }
   const segments = choreo.segments
-  if (segments.length === 0 || frame <= INTRO_HOLD_FRAMES) return full
+  if (segments.length === 0 || frame <= INTRO_HOLD) return wideCamera()
 
   const first = segments[0]
+  const firstStop = first.stops[0]
+  const followTarget: CameraState = firstStop
+    ? { cx: firstStop.x, cy: firstStop.y, zoom: first.followZoom, tilt: TILT_FOLLOW, ...ANCHOR_FOLLOW }
+    : { ...wideCamera(), tilt: TILT_FOLLOW, ...ANCHOR_FOLLOW }
+
+  // S0 开场俯冲：[INTRO_HOLD, INTRO_HOLD+INTRO_DIVE) 内插，之后 6 帧 settle（即跟拍首帧）
   if (frame < choreo.introEndFrame) {
-    const u = smoothstep((frame - INTRO_HOLD_FRAMES) / (choreo.introEndFrame - INTRO_HOLD_FRAMES))
-    const target = first.stops[0]
-      ? { cx: first.stops[0].x, cy: first.stops[0].y, zoomScale: first.followZoom }
-      : full
-    return clampCamera({
-      cx: lerp(full.cx, target.cx, u),
-      cy: lerp(full.cy, target.cy, u),
-      zoomScale: lerp(full.zoomScale, target.zoomScale, u),
-    })
+    const u = (frame - INTRO_HOLD) / INTRO_DIVE
+    const zoom = u < 0.18
+      ? lerp(1, 0.94, smoothstep(u / 0.18))
+      : lerp(0.94, followTarget.zoom, inOutCubic((u - 0.18) / 0.82))
+    const w = smoothstep(u)
+    return {
+      cx: lerp(ANCHOR_WIDE.ax, followTarget.cx, w),
+      cy: lerp(ANCHOR_WIDE.ay, followTarget.cy, w),
+      zoom,
+      tilt: lerp(TILT_WIDE, TILT_FOLLOW, easeOutCubic(u)),
+      ax: ANCHOR_FOLLOW.ax,
+      ay: lerp(ANCHOR_WIDE.ay, ANCHOR_FOLLOW.ay, w),
+    }
   }
 
+  // S3 收尾拉升（hold 从 dwell 尾的 Ken Burns 终值起步，避免段尾→outro 的 zoom 跳变）
   if (frame >= choreo.outroStartFrame) {
+    const inOutro = frame - choreo.outroStartFrame
+    if (inOutro < OUTRO_HOLD) {
+      const last = segments[segments.length - 1]
+      return { cx: last.lastTip.x, cy: last.lastTip.y, zoom: last.followZoom * 1.06, tilt: TILT_FOLLOW, ...ANCHOR_FOLLOW }
+    }
+    const u = clamp((inOutro - OUTRO_HOLD) / OUTRO_EASE, 0, 1)
     const last = segments[segments.length - 1]
-    const u = smoothstep((frame - choreo.outroStartFrame) / OUTRO_EASE_FRAMES)
-    return clampCamera({
-      cx: lerp(last.lastTip.x, full.cx, u),
-      cy: lerp(last.lastTip.y, full.cy, u),
-      zoomScale: lerp(last.followZoom, full.zoomScale, u),
-    })
+    const e = inOutCubic(u)
+    return {
+      cx: lerp(last.lastTip.x, ANCHOR_WIDE.ax, e),
+      cy: lerp(last.lastTip.y, ANCHOR_WIDE.ay, e),
+      zoom: lerp(last.followZoom * 1.06, 1, e),
+      tilt: lerp(TILT_FOLLOW, TILT_WIDE, e),
+      ax: ANCHOR_FOLLOW.ax,
+      ay: lerp(ANCHOR_FOLLOW.ay, ANCHOR_WIDE.ay, e),
+    }
   }
 
+  // S1/S2 段内跟拍与段首 hop 转场
   const index = segments.findIndex(
     segment => frame >= segment.startFrame && frame < segment.endFrame)
   const segment = segments[index === -1 ? segments.length - 1 : index]
+  const geometry = segmentGeometry(segment)
+  const drawT = clamp((frame - segment.startFrame) / segment.drawFrames, 0, 1)
 
-  // 段内镜头位：有折线贴笔尖，无折线按进度跳停靠点
   let cx: number
   let cy: number
   if (segment.tipPoints.length > 0) {
-    const t = clamp((frame - segment.startFrame) / segment.drawFrames, 0, 1)
-    const point = pointAtProgress(
-      { points: segment.tipPoints, cumulative: segment.cumulativePx, totalPx: segment.pathPx }, t)
-    cx = point.x
-    cy = point.y
+    const tip = pointAtProgress(geometry, drawT)
+    cx = tip.x
+    cy = tip.y
   } else if (segment.stops.length > 0) {
-    const t = clamp((frame - segment.startFrame) / segment.drawFrames, 0, 1)
-    const stopIndex = clamp(Math.round(t * (segment.stops.length - 1)), 0, segment.stops.length - 1)
+    const stopIndex = clamp(Math.round(drawT * (segment.stops.length - 1)), 0, segment.stops.length - 1)
     cx = segment.stops[stopIndex].x
     cy = segment.stops[stopIndex].y
   } else {
-    return full
+    return wideCamera()
   }
 
-  // 段首过渡：从上一段尾位置平滑接到本段笔尖
+  let zoom = segment.followZoom
+  let tilt = TILT_FOLLOW
+
   if (index > 0 && frame < segment.startFrame + SEGMENT_TRANSITION) {
     const prev = segments[index - 1]
-    const u = smoothstep((frame - segment.startFrame) / SEGMENT_TRANSITION)
-    cx = lerp(prev.lastTip.x, cx, u)
-    cy = lerp(prev.lastTip.y, cy, u)
+    const u = (frame - segment.startFrame) / SEGMENT_TRANSITION
+    const w = smoothstep(u)
+    cx = lerp(prev.lastTip.x, cx, w)
+    cy = lerp(prev.lastTip.y, cy, w)
+    // zoom 从上一段 dwell 终值（Ken Burns 后）连续过渡到本段 followZoom，再叠 hop 回拉谷
+    zoom = lerp(prev.followZoom * 1.06, segment.followZoom, w) * (1 - 0.2 * Math.sin(Math.PI * u))
+    tilt = TILT_FOLLOW - 9 * Math.sin(Math.PI * u)
   }
-  return clampCamera({ cx, cy, zoomScale: segment.followZoom })
+
+  // dwell 期 Ken Burns：zoom 缓推 +6%
+  if (frame >= segment.startFrame + segment.drawFrames) {
+    const dwellU = clamp((frame - segment.startFrame - segment.drawFrames) / Math.max(segment.dwellFrames, 1), 0, 1)
+    zoom = zoom * (1 + 0.06 * dwellU)
+  }
+
+  return { cx, cy, zoom, tilt, ...ANCHOR_FOLLOW }
 }
 
-/** 天序号 → 段起始帧（null = 未排期/「全部」语义 → outro 全图帧；未知 → 0） */
+/** 天序号 → 交互 seek 落点（转场结束后 3 帧；null = 「全部」= outro rest 静帧；未知 → 0） */
 export function frameForDay(choreo: ReplayChoreography, day: number | null): number {
-  if (day === null) return choreo.outroStartFrame
+  if (day === null) return Math.min(choreo.outroStartFrame + OUTRO_HOLD + OUTRO_EASE + 17, choreo.totalFrames - 1)
   const segment = choreo.segments.find(item => item.day === day)
-  return segment ? segment.startFrame : 0
+  return segment ? segment.startFrame + SEGMENT_TRANSITION + 3 : 0
 }
 
 /** 地点键 → 「查看地图」seek 帧（弹出动画落定后）；未知 → null */

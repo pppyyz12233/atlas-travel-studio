@@ -4,8 +4,8 @@ import type { DayPlan } from '../viewModel'
 import { buildRoutedLocations } from '../mapRouting'
 import { buildMapCanvasSpec } from './basemap'
 import {
-  DAY_DWELL, DRAW_MAX, DRAW_MIN, INTRO_FRAMES, MAX_TOTAL_FRAMES, OUTRO_FRAMES,
-  SINGLE_STOP_DRAW, STOP_SETTLE,
+  ANCHOR_FOLLOW, ANCHOR_WIDE, DAY_DWELL, DRAW_MAX, DRAW_MIN, INTRO_FRAMES, MAX_TOTAL_FRAMES,
+  OUTRO_FRAMES, SEGMENT_TRANSITION, SINGLE_STOP_DRAW, STOP_SETTLE, TILT_FOLLOW, TILT_WIDE,
   buildChoreography, cameraAt, dayAtFrame, frameForDay, frameForLocation,
 } from './choreography'
 
@@ -13,7 +13,7 @@ function loc(name: string, lng: number, lat: number): Location {
   return { name, lng, lat, address: '', type: 'attraction' }
 }
 
-// 三天两城内行程：D1 三点折线、D2 两点折线、D3 单点（无折线）、外加一个未排期点
+// 三天行程：D1 三点折线、D2 两点折线、D3 单点（无折线）、外加一个未排期点
 const LOCATIONS: Location[] = [
   loc('沙面', 113.2400, 23.1070),
   loc('广州塔', 113.3246, 23.1064),
@@ -72,7 +72,6 @@ describe('buildChoreography 时间线不变量', () => {
     expect(d1.drawFrames).toBeLessThanOrEqual(DRAW_MAX)
     expect(d2.drawFrames).toBeGreaterThanOrEqual(DRAW_MIN)
     expect(d2.tipPoints.length).toBeGreaterThanOrEqual(2)
-    // D3 只有一个地点 → 无折线 → SINGLE_STOP_DRAW
     expect(d3.tipPoints).toHaveLength(0)
     expect(d3.drawFrames).toBe(SINGLE_STOP_DRAW)
     expect(d3.dwellFrames).toBe(DAY_DWELL)
@@ -101,11 +100,15 @@ describe('buildChoreography 时间线不变量', () => {
     }
   })
 
-  it('seek 往返：frameForDay↔dayAtFrame；frameForLocation = popFrame + STOP_SETTLE；未知 → null/0', () => {
+  it('seek 往返：frameForDay = 段首+转场+3；frameForLocation = popFrame + STOP_SETTLE；未知 → null/0', () => {
     for (const day of [0, 1, 2]) {
-      expect(dayAtFrame(choreo, frameForDay(choreo, day))).toBe(day)
+      const target = frameForDay(choreo, day)
+      const segment = choreo.segments.find(item => item.day === day)!
+      expect(target).toBe(segment.startFrame + SEGMENT_TRANSITION + 3)
+      expect(dayAtFrame(choreo, target)).toBe(day)
     }
-    expect(frameForDay(choreo, null)).toBe(choreo.outroStartFrame)
+    // 「全部」= outro 静帧（rest 期内，倒数第一帧）
+    expect(frameForDay(choreo, null)).toBe(choreo.totalFrames - 1)
     expect(frameForDay(choreo, 99)).toBe(0)
     expect(dayAtFrame(choreo, 0)).toBeNull()
     expect(dayAtFrame(choreo, choreo.totalFrames - 1)).toBeNull()
@@ -117,54 +120,74 @@ describe('buildChoreography 时间线不变量', () => {
     }
     expect(frameForLocation(choreo, '沙面:9999:9999')).toBeNull()
   })
-
-  it('相机关键帧：帧严格递增、首尾 = 全图、zoomScale ∈ [1,3]', () => {
-    const frames = choreo.cameraKeyframes.map(keyframe => keyframe.frame)
-    for (let i = 1; i < frames.length; i += 1) {
-      expect(frames[i]).toBeGreaterThan(frames[i - 1])
-    }
-    expect(frames[0]).toBe(0)
-    expect(frames[frames.length - 1]).toBe(choreo.totalFrames - 1)
-    expect(choreo.cameraKeyframes[0]).toEqual({ frame: 0, cx: 480, cy: 300, zoomScale: 1 })
-    expect(choreo.cameraKeyframes[frames.length - 1])
-      .toEqual({ frame: choreo.totalFrames - 1, cx: 480, cy: 300, zoomScale: 1 })
-    for (const keyframe of choreo.cameraKeyframes) {
-      expect(keyframe.zoomScale).toBeGreaterThanOrEqual(1)
-      expect(keyframe.zoomScale).toBeLessThanOrEqual(3)
-    }
-  })
 })
 
-describe('cameraAt 逐段行为', () => {
+describe('cameraAt v2 分镜', () => {
   const { choreo } = makeChoreo()
+  const first = choreo.segments[0]
 
-  it('开场静止与收尾拉远都是全图', () => {
-    expect(cameraAt(choreo, 0)).toEqual({ cx: 480, cy: 300, zoomScale: 1 })
-    expect(cameraAt(choreo, 10)).toEqual({ cx: 480, cy: 300, zoomScale: 1 })
+  it('开场静止与收尾都是全图广角（tilt 42 / zoom 1 / 锚点居中）', () => {
+    expect(cameraAt(choreo, 0)).toEqual({ cx: 480, cy: 300, zoom: 1, tilt: TILT_WIDE, ax: 480, ay: 300 })
     const end = cameraAt(choreo, choreo.totalFrames - 1)
-    expect(end.zoomScale).toBe(1)
-    expect(end.cx).toBeCloseTo(480, 3)
-    expect(end.cy).toBeCloseTo(300, 3)
+    expect(end).toEqual({ cx: 480, cy: 300, zoom: 1, tilt: TILT_WIDE, ax: 480, ay: 300 })
   })
 
-  it('段内跟拍：段首帧镜头中心贴住首停位置（差不超过半屏）', () => {
-    const first = choreo.segments[0]
-    const camera = cameraAt(choreo, first.startFrame)
-    expect(camera.zoomScale).toBeGreaterThan(1)
+  it('俯冲：tilt 单调 42→55；zoom 先微拉（<1）再扎向 followZoom；锚点 ay → 348', () => {
+    const mid = cameraAt(choreo, 18 + 10)
+    expect(mid.tilt).toBeGreaterThan(TILT_WIDE)
+    expect(mid.tilt).toBeLessThan(TILT_FOLLOW)
+    expect(mid.zoom).toBeLessThan(1) // 微拉段
+    expect(mid.ay).toBeGreaterThan(300)
+    const settled = cameraAt(choreo, choreo.introEndFrame)
+    expect(settled.tilt).toBeCloseTo(TILT_FOLLOW, 5)
+    expect(settled.ay).toBe(ANCHOR_FOLLOW.ay)
+  })
+
+  it('跟拍：段中 tilt=55、锚点 (480,348)、镜头在首停附近；跳变帧无 hop', () => {
+    const camera = cameraAt(choreo, first.startFrame + SEGMENT_TRANSITION + 10)
+    expect(camera.tilt).toBeCloseTo(TILT_FOLLOW, 6)
+    expect(camera.ax).toBe(ANCHOR_FOLLOW.ax)
+    expect(camera.ay).toBe(ANCHOR_FOLLOW.ay)
+    expect(camera.zoom).toBeGreaterThan(1)
     const stop = first.stops[0]
-    expect(Math.hypot(camera.cx - stop.x, camera.cy - stop.y)).toBeLessThan(480 / camera.zoomScale)
+    expect(Math.hypot(camera.cx - stop.x, camera.cy - stop.y)).toBeLessThan(480 / camera.zoom)
   })
 
-  it('钳制：镜头可视矩形始终在画布内', () => {
+  it('hop 转场：段首 tilt 短暂 <55、zoom 有回拉谷值', () => {
+    const second = choreo.segments[1]
+    const hopMid = cameraAt(choreo, second.startFrame + 9)
+    expect(hopMid.tilt).toBeLessThan(TILT_FOLLOW)
+    expect(hopMid.zoom).toBeLessThan(second.followZoom)
+  })
+
+  it('dwell Ken Burns：段尾 zoom 比段中 +6% 以内递增', () => {
+    const before = cameraAt(choreo, first.startFrame + first.drawFrames - 1)
+    const after = cameraAt(choreo, first.endFrame - 1)
+    expect(after.zoom).toBeGreaterThan(before.zoom)
+    expect(after.zoom / before.zoom).toBeLessThan(1.07)
+  })
+
+  it('tilt/zoom/anchor 全程有界', () => {
     for (let frame = 0; frame < choreo.totalFrames; frame += 3) {
       const camera = cameraAt(choreo, frame)
-      const halfW = 480 / camera.zoomScale
-      const halfH = 300 / camera.zoomScale
-      expect(camera.cx - halfW).toBeGreaterThanOrEqual(-0.001)
-      expect(camera.cx + halfW).toBeLessThanOrEqual(960.001)
-      expect(camera.cy - halfH).toBeGreaterThanOrEqual(-0.001)
-      expect(camera.cy + halfH).toBeLessThanOrEqual(600.001)
+      expect(camera.tilt).toBeGreaterThanOrEqual(TILT_WIDE)
+      expect(camera.tilt).toBeLessThanOrEqual(TILT_FOLLOW)
+      expect(camera.zoom).toBeGreaterThan(0.9)
+      expect(camera.zoom).toBeLessThan(3)
+      expect(camera.ax).toBe(ANCHOR_WIDE.ax)
+      expect(camera.ay).toBeGreaterThanOrEqual(300)
+      expect(camera.ay).toBeLessThanOrEqual(ANCHOR_FOLLOW.ay)
     }
+  })
+
+  it('相机全程逐帧连续：相邻帧 zoom 变化 < 5.5%（段界/outro 不连续回归锁；hop 正弦端点自然变化率 ~5%）', () => {
+    let maxJump = 0
+    for (let frame = 1; frame < choreo.totalFrames; frame += 1) {
+      const a = cameraAt(choreo, frame - 1)
+      const b = cameraAt(choreo, frame)
+      maxJump = Math.max(maxJump, Math.abs(b.zoom - a.zoom) / a.zoom)
+    }
+    expect(maxJump).toBeLessThan(0.055)
   })
 })
 

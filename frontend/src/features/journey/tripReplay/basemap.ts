@@ -49,6 +49,41 @@ export function projectToCanvas(spec: MapCanvasSpec, lng: number, lat: number): 
   }
 }
 
+/** L2 高清拼接：单块瓦片在拼接位图（1920×1200）内的位置与请求 URL */
+export interface StitchTile {
+  x: number
+  y: number
+  url: string
+}
+
+/**
+ * L2 同覆盖翻密度拼接：zoom+1 下同一地理范围 = 1920×1200 世界像素，
+ * 拆 4 张 960×600 请求（每张 scale=2 返回 1920×1200 物理像素），
+ * 离屏 canvas 拼合后按 960×600 显示 = 2× 密度，跟拍 zoom≤2.2 仍锐。
+ * zoom 已达 17（静态图上限）时返回空数组（无升级空间）。
+ */
+export function buildStitchTiles(spec: MapCanvasSpec): StitchTile[] {
+  if (spec.zoom >= MAX_ZOOM) return []
+  const hiZoom = spec.zoom + 1
+  const center = mercatorProject(spec.centerLng, spec.centerLat, hiZoom)
+  const tiles: StitchTile[] = []
+  for (const ox of [-REPLAY_CANVAS_WIDTH / 2, REPLAY_CANVAS_WIDTH / 2]) {
+    for (const oy of [-REPLAY_CANVAS_HEIGHT / 2, REPLAY_CANVAS_HEIGHT / 2]) {
+      const tileCenter = mercatorUnproject(center.x + ox, center.y + oy, hiZoom)
+      const params = new URLSearchParams({
+        lng: tileCenter.lng.toFixed(6),
+        lat: tileCenter.lat.toFixed(6),
+        zoom: String(hiZoom),
+        w: String(REPLAY_CANVAS_WIDTH),
+        h: String(REPLAY_CANVAS_HEIGHT),
+        scale: '2',
+      })
+      tiles.push({ x: ox < 0 ? 0 : REPLAY_CANVAS_WIDTH, y: oy < 0 ? 0 : REPLAY_CANVAS_HEIGHT, url: `/api/map/static?${params.toString()}` })
+    }
+  }
+  return tiles
+}
+
 /**
  * 从渲染计划推底图规格：覆盖全部有效 marker 的外接框 + 边距，
  * 从 z=17 降到 z=3 取第一个放得下的级别；单点固定 z=13。
