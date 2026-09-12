@@ -16,6 +16,28 @@ vi.mock('../hooks/useApi', () => ({
   api: { get: vi.fn() },
 }))
 
+// 行程详情页的路线动画卡片：stub 模拟真实契约——seekToDay(day) 后帧事件回流 onFrameChange
+vi.mock('../features/journey/tripReplay/TripReplayCard', async () => {
+  const { useEffect } = await import('react')
+  type CardProps = {
+    onReady?: (api: unknown) => void
+    onFrameChange?: (frame: number, day: number | null) => void
+  }
+  const Stub = ({ onReady, onFrameChange }: CardProps) => {
+    useEffect(() => {
+      onReady?.({
+        seekToDay: (day: number | null) => { onFrameChange?.(0, day) },
+        seekToLocation: () => { onFrameChange?.(0, 0); return true },
+        seekToFrame: () => undefined,
+        play: () => undefined,
+        pause: () => undefined,
+      })
+    }, [onReady, onFrameChange])
+    return <div data-testid="trip-replay-stub" />
+  }
+  return { default: Stub }
+})
+
 const apiGet = vi.mocked(api.get)
 
 function renderApp(ui: React.ReactElement) {
@@ -260,6 +282,28 @@ describe('trip detail page', () => {
     expect(within(timeline).getByText('龙井村')).toBeInTheDocument()
     expect(within(timeline).queryByText('灵隐寺')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '每日安排' })).toBeInTheDocument()
+  })
+
+  it('今日执行「查看地图」未匹配地点时给出诚实提示', async () => {
+    const user = userEvent.setup()
+    const session = createJourneySession({
+      id: 'detail-map',
+      title: '东京五日',
+      phase: 'ready',
+      conversationId: 8,
+      finalReply: '# 东京方案\n## 日程\n### Day 1 抵达东京\n- 15:00：入住银座酒店',
+      messages: [
+        { role: 'user', content: '东京五天' },
+        { role: 'assistant', content: '# 东京方案' },
+      ],
+    })
+    sessionStorage.setItem('atlas_journey_state', JSON.stringify({ sessions: [session], activeId: session.id }))
+
+    renderApp(<TripDetailPage sessionId="detail-map" />)
+
+    await user.click(screen.getByRole('button', { name: '查看地图' }))
+    // 会话没有坐标数据：不猜，直接说没匹配到（静态底图无 POI 搜索兜底）
+    expect(await screen.findByText('本条目没有匹配到可定位地点')).toBeInTheDocument()
   })
 
   it('handles a missing session gracefully', () => {

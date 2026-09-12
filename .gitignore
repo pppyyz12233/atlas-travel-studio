@@ -25,6 +25,9 @@ frontend/.env.local
 *.db-wal
 *.db-journal
 
+# 静态底图磁盘缓存（/api/map/static 运行时产物）
+data/
+
 # 环境变量
 .env
 

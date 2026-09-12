@@ -535,3 +535,81 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .map-empty-note p { margin: 0; font-weight: 650; }
 .map-empty-note small { color: var(--atlas-ink-muted); font-size: 11.5px; }
+
+/* ---------- 路线动画（Remotion 行程回放，仅行程详情页使用；规划页仍是 AMap） ---------- */
+
+.trip-replay-surface { background: var(--atlas-paper-soft); }
+
+.trip-replay-stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--atlas-paper-soft);
+  font-family: var(--atlas-font);
+  user-select: none;
+}
+.trip-replay-camera { position: absolute; inset: 0; will-change: transform; }
+.trip-replay-basemap { display: block; }
+.dark .trip-replay-basemap {
+  /* 高德静态图只有标准浅色样式：暗色模式用 CSS 反色近似夜航底图（路线色不受影响） */
+  filter: invert(93%) hue-rotate(180deg) saturate(.65) contrast(.95);
+}
+.trip-replay-fallback {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 47px, color-mix(in srgb, var(--atlas-line) 55%, transparent) 47px 48px),
+    repeating-linear-gradient(90deg, transparent 0 47px, color-mix(in srgb, var(--atlas-line) 55%, transparent) 47px 48px),
+    linear-gradient(160deg, var(--atlas-paper-soft), color-mix(in srgb, var(--atlas-sky) 7%, var(--atlas-paper)));
+}
+.trip-replay-routes { position: absolute; inset: 0; }
+
+.trip-replay-title {
+  position: absolute;
+  left: 18px;
+  top: 16px;
+  z-index: 6;
+  display: grid;
+  gap: 3px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--atlas-paper) 92%, transparent);
+  border: 1px solid var(--atlas-line);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 6px rgba(31, 28, 23, .12);
+  pointer-events: none;
+}
+.trip-replay-kicker {
+  color: var(--atlas-ink-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.trip-replay-title strong { color: var(--atlas-ink); font-size: 15px; line-height: 1.35; }
+.trip-replay-sub { color: var(--atlas-ink-soft); font-size: 11.5px; }
+.trip-replay-title--outro { left: 50%; top: auto; bottom: 56px; transform: translateX(-50%); text-align: center; }
+
+.trip-replay-badge {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  z-index: 6;
+  padding: 5px 12px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(31, 28, 23, .28);
+  pointer-events: none;
+}
+.trip-replay-note {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 6;
+  padding: 4px 10px;
+  color: var(--atlas-ink-soft);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--atlas-paper) 88%, transparent);
+  border: 1px dashed var(--atlas-line-strong);
+  border-radius: 999px;
+  pointer-events: none;
+}

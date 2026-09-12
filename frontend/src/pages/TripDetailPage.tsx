@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Copy, Check, Download, FileDown, FileText,
   MapPinned, Users, Wallet, ListChecks,
@@ -8,20 +8,21 @@ import { useJourney } from '../app/JourneyProvider'
 import { useToast } from '../app/Toast'
 import SafeMarkdown from '../components/SafeMarkdown'
 import TripTimeline from '../components/TripTimeline'
-import MapView from '../components/MapView'
-import type { MapApi } from '../components/MapView'
 import { EmptyState } from '../components/states'
 import { buildItineraryViewModel, routeLabel } from '../features/journey'
 import { buildRoutedLocations, findLocationKeyByText } from '../features/journey/mapRouting'
-import { getWorkerMeta } from '../features/journey'
+import type { TripReplayApi } from '../features/journey/tripReplay/TripReplayCard'
 import ArriveStay from '../features/journey/ArriveStay'
 import { destinations } from '../content/destinations'
+
+// Remotion 路线动画：整卡懒加载（remotion + @remotion/player 独立 chunk，主页不背）
+const TripReplayCard = lazy(() => import('../features/journey/tripReplay/TripReplayCard'))
 
 export default function TripDetailPage({ sessionId }: { sessionId: string }) {
   const { state, dispatch } = useJourney()
   const { navigate } = useRouter()
   const { notify } = useToast()
-  const mapRef = useRef<MapApi | null>(null)
+  const replayRef = useRef<TripReplayApi | null>(null)
   const session = state.sessions.find(item => item.id === sessionId)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({})
   const [activeDay, setActiveDay] = useState<number | null>(0)
@@ -31,47 +32,47 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
     document.querySelector('.mag-main')?.scrollTo({ top: 0, behavior: 'auto' })
   }, [sessionId])
 
-  const searchMap = useCallback((keyword: string, city: string) => {
-    mapRef.current?.searchAndMark(keyword, city, keyword, getWorkerMeta('itinerary').markerColor)
-  }, [])
-
   const viewModel = useMemo(
     () => buildItineraryViewModel(session?.finalReply ?? '', session?.tripState),
     [session?.finalReply, session?.tripState],
   )
 
-  // 阶段4：地点派生 + 时间轴 → 地图聚焦（未命中回落 POI 搜索）
-  const routedLocations = useMemo(
-    () => buildRoutedLocations(session?.locations ?? [], viewModel.days).routed,
+  // 地点派生（单次全量）：时间轴计数、日按钮文案、路线动画共用同一份
+  const routedPlan = useMemo(
+    () => buildRoutedLocations(session?.locations ?? [], viewModel.days),
     [session?.locations, viewModel.days],
   )
   const visibleDays = useMemo(() => activeDay === null ? viewModel.days : viewModel.days.filter((_, index) => index === activeDay), [activeDay, viewModel.days])
-  const visibleLocations = useMemo(() => activeDay === null ? (session?.locations ?? []) : routedLocations.filter(location => location.day === activeDay), [activeDay, routedLocations, session?.locations])
-  const visibleRouted = useMemo(() => activeDay === null ? routedLocations : routedLocations.filter(location => location.day === activeDay), [activeDay, routedLocations])
-  const focusOrSearchMap = useCallback((itemText: string): boolean => {
+
+  // activeDay 由动画播放头驱动：seekToDay 只改播放位置，帧事件回流这里更新时间轴/今日执行
+  const handleFrameChange = useCallback((_frame: number, day: number | null) => {
+    setActiveDay(day)
+  }, [])
+
+  // 时间轴条目 → 动画定位（静态底图无 POI 搜索兜底，未命中给诚实提示）
+  const focusReplay = useCallback((itemText: string): boolean => {
     const mapSection = document.querySelector('.mag-detail-map')
     const rect = mapSection?.getBoundingClientRect()
     const visible = Boolean(rect && rect.top < window.innerHeight && rect.bottom > 0)
-    const key = findLocationKeyByText(visibleRouted, itemText)
-    const focus = () => {
-      if (key && mapRef.current?.focusLocation(key)) {
-        notify('success', `地图已定位到：${itemText.slice(0, 24)}`)
+    const seek = () => {
+      const key = findLocationKeyByText(routedPlan.routed, itemText)
+      if (!key) {
+        notify('info', '本条目没有匹配到可定位地点')
         return
       }
-      if (mapRef.current) {
-        const combined = itemText.match(/[（(]([^）)]+)[）)]/)?.[1]
-        const searchTerm = combined?.split(/[、,，\-—]/)[0]?.trim() || itemText.replace(/^\s*\d{1,2}:\d{2}\s*/, '').slice(0, 28)
-        searchMap(searchTerm, session?.form.destination ?? '')
-        notify('info', `正在地图中搜索：${searchTerm.slice(0, 24)}`)
-      } else notify('info', '地图仍在加载，请稍后再试')
+      if (replayRef.current?.seekToLocation(key)) {
+        notify('success', `动画已定位到：${itemText.slice(0, 24)}`)
+      } else {
+        notify('info', '路线动画仍在加载，请稍后再试')
+      }
     }
-    if (visible) focus()
+    if (visible) seek()
     else if (mapSection) {
       mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      window.setTimeout(focus, 500)
-    } else focus()
+      window.setTimeout(seek, 500)
+    } else seek()
     return true
-  }, [visibleRouted, session?.form.destination, notify, searchMap])
+  }, [routedPlan.routed, notify])
 
   if (!session) {
     return (
@@ -228,7 +229,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
 
       {viewModel.days.length > 0 ? (
         <>
-          <nav className="trip-day-switcher" aria-label="行程日期"><span>查看行程</span>{viewModel.days.map((day, index) => <button type="button" key={day.day} className={activeDay === index ? 'is-active' : ''} aria-pressed={activeDay === index} onClick={() => setActiveDay(index)}><b>{String(index + 1).padStart(2, '0')}</b><span>第{index + 1}天</span><small>{(() => { const located = buildRoutedLocations(session.locations, viewModel.days).plan.legendDays.find(item => item.day === index + 1)?.count ?? 0; return `${day.items.length} 个行程地点 · ${located} 个可定位` })()}</small></button>)}<button type="button" className={activeDay === null ? 'is-active' : ''} aria-pressed={activeDay === null} onClick={() => setActiveDay(null)}><b>—</b><span>全部</span><small>完整行程</small></button></nav>
+          <nav className="trip-day-switcher" aria-label="行程日期"><span>查看行程</span>{viewModel.days.map((day, index) => <button type="button" key={day.day} className={activeDay === index ? 'is-active' : ''} aria-pressed={activeDay === index} onClick={() => { replayRef.current?.seekToDay(index) }}><b>{String(index + 1).padStart(2, '0')}</b><span>第{index + 1}天</span><small>{(() => { const located = routedPlan.plan.legendDays.find(item => item.day === index + 1)?.count ?? 0; return `${day.items.length} 个行程地点 · ${located} 个可定位` })()}</small></button>)}<button type="button" className={activeDay === null ? 'is-active' : ''} aria-pressed={activeDay === null} onClick={() => { replayRef.current?.seekToDay(null) }}><b>—</b><span>全部</span><small>完整行程</small></button></nav>
 
           <div className="mag-detail-grid">
             <section className="mag-detail-timeline" aria-label="逐日行程">
@@ -239,9 +240,17 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
             <aside className="mag-detail-map" aria-label="路线预览">
               <h2><MapPinned size={15} aria-hidden="true" /> 路线预览</h2>
               <div className="mag-map-frame">
-                {/* days 传完整列表：MapView 内部按“地点名⊂日程条目”重新派生天/顺序，
-                    若传过滤后的 days 会把第 N 天重标成 D1 且颜色错位；locations 才是过滤维度 */}
-                <MapView locations={visibleLocations} days={viewModel.days} onMapReady={apiInstance => { mapRef.current = apiInstance }} />
+                <div role="region" aria-label="路线动画回放">
+                  <Suspense fallback={<div className="map-state" role="status">正在加载路线动画…</div>}>
+                    <TripReplayCard
+                      plan={routedPlan.plan}
+                      title={`${session.form.destination || '目的地'} · ${session.form.days} 天`}
+                      subtitle={`${viewModel.days.length} 天 · ${routedPlan.plan.validCount} 个地点`}
+                      onFrameChange={handleFrameChange}
+                      onReady={api => { replayRef.current = api }}
+                    />
+                  </Suspense>
+                </div>
               </div>
               <p className="mag-map-note">{session.locations.length > 0 ? '坐标来自智能体检索的真实地点。' : '本次执行未返回坐标数据。'}</p>
             </aside>
@@ -249,7 +258,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
         </>
       ) : (
         /* 无结构化日程：不渲染空时间轴和空的日期选择器，只留紧凑提示；
-           地图仍显示全部坐标（未排期 marker）——只有真没有有效坐标才显示空态 */
+           动画天然走「全未排期」合成（intro + 灰点错开弹出 + outro），无需特判 */
         <>
           <section className="mag-detail-timeline" aria-label="逐日行程">
             <h2>每日安排</h2>
@@ -257,7 +266,17 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
             <aside className="mag-detail-map mag-detail-map--solo" aria-label="路线预览">
               <h2><MapPinned size={15} aria-hidden="true" /> 路线预览</h2>
               <div className="mag-map-frame">
-                <MapView locations={session.locations} days={[]} onMapReady={apiInstance => { mapRef.current = apiInstance }} />
+                <div role="region" aria-label="路线动画回放">
+                  <Suspense fallback={<div className="map-state" role="status">正在加载路线动画…</div>}>
+                    <TripReplayCard
+                      plan={routedPlan.plan}
+                      title={`${session.form.destination || '目的地'} · ${session.form.days} 天`}
+                      subtitle={`${routedPlan.plan.validCount} 个地点`}
+                      onFrameChange={handleFrameChange}
+                      onReady={api => { replayRef.current = api }}
+                    />
+                  </Suspense>
+                </div>
               </div>
               <p className="mag-map-note">{session.locations.length > 0 ? '坐标来自智能体检索的真实地点。' : '本次执行未返回坐标数据。'}</p>
             </aside>
@@ -275,7 +294,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
       {visibleDays[0] && (
         <section className="today-execution" aria-labelledby="today-execution-title">
           <div className="today-execution__head"><div><span className="mag-kicker">Today</span><h2 id="today-execution-title">今日执行</h2><p>{session.form.date || '出发日期待定'} · {activeDay === null ? '全部行程' : visibleDays[0].day}</p></div></div>
-          <ol>{visibleDays[0].items.map((item, index) => <li key={`${item.description}-${index}`}><time>{item.time || `${String(index + 1).padStart(2, '0')}`}</time><span>{item.description}</span><button type="button" className="mag-ghost-button" onClick={() => focusOrSearchMap(item.description)}>查看地图</button></li>)}</ol>
+          <ol>{visibleDays[0].items.map((item, index) => <li key={`${item.description}-${index}`}><time>{item.time || `${String(index + 1).padStart(2, '0')}`}</time><span>{item.description}</span><button type="button" className="mag-ghost-button" onClick={() => focusReplay(item.description)}>查看地图</button></li>)}</ol>
         </section>
       )}
 

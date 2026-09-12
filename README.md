@@ -148,6 +148,7 @@ cd ..
 | `JWT_SECRET` | ≥32 位随机串，`python -c "import secrets; print(secrets.token_urlsafe(48))"` | 开发环境自动回退随机临时密钥（重启失效）并告警；生产环境拒绝启动 |
 | `SQLITE_PATH` | 业务库连接串 | 默认 SQLite；置空回退 MySQL 配置 |
 | `MAX_TOOL_ITERATIONS` | Worker ReAct 最大迭代数 | 3 |
+| `AMAP_WEBSERVICE_KEY` | 高德「Web服务」类型 Key | 行程详情页路线动画的静态底图代理（服务端专用）；缺省时动画降级为示意底图 |
 
 前端地图（可选）：在 `frontend/.env.local` 配置 `VITE_AMAP_KEY` / `VITE_AMAP_SECURITY_CODE`（[高德开放平台](https://lbs.amap.com/)免费申请）。**必须在 `npm run build` 之前就位**——Key 在构建期内联进产物。
 
@@ -205,6 +206,8 @@ journalctl -u travel-agent -f        # 看日志
 ```
 
 **高德地图上线检查**：在高德控制台将部署域名（如 `pppyyz12233.top`）加入 Key 的安全域名白名单；本地开发用的 localhost 条目保留即可。
+
+**路线动画底图（可选）**：行程详情页的 Remotion 路线动画默认经 `/api/map/static` 代理拉取高德静态地图。在高德控制台另建一个 **「Web服务」类型** Key（与前端 JS Key 不同类型），写入服务器根目录 `.env` 的 `AMAP_WEBSERVICE_KEY=` 后 `systemctl restart travel-agent` 即生效——该 Key 只在服务端使用，不进前端构建产物，无需重新 `npm run build`。未配置时动画自动降级为示意底图，其余功能不受影响。
 
 ## Worker 与工具
 
