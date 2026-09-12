@@ -139,9 +139,6 @@ class Settings(BaseSettings):
     # Agent
     max_tool_iterations: int = 3
 
-    # 高德静态地图（Web 服务 Key：服务端专用，绝不下发前端/进前端构建产物）
-    amap_webservice_key: str = ""
-
     @property
     def is_production(self) -> bool:
         return self.env.strip().lower() in PRODUCTION_ENV_NAMES

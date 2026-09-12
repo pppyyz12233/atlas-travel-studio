@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter
-from app.routers import auth_router, chat_router, admin_router, map_router, search_router
+from app.routers import auth_router, chat_router, admin_router, search_router
 from app.routers.export_router import router as export_router
 
 router = APIRouter(prefix="/api")
@@ -9,4 +9,3 @@ router.include_router(chat_router.router)
 router.include_router(admin_router.router)
 router.include_router(export_router)
 router.include_router(search_router.router)
-router.include_router(map_router.router)

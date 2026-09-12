@@ -1109,19 +1109,12 @@
 
 .mag-map-frame {
   position: relative;
-  /* 路线动画合成固定 960×600（16:10）：按宽高比给高度，避免窄屏 letterbox 黑边 */
-  aspect-ratio: 960 / 600;
-  height: auto;
-  max-height: 430px;
-  min-height: 240px;
+  height: clamp(340px, 34vw, 390px);
   overflow: hidden;
   background: var(--atlas-paper);
   border: 1px solid var(--atlas-line);
   border-radius: var(--atlas-r-card);
 }
-/* 高度链续传：region 包装层必须把确定高度交给 .map-view-stack（同上注释的循环解析坑） */
-.mag-map-frame > [role="region"] { height: 100%; min-height: 0; }
-.mag-map-frame > [role="region"] > .map-view-stack { height: 100%; }
 .mag-map-note { margin: 10px 2px 0; color: var(--atlas-ink-muted); font-size: 11.5px; }
 .mag-timeline-note--solo { margin: 18px 2px 24px; padding: 14px 16px; background: var(--atlas-paper-soft); border: 1px dashed var(--atlas-line-strong); border-radius: var(--atlas-r-card); }
 .mag-detail-map--solo { margin-top: 8px; }
