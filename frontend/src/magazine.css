@@ -39,9 +39,9 @@
   scrollbar-color: var(--atlas-line-strong) transparent;
 }
 
-/* 规划工作台页面：内部自己管理滚动 */
-.mag-main:has(> .atlas-shell) { overflow: hidden; }
-.mag-main > .atlas-shell { height: 100%; }
+/* 规划工作台页面：内部自己管理滚动（route-view 过渡层介入后选择器跟着下移一层） */
+.mag-main:has(> .route-view > .atlas-shell) { overflow: hidden; }
+.mag-main > .route-view > .atlas-shell { height: 100%; }
 
 .mag-page {
   width: min(1180px, 100%);
@@ -77,10 +77,10 @@
   text-decoration: none;
   cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
-  transition: background var(--atlas-fast), transform var(--atlas-fast), box-shadow var(--atlas-fast);
+  transition: background var(--atlas-fast), transform var(--atlas-dur-2) var(--atlas-ease-snap), box-shadow var(--atlas-dur-2) var(--atlas-ease-snap);
 }
-.mag-cta:hover { background: var(--atlas-cta-deep); }
-.mag-cta:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
+.mag-cta:hover { background: var(--atlas-cta-deep); transform: translateY(-1px); box-shadow: 3px 3px 0 0 var(--atlas-line-strong), 0 10px 26px rgba(31, 28, 23, .14); }
+.mag-cta:active { transform: translateY(1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
 
 .mag-cta.is-ghost {
   color: var(--atlas-ink);
@@ -102,13 +102,16 @@
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-  transition: color var(--atlas-fast), border-color var(--atlas-fast), background var(--atlas-fast);
+  transition: color var(--atlas-fast), border-color var(--atlas-fast), background var(--atlas-fast), transform var(--atlas-dur-2) var(--atlas-ease-snap), box-shadow var(--atlas-dur-2) var(--atlas-ease-snap);
 }
 .mag-ghost-button:hover {
   color: var(--atlas-ink);
   border-color: var(--atlas-ink-muted);
   background: var(--atlas-paper);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(31, 28, 23, .09);
 }
+.mag-ghost-button:active { transform: translateY(0); box-shadow: none; }
 
 .mag-frame button:focus-visible,
 .mag-frame a:focus-visible,
@@ -171,7 +174,7 @@
   font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: color var(--atlas-fast), background var(--atlas-fast);
+  transition: color var(--atlas-dur-2) var(--atlas-ease-snap), background var(--atlas-dur-2) var(--atlas-ease-snap), box-shadow var(--atlas-dur-2) var(--atlas-ease-snap);
 }
 .mag-nav-link:hover { color: var(--atlas-ink); background: var(--atlas-paper-soft); }
 .mag-nav-link.is-active { color: var(--atlas-ink); background: var(--atlas-paper); box-shadow: inset 0 0 0 1px var(--atlas-line-strong); }
@@ -206,10 +209,10 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--atlas-line-strong);
-  transition: background var(--atlas-fast), transform var(--atlas-fast), box-shadow var(--atlas-fast);
+  transition: background var(--atlas-fast), transform var(--atlas-dur-2) var(--atlas-ease-snap), box-shadow var(--atlas-dur-2) var(--atlas-ease-snap);
 }
-.mag-login-action:hover { background: var(--atlas-cta-deep); }
-.mag-login-action:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
+.mag-login-action:hover { background: var(--atlas-cta-deep); transform: translateY(-1px); box-shadow: 3px 3px 0 0 var(--atlas-line-strong), 0 10px 26px rgba(31, 28, 23, .14); }
+.mag-login-action:active { transform: translateY(1px); box-shadow: 1px 1px 0 0 var(--atlas-line-strong); }
 
 .mag-user-chip {
   display: inline-flex;
@@ -578,9 +581,9 @@
   border: 1px solid var(--atlas-line);
   border-radius: var(--atlas-r-card);
   box-shadow: var(--atlas-shadow-sm);
-  transition: transform var(--atlas-normal) var(--atlas-ease), box-shadow var(--atlas-normal) var(--atlas-ease);
+  transition: transform var(--atlas-dur-2) var(--atlas-ease-soft), box-shadow var(--atlas-dur-2) var(--atlas-ease-soft);
 }
-.mag-destination-card:hover { transform: translateY(-2px); box-shadow: var(--atlas-shadow-md); }
+.mag-destination-card:hover { transform: translateY(-3px); box-shadow: 2px 2px 0 0 var(--atlas-line-strong), var(--atlas-shadow-lift); }
 
 .mag-destination-cover {
   position: relative;
@@ -609,7 +612,8 @@
 .mag-quote-card small { opacity: .8; }
 .mag-destination-cover .mag-cover-art { object-fit: cover; }
 .mag-destination-detail .mag-detail-head > img { display: block; width: 100%; max-height: 360px; aspect-ratio: 16 / 7; object-fit: cover; margin-bottom: 24px; border-radius: var(--atlas-r-card); }
-.mag-destination-card:hover .mag-cover-art { transform: scale(1.025); }
+.mag-destination-card .mag-cover-art { transition: transform var(--atlas-dur-3) var(--atlas-ease-soft); }
+.mag-destination-card:hover .mag-cover-art { transform: scale(1.04); }
 
 .mag-destination-region {
   position: absolute;
@@ -806,9 +810,9 @@
   border: 1px solid var(--atlas-line);
   border-radius: var(--atlas-r-card);
   box-shadow: var(--atlas-shadow-sm);
-  transition: transform var(--atlas-normal) var(--atlas-ease), box-shadow var(--atlas-normal) var(--atlas-ease);
+  transition: transform var(--atlas-dur-2) var(--atlas-ease-soft), box-shadow var(--atlas-dur-2) var(--atlas-ease-soft);
 }
-.mag-trip-card:hover { transform: translateY(-2px); box-shadow: var(--atlas-shadow-md); }
+.mag-trip-card:hover { transform: translateY(-3px); box-shadow: 2px 2px 0 0 var(--atlas-line-strong), var(--atlas-shadow-lift); }
 
 .mag-trip-main {
   display: grid;
@@ -1290,9 +1294,9 @@
   background: var(--atlas-paper);
   border: 1px solid var(--atlas-line-strong);
   border-radius: var(--atlas-r-card);
-  box-shadow: var(--atlas-shadow-md);
+  box-shadow: 2px 2px 0 0 var(--atlas-line-strong), var(--atlas-shadow-lift);
   font-size: 13px;
-  animation: mag-toast-in .3s var(--atlas-ease) both;
+  animation: mag-toast-in var(--atlas-dur-2) var(--atlas-ease-snap) both;
 }
 .mag-toast.is-success svg { color: var(--atlas-route); }
 .mag-toast.is-error svg { color: var(--atlas-alert); }
@@ -1319,7 +1323,7 @@
 }
 
 @keyframes mag-toast-in {
-  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .destination-detail-facts { display: flex; flex-wrap: wrap; gap: 24px; margin: 22px 0 0; }

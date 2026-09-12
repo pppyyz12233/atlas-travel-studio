@@ -18,20 +18,28 @@ function Routes({ auth, theme }: {
   theme: ReturnType<typeof useTheme>
 }) {
   const { route } = useRouter()
-  switch (route.name) {
-    case 'plan':
-      return <AIPage auth={auth} theme={theme} />
-    case 'explore':
-      return <ExplorePage />
-    case 'destination':
-      return route.sessionId ? <DestinationDetailPage destinationId={route.sessionId} /> : <ExplorePage />
-    case 'trips':
-      return <TripsPage auth={auth} />
-    case 'trip':
-      return route.sessionId ? <TripDetailPage sessionId={route.sessionId} /> : <HomePage />
-    default:
-      return <HomePage />
-  }
+  const view = (() => {
+    switch (route.name) {
+      case 'plan':
+        return <AIPage auth={auth} theme={theme} />
+      case 'explore':
+        return <ExplorePage />
+      case 'destination':
+        return route.sessionId ? <DestinationDetailPage destinationId={route.sessionId} /> : <ExplorePage />
+      case 'trips':
+        return <TripsPage auth={auth} />
+      case 'trip':
+        return route.sessionId ? <TripDetailPage sessionId={route.sessionId} /> : <HomePage />
+      default:
+        return <HomePage />
+    }
+  })()
+  // 页面过渡：路由键变化重挂载触发 .route-view 的进场动画（reduced-motion 由全局规则接管）
+  return (
+    <div className="route-view" key={`${route.name}:${route.sessionId ?? ''}`}>
+      {view}
+    </div>
+  )
 }
 
 export default function App() {

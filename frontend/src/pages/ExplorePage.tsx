@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Reveal from '../components/Reveal'
 import { MapPin, Search } from 'lucide-react'
 import { useRouter } from '../app/router'
 import { useJourney } from '../app/JourneyProvider'
@@ -98,15 +99,15 @@ export default function ExplorePage() {
         />
       ) : (
         <div className="mag-destination-grid">
-          {filtered.map(destination => (
-              <div key={destination.id} className="mag-destination-cell">
+          {filtered.map((destination, index) => (
+              <Reveal key={destination.id} className="mag-destination-cell" delay={Math.min(index * 60, 360)}>
               <DestinationCard
                 destination={destination}
                 favorited={isFavorite(destination.id)}
                 onToggleFavorite={toggle}
                 onPlan={planDestination}
               />
-            </div>
+            </Reveal>
           ))}
         </div>
       )}

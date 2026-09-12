@@ -2472,3 +2472,7 @@ button.atlas-save-badge.is-local:hover { color: var(--atlas-sky); border-color: 
 }
 .atlas-map-frame--flight { display: grid; place-items: center; min-height: 160px; }
 .atlas-flight-task-note { margin: 0; padding: 18px 16px; color: var(--atlas-ink-muted); font-size: 12.5px; text-align: center; line-height: 1.8; }
+/* ---------- 高级感：流式消息进场（新消息插入即播放，React 复用的旧消息不重播） ---------- */
+.atlas-conversation-message {
+  animation: atlas-item-in var(--atlas-dur-2) var(--atlas-ease-soft) both;
+}

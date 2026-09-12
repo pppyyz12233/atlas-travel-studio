@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Reveal from '../components/Reveal'
 import { ChevronDown, Cloud, Heart, LogIn, MapPin, Search } from 'lucide-react'
 import { Link, useRouter } from '../app/router'
 import { useJourney } from '../app/JourneyProvider'
@@ -198,19 +199,19 @@ export default function TripsPage({ auth }: { auth: ReturnType<typeof useAuth> }
           <EmptyState title="云端还没有行程" description="完成一次规划并登录，行程会自动保存到这里。" />
         ) : (
           <div className="mag-trip-grid">
-            {cloudTrips.map(trip => {
+            {cloudTrips.map((trip, tripIndex) => {
               const conversation = cloud.status === 'ready'
                 ? cloud.conversations.find(item => item.id === Number(trip.id.replace('cloud-', '')))
                 : undefined
               return (
-                <div key={trip.id} className="mag-trip-cell">
+                <Reveal key={trip.id} className="mag-trip-cell" delay={Math.min(tripIndex * 60, 360)}>
                   <TripCard
                     trip={trip}
                     onOpen={() => conversation && void openCloudConversation(conversation)}
                     onRemove={conversation ? () => void removeCloudConversation(conversation.id, trip.title) : undefined}
                   />
                   {loadingHistory === conversation?.id && <LoadingState label="正在读取历史" />}
-                </div>
+                </Reveal>
               )
             })}
           </div>

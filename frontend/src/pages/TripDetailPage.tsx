@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Reveal from '../components/Reveal'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Copy, Check, Download, FileDown, FileText,
   MapPinned, Users, Wallet, ListChecks,
@@ -205,7 +206,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
       })()}
 
       {viewModel.budgetItems.length > 0 && (
-        <section className="mag-detail-budget" aria-label="预算结构">
+        <Reveal as="section" className="mag-detail-budget" aria-label="预算结构">
           <h2>预算结构</h2>
           <div className="mag-budget-rows">
             {viewModel.budgetItems.map(item => {
@@ -223,14 +224,14 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
               <small>（金额均来自后端真实返回，预订前请复核）</small>
             </p>
           </div>
-        </section>
+        </Reveal>
       )}
 
       {viewModel.days.length > 0 ? (
         <>
           <nav className="trip-day-switcher" aria-label="行程日期"><span>查看行程</span>{viewModel.days.map((day, index) => <button type="button" key={day.day} className={activeDay === index ? 'is-active' : ''} aria-pressed={activeDay === index} onClick={() => setActiveDay(index)}><b>{String(index + 1).padStart(2, '0')}</b><span>第{index + 1}天</span><small>{(() => { const located = buildRoutedLocations(session.locations, viewModel.days).plan.legendDays.find(item => item.day === index + 1)?.count ?? 0; return `${day.items.length} 个行程地点 · ${located} 个可定位` })()}</small></button>)}<button type="button" className={activeDay === null ? 'is-active' : ''} aria-pressed={activeDay === null} onClick={() => setActiveDay(null)}><b>—</b><span>全部</span><small>完整行程</small></button></nav>
 
-          <div className="mag-detail-grid">
+          <Reveal className="mag-detail-grid">
             <section className="mag-detail-timeline" aria-label="逐日行程">
               <h2>每日安排</h2>
               <TripTimeline days={visibleDays} city={session.form.destination} />
@@ -245,7 +246,7 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
               </div>
               <p className="mag-map-note">{session.locations.length > 0 ? '坐标来自智能体检索的真实地点。' : '本次执行未返回坐标数据。'}</p>
             </aside>
-          </div>
+          </Reveal>
         </>
       ) : (
         /* 无结构化日程：不渲染空时间轴和空的日期选择器，只留紧凑提示；
@@ -273,24 +274,24 @@ export default function TripDetailPage({ sessionId }: { sessionId: string }) {
       />
 
       {visibleDays[0] && (
-        <section className="today-execution" aria-labelledby="today-execution-title">
+        <Reveal as="section" className="today-execution" aria-labelledby="today-execution-title">
           <div className="today-execution__head"><div><span className="mag-kicker">Today</span><h2 id="today-execution-title">今日执行</h2><p>{session.form.date || '出发日期待定'} · {activeDay === null ? '全部行程' : visibleDays[0].day}</p></div></div>
           <ol>{visibleDays[0].items.map((item, index) => <li key={`${item.description}-${index}`}><time>{item.time || `${String(index + 1).padStart(2, '0')}`}</time><span>{item.description}</span><button type="button" className="mag-ghost-button" onClick={() => focusOrSearchMap(item.description)}>查看地图</button></li>)}</ol>
-        </section>
+        </Reveal>
       )}
 
-      <section className="trip-checklist" aria-labelledby="trip-checklist-title">
+      <Reveal as="section" className="trip-checklist" aria-labelledby="trip-checklist-title">
         <h2 id="trip-checklist-title"><ListChecks size={16} aria-hidden="true" /> 出行清单</h2>
         <div className="trip-checklist__items">{['证件与必要预约已确认', '交通和住宿地址已保存', '天气与随身衣物已检查', '充电器、药品等随身物品已准备'].map(item => <label key={item}><input type="checkbox" checked={Boolean(checklist[item])} onChange={event => setChecklist(current => ({ ...current, [item]: event.target.checked }))} /><span>{item}</span></label>)}</div>
-      </section>
+      </Reveal>
 
-      <section className="mag-detail-document" aria-label="方案全文">
+      <Reveal as="section" className="mag-detail-document" aria-label="方案全文">
         <h2><FileText size={15} aria-hidden="true" /> 方案全文</h2>
         <article className="mag-document-paper">
           <SafeMarkdown content={viewModel.markdown} />
         </article>
         <p className="mag-detail-hint"><Check size={13} aria-hidden="true" /> 以上内容由 Atlas 智能体生成并原样保留，可随时在规划页继续追问修改。</p>
-      </section>
+      </Reveal>
     </div>
   )
 }

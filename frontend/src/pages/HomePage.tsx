@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Reveal from '../components/Reveal'
 import { ArrowRight, Compass, MapPin, Navigation, SendHorizontal } from 'lucide-react'
 import { Link, useRouter } from '../app/router'
 import { useJourney } from '../app/JourneyProvider'
@@ -80,7 +81,7 @@ export default function HomePage() {
   return (
     <div className="mag-page mag-home">
       <section className="mag-hero">
-        <div className="mag-hero-copy">
+        <Reveal className="mag-hero-copy">
           <span className="mag-kicker"><Compass size={14} aria-hidden="true" /> Atlas 智能旅行工作室</span>
           <h1>让下一段旅程，<br />从一个想法开始。</h1>
           <p>说说你想去哪、和谁同行、预算多少 —— 五位旅行智能体并行检索航班、住宿、景点与汇率，为你编排一份可以继续对话修改的行程。</p>
@@ -108,17 +109,17 @@ export default function HomePage() {
           <Link to="/explore" className="mag-hero-explore-link mag-hero-explore-cta">
             <MapPin size={13} aria-hidden="true" /> 还没想好？浏览编辑部精选目的地
           </Link>
-        </div>
-        <figure className="mag-hero-visual">
+        </Reveal>
+        <Reveal as="div" className="mag-hero-visual" delay={120}>
           <span className="mag-hero-arc mag-hero-arc-a" />
           <span className="mag-hero-arc mag-hero-arc-b" />
           <span className="mag-hero-coordinate">35.68°N — 139.69°E</span>
           <TravelQuotePanel />
-        </figure>
+        </Reveal>
       </section>
 
       {recentTrips.length > 0 && (
-        <section className="mag-section" aria-labelledby="mag-recent">
+        <Reveal as="section" className="mag-section" aria-labelledby="mag-recent">
           <header className="mag-section-head">
             <h2 id="mag-recent">最近行程</h2>
             <Link to="/trips" className="mag-section-more">查看全部 <ArrowRight size={13} aria-hidden="true" /></Link>
@@ -135,10 +136,10 @@ export default function HomePage() {
               />
             ))}
           </div>
-        </section>
+        </Reveal>
       )}
 
-      <section className="mag-section" aria-labelledby="mag-featured">
+      <Reveal as="section" className="mag-section" aria-labelledby="mag-featured">
         <header className="mag-section-head">
           <h2 id="mag-featured"><Navigation size={15} aria-hidden="true" /> 编辑部精选</h2>
           <Link to="/explore" className="mag-section-more">全部目的地 <ArrowRight size={13} aria-hidden="true" /></Link>
@@ -151,7 +152,7 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </Reveal>
     </div>
   )
 }
