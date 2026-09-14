@@ -139,6 +139,12 @@ class Settings(BaseSettings):
     # Agent
     max_tool_iterations: int = 3
 
+    # 聊天配额与并发（进程内存版：重启清零、跨天自动重置；<=0 表示该层不限制）
+    chat_daily_global_limit: int = 300   # 全站每日聊天管线总数（账单熔断线）
+    chat_daily_guest_limit: int = 5      # 游客每日次数
+    chat_daily_user_limit: int = 30      # 登录用户每日次数
+    chat_max_concurrency: int = 5        # 同时在跑的管线数
+
     @property
     def is_production(self) -> bool:
         return self.env.strip().lower() in PRODUCTION_ENV_NAMES

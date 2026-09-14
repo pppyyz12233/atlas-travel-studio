@@ -229,6 +229,7 @@ journalctl -u travel-agent -f        # 看日志
 |----|------|
 | 认证 | JWT（HS256，24h）+ bcrypt；token 带 `jti`，`POST /auth/logout` 登出吊销（内存黑名单，过期自动清理） |
 | 限流 | 登录 5 次/分钟（IP+账号维度）；聊天 20 次/分钟；滑动窗口 + 过期键清理；不信任可伪造的 `X-Forwarded-For` |
+| 配额 | 聊天管线三层防线（`app/utils/quota.py`，进入 LLM 前生效，guard 拦下的请求不计数）：全站每日总数熔断（默认 300，账单保护线）+ 身份日配额（游客 5 次/天，登录用户 30 次/天）+ 并发闸门（同时在跑管线 ≤5，满即 429 不排队）。限值可经环境变量 `CHAT_DAILY_GLOBAL_LIMIT` / `CHAT_DAILY_GUEST_LIMIT` / `CHAT_DAILY_USER_LIMIT` / `CHAT_MAX_CONCURRENCY` 调整，`<=0` 关闭该层；计数为进程内存态，跨天自动重置 |
 | 护栏 | `app/agents/workflow/guard.py` 正则门卫（词边界匹配防误伤，交易/越狱/违规拦截） |
 | 上传 | 分块读取边读边限（50MB）、扩展名白名单、文件名 UUID 防覆盖、防路径穿越 |
 | 导出 | WeasyPrint 禁止加载外部资源（隔离 LLM 输出中的外链 SSRF 面）；渲染移入线程池不阻塞事件循环 |
@@ -335,7 +336,7 @@ atlas-travel-studio/
 
 ## 已知限制
 
-- 限流器与 JWT 黑名单为**进程内存态**：多进程部署或重启后失效，生产应换 Redis
+- 限流器、配额计数与 JWT 黑名单为**进程内存态**：多进程部署或重启后失效（配额重启清零、跨天自动重置），生产应换 Redis
 - 航班/酒店为模拟数据（天气/汇率为真实 API）；接入真实供应商只需替换 `app/mcp/servers/`
 - Guard 为轻量正则第一道防线，深度防护依赖 Worker system prompt
 - SQLite 单实例（单写者），高并发场景切 MySQL（`SQLITE_PATH` 置空即用 `DB_URL`）

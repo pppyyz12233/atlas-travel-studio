@@ -26,6 +26,7 @@ from app.agents.supervisor import (
 from app.agents.state import AgentState
 from app.crud import conversation, message
 from app.utils.rate_limiter import RateLimiter
+from app.utils.quota import ChatBusyError, QuotaExceeded, daily_quota, gate
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,14 @@ async def chat(
             "final_answer": "", "guard_blocked": False, "guard_reason": "",
             "intent": "full_trip", "active_workers": [], "trip_state": {},
         }
-        result = await build_graph().ainvoke(state)
+        # 配额 + 并发闸门（guard 通过后才计数；闸门在前——被拒不扣次数）
+        try:
+            with gate.slot():
+                await daily_quota.consume(None, f"ip:{_client_key(request)}")
+                result = await build_graph().ainvoke(state)
+        except (QuotaExceeded, ChatBusyError) as e:
+            logger.warning("[chat] 拒绝 ip=%s: %s", _client_key(request), e)
+            raise HTTPException(status_code=429, detail=str(e))
         return {
             "code": 200, "message": "",
             "data": {"conversation_id": None, "reply": result["final_answer"]},
@@ -125,10 +133,17 @@ async def chat(
         }
     }
 
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": req.message}]},
-        config,
-    )
+    # 配额 + 并发闸门（同游客路径：闸门在前，配额超限时不占用槽位也不扣次数）
+    try:
+        with gate.slot():
+            await daily_quota.consume(f"user:{user.id}", None)
+            result = await agent.ainvoke(
+                {"messages": [{"role": "user", "content": req.message}]},
+                config,
+            )
+    except (QuotaExceeded, ChatBusyError) as e:
+        logger.warning("[chat] 拒绝 user=%s: %s", user.id, e)
+        raise HTTPException(status_code=429, detail=str(e))
 
     # 保存消息到业务表（供前端 history 接口查询）
     await message.add_message(db, conv_id, "user", req.message)
@@ -174,6 +189,27 @@ async def chat_stream(
             yield f"data: {json.dumps({'event': 'guard', 'blocked': True, 'reason': reason}, ensure_ascii=False)}\n\n"
             return
         yield _gs("guard", "done")
+
+        # 1.5 配额 + 并发闸门：guard 通过后、进图之前计数（被拦截的消息不消耗次数）；
+        #     闸门在前——并发拒绝不扣配额。拒绝以 SSE error 事件返回（前端已有可重试恢复态）。
+        if user is not None:
+            _quota_user, _quota_guest = f"user:{user.id}", None
+        elif guest_session is not None:
+            _quota_user, _quota_guest = None, f"guest:{guest_session.guest_id}"
+        else:
+            _quota_user, _quota_guest = None, f"ip:{_client_key(request)}"
+        try:
+            with gate.slot():
+                await daily_quota.consume(_quota_user, _quota_guest)
+                async for chunk in _pipeline():
+                    yield chunk
+        except (QuotaExceeded, ChatBusyError) as e:
+            logger.warning("[SSE] 拒绝 %s: %s", _quota_user or _quota_guest, e)
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    async def _pipeline():
+        """第 2~9 步：身份解析 → 图执行 → 落库/存档（由 _run 驱动，准入已在上层完成）。"""
+        msg = req.message
 
         # 2. 解析用户身份（登录用户先创建/校验会话，让 thread_id 与会话一一对应，
         #    避免所有新对话挤在 conv_0 线程里互相污染上下文）
